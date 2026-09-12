@@ -76,8 +76,10 @@ don’t run it.
 
 `electron-builder` is a **local** devDependency. Scripts produce unsigned
 Linux / Windows / macOS artifacts under `dist-electron/` (gitignored).
-`private: true` so `npm publish` is refused; no public Docker, no
-auto-update feed, no Apple Developer ID, no Microsoft Authenticode.
+`private: true` so `npm publish` is refused. electron-builder does not
+create GitHub Releases (`--publish never`); Package uses `gh` for a
+**draft** only, same as Sparrow. No public Docker, no auto-update feed,
+no Apple Developer ID, no Microsoft Authenticode.
 
 ```bash
 npm run dist:linux

@@ -20,10 +20,10 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false && npm run test:miner",
     "test:miner": "vitest run --config vitest.miner.config.ts",
-    "dist": "npm run build:app && electron-builder --linux --win",
-    "dist:linux": "npm run build:app && electron-builder --linux",
-    "dist:win": "npm run build:app && electron-builder --win",
-    "dist:mac": "npm run build:app && electron-builder --mac"
+    "dist": "npm run build:app && electron-builder --linux --win --publish never",
+    "dist:linux": "npm run build:app && electron-builder --linux --publish never",
+    "dist:win": "npm run build:app && electron-builder --win --publish never",
+    "dist:mac": "npm run build:app && electron-builder --mac --publish never"
   },
   "dependencies": {
     "@angular/common": "^22.1.0",
