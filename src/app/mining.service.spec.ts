@@ -25,6 +25,7 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
     stop: vi.fn(async () => {
       statsCb?.({ ...IDLE_STATS });
     }),
+    gpus: vi.fn().mockResolvedValue({ devices: [], addon: false }),
     pickDatadir: vi.fn().mockResolvedValue(null),
     logHistory: vi.fn().mockResolvedValue([]),
     info: vi.fn().mockResolvedValue(electronInfo),

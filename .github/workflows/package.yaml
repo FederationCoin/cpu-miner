@@ -87,7 +87,23 @@ jobs:
           node-version: '26'
           cache: npm
       - run: node -v && npm -v
+      - name: Native toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y g++ make python3 python3-setuptools
+      - name: Native toolchain (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python --version
+          npm config set msvs_version 2022
       - run: npm ci
+      - name: Native GPU hasher (Electron ABI)
+        env:
+          FC_GPU_REQUIRED: '1'
+        run: npm run build:gpu
+      - name: Require gpu-hasher.node
+        shell: bash
+        run: test -s native/gpu-hasher/dist/gpu-hasher.node
       # Do not give this job GH_TOKEN (Sparrow does not either). electron-builder
       # v26 still implicit-publishes on GITHUB_ACTIONS and would upload a Release
       # if a token were present. --publish never: pack only. Draft is the gh job.

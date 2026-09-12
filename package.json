@@ -13,17 +13,20 @@
   "packageManager": "npm@11.19.1",
   "scripts": {
     "ng": "ng",
-    "start": "npm run build:app && electron .",
+    "start": "npm run build:app && node native/gpu-hasher/rebuild.mjs && electron .",
     "build": "npm run build:app",
     "build:app": "ng build --configuration development && npm run build:electron",
     "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\"",
+    "build:gpu": "node native/gpu-hasher/rebuild.mjs",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test --watch=false && npm run test:miner",
+    "test": "ng test --watch=false && npm run test:miner && npm run test:gpu",
     "test:miner": "vitest run --config vitest.miner.config.ts",
-    "dist": "npm run build:app && electron-builder --linux --win --publish never",
-    "dist:linux": "npm run build:app && electron-builder --linux --publish never",
-    "dist:win": "npm run build:app && electron-builder --win --publish never",
-    "dist:mac": "npm run build:app && electron-builder --mac --publish never"
+    "test:gpu": "make -C native/gpu-hasher test",
+    "dist": "npm run build:app && npm run build:gpu && electron-builder --linux --win --publish never",
+    "dist:linux": "npm run build:app && npm run build:gpu && electron-builder --linux --publish never",
+    "dist:win": "npm run build:app && npm run build:gpu && electron-builder --win --publish never",
+    "pack:win": "npm run build:app && node scripts/pack-win.mjs",
+    "dist:mac": "npm run build:app && npm run build:gpu && electron-builder --mac --publish never"
   },
   "dependencies": {
     "@angular/common": "^22.1.0",
@@ -44,6 +47,7 @@
     "electron": "^44.3.0",
     "electron-builder": "^26.8.1",
     "jsdom": "^28.0.0",
+    "node-addon-api": "^8.5.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
     "vitest": "^4.0.8"
@@ -60,6 +64,13 @@
     "forceCodeSigning": false,
     "npmRebuild": false,
     "publish": [],
+    "extraResources": [
+      {
+        "from": "native/gpu-hasher/dist/",
+        "to": "gpu-hasher",
+        "filter": ["**/*"]
+      }
+    ],
     "files": [
       "out-electron/**/*",
       "dist/renderer/**/*",

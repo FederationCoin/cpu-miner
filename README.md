@@ -24,6 +24,16 @@ announcement. Threads stay in both modes. PoW is TypeScript
 [`testdata/block_header_v2.json`](testdata/block_header_v2.json). Tests do not
 live-grind nonces.
 
+GPU hashing is **additive** and in-process. CPU `worker_threads` do not
+change. A Node-API addon (`gpu-hasher.node`: DLL / `.so` / dylib) loads in
+the Electron **main** process. Tick GPUs in the pane (all off by default,
+including Intel iGPU). Combined hashrate is the existing stats line. You
+do **not** run a second app or `fcminer`. You do **not** install the CUDA
+Toolkit. Install NVIDIA / AMD / Intel **GPU drivers** (OpenCL ICD) if you
+want devices listed. No driver: empty GPU list, CPU still mines. A GPU
+driver fault can take down the whole app. ccminer “blake2b” hashes the
+wrong construction.
+
 C++ [`cpu-miner-cpp/`](../cpu-miner-cpp/) (`fcminer` + TCP `stratum-proxy`) is
 the fast CLI in the parent workspace. This app does **not** wrap those
 binaries.
@@ -87,6 +97,11 @@ npm run dist:win
 npm run dist:mac
 ```
 
+`npm run pack:win` is a WSL helper that unpacks Electron’s win32 zip without
+Wine. It does **not** compile a Windows `gpu-hasher.node` (that is PE /
+MSVC). GPU Windows / Linux / macOS zips come from Package, which runs
+`FC_GPU_REQUIRED=1 npm run build:gpu` on each OS runner.
+
 CI Package (Actions → Package, human tag, draft Release) is the ship path.
 Tags match `package.json` version:
 
@@ -115,7 +130,11 @@ npm test
 npm start
 ```
 
-`npm start` builds the renderer + `out-electron/` then launches Electron.
+`npm start` builds the renderer + `out-electron/` then the GPU addon
+(Electron 44 ABI) then launches Electron. If the addon fails to compile,
+Start still works on CPU.
+
+Developer GPU hasher: [`native/gpu-hasher/README.md`](native/gpu-hasher/README.md).
 
 ## Rejected: in-browser + Stratum WebSocket sidecar
 

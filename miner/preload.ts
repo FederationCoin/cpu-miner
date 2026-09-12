@@ -26,10 +26,25 @@ export type MinerInfo = {
   defaultThreads: number;
 };
 
+export type GpuDevice = {
+  id: string;
+  name: string;
+  vendor: string;
+  memoryMiB: number;
+  backend: 'opencl';
+  kind: 'discrete' | 'integrated';
+};
+
+export type GpuScan = {
+  devices: GpuDevice[];
+  addon: boolean;
+};
+
 export type MinerStartOpts = {
   chain: MinerChain;
   mode: MinerMode;
   threads: number;
+  gpuIds?: string[];
   host?: string;
   port?: number;
   payout?: string;
@@ -50,6 +65,7 @@ contextBridge.exposeInMainWorld('miner', {
   start: (opts: MinerStartOpts) => ipcRenderer.invoke('miner:start', opts),
   stop: () => ipcRenderer.invoke('miner:stop'),
   info: () => ipcRenderer.invoke('miner:info') as Promise<MinerInfo>,
+  gpus: () => ipcRenderer.invoke('miner:gpus') as Promise<GpuScan>,
   pickDatadir: () => ipcRenderer.invoke('miner:pickDatadir') as Promise<string | null>,
   logHistory: () => ipcRenderer.invoke('miner:logHistory') as Promise<LogLine[]>,
   onStats: (cb: (s: MinerStats) => void) => listen('miner:stats', cb),

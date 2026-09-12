@@ -14,6 +14,11 @@ pnpm-debug.log*
 # Electron main (tsc)
 /out-electron
 
+/native/gpu-hasher/build/
+/native/gpu-hasher/dist/
+/native/gpu-hasher/test-cpu-hash
+/native/gpu-hasher/*.obj
+
 # electron-builder
 /dist-electron
 *.AppImage

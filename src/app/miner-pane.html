@@ -145,6 +145,34 @@
     />
   </label>
 
+  <fieldset class="gpus" [attr.id]="id('gpus')">
+    <legend>GPUs</legend>
+    <button
+      type="button"
+      [id]="id('detectGpus')"
+      [disabled]="gpuDetectDisabled()"
+      (click)="detectGpus()"
+    >
+      {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
+    </button>
+    @if (gpuList().length > 0) {
+      @for (dev of gpuList(); track dev.id) {
+        <label class="check" [attr.for]="id('gpu-' + dev.id)">
+          <input
+            [id]="id('gpu-' + dev.id)"
+            type="checkbox"
+            [checked]="gpuSelected(dev.id)"
+            [disabled]="modeLocked()"
+            (change)="toggleGpu(dev.id, $any($event.target).checked)"
+          />
+          {{ dev.name }}
+          <span class="hint-inline">{{ dev.vendor }} · {{ dev.memoryMiB }} MiB · {{ dev.kind }}</span>
+        </label>
+      }
+    }
+    <p class="hint">{{ gpuHint() }}</p>
+  </fieldset>
+
   <div class="row">
     <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">
       Start

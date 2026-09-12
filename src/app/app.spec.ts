@@ -52,6 +52,7 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
     stop: vi.fn(async () => {
       statsCb?.({ ...IDLE_STATS });
     }),
+    gpus: vi.fn().mockResolvedValue({ devices: [], addon: false }),
     pickDatadir: vi.fn().mockResolvedValue(null),
     logHistory: vi.fn().mockResolvedValue([]),
     info: vi.fn().mockResolvedValue(electronInfo),
@@ -212,11 +213,28 @@ describe('App', () => {
         chain: 'testnet',
         mode: 'stratum',
         threads: 4,
+        gpuIds: [],
         host: '127.0.0.1',
         port: 23334,
         worker: 'tfcn1abc.cpu',
         password: 'x',
       });
+    });
+
+    it('shows a GPUs fieldset', async () => {
+      const f = await render(stubMiner());
+      expect(has(f, '#main-gpus')).toBe(true);
+      expect(queryEl(f, '#main-gpus').textContent).toMatch(/OpenCL/);
+    });
+
+    it('Detect GPUs reports when the hasher addon is missing', async () => {
+      const gpus = vi.fn().mockResolvedValue({ devices: [], addon: false });
+      const f = await render(stubMiner({ gpus }));
+      queryDe(f, '#main-detectGpus').triggerEventHandler('click');
+      await f.whenStable();
+      f.detectChanges();
+      expect(gpus).toHaveBeenCalled();
+      expect(queryEl(f, '#main-gpus').textContent).toMatch(/No GPU hasher/);
     });
 
     it('Start in Main RPC sends fcn payout and dummy RPC port', async () => {
@@ -229,6 +247,7 @@ describe('App', () => {
         chain: 'main',
         mode: 'rpc',
         threads: 4,
+        gpuIds: [],
         host: '127.0.0.1',
         port: 4094,
         payout: 'fcn1qqq',

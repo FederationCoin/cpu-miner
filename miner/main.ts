@@ -23,6 +23,7 @@ import {
   RPC_PORT,
   type RpcAuth,
 } from './rpc.js';
+import { gpuExtraNonce2, listGpus, scanGpus, startGpuGrind, stopGpu } from './gpu.js';
 import { StratumClient } from './stratum.js';
 import type { MinerInfo, MinerMode, MinerStartOpts, MinerStats } from './preload.js';
 import type { WorkerInit, WorkerMsg } from './worker.js';
@@ -60,6 +61,7 @@ let activeCookieFile = '';
 let cookieAuth: RpcAuth | null = null;
 let cookieSecret = '';
 let stratumSecret = '';
+let activeGpuIds: string[] = [];
 
 function stats(): MinerStats {
   return {
@@ -103,6 +105,7 @@ function emitLog(mode: string, message: string, toast = false): LogLine {
 }
 
 function killWorkers(): void {
+  stopGpu();
   for (const w of workers) {
     w.terminate();
   }
@@ -209,6 +212,61 @@ function spawnWorkers(spec: GrindSpec, threads: number): void {
   }
 }
 
+function spawnGpu(spec: GrindSpec, target: Uint8Array): void {
+  const ids = activeGpuIds.filter((id) => id.trim());
+  if (ids.length === 0) {
+    return;
+  }
+  const known = new Set(listGpus().map((d) => d.id));
+  const myGen = gen;
+  for (let g = 0; g < ids.length; g++) {
+    const id = ids[g]!;
+    if (!known.has(id)) {
+      emitLog(activeMode, `gpu: skipped missing device ${id}`);
+      continue;
+    }
+    const extraNonce2 = gpuExtraNonce2(g);
+    const extraNonce12 = concat(spec.extraNonce1, extraNonce2);
+    const root = datumWorkRoot(spec.coinb1, extraNonce12);
+    const nonce8 = new Uint8Array(8);
+    const work = datumWorkHeader(spec.prevHidden, nonce8, spec.ntime8, root);
+    const started = startGpuGrind({
+      deviceId: id,
+      work,
+      target,
+      xorKey: spec.xorKey,
+      xorClear: spec.xorClear,
+      extraNonce2,
+      gen: myGen,
+      onProgress: (n) => {
+        if (myGen === gen) {
+          noteHashes(n);
+        }
+      },
+      onFound: (msg) => {
+        if (msg && myGen === gen) {
+          spec.onFound(
+            {
+              type: 'found',
+              nonce: msg.nonce,
+              nonce2: msg.nonce2,
+              ntime8: spec.ntime8,
+              extraNonce2,
+              hashes: msg.hashes,
+              gen: myGen,
+            },
+            extraNonce12,
+          );
+        }
+      },
+      onLog: (message) => emitLog(activeMode, message, true),
+    });
+    if (started) {
+      emitLog(activeMode, `gpu: hashing on ${id}`);
+    }
+  }
+}
+
 function authCached(fresh?: RpcAuth): RpcAuth {
   if (fresh) {
     cookieAuth = fresh;
@@ -275,8 +333,7 @@ async function mineRpcLoop(payout: Uint8Array, threads: number): Promise<void> {
         const job = buildJobFromGbt(raw, payout);
         lastJobKey = key;
         lastError = '';
-        spawnWorkers(
-          {
+        const spec = {
             coinb1: job.coinb1,
             prevHidden: job.prevHidden,
             ntime8: job.ntime8,
@@ -285,12 +342,15 @@ async function mineRpcLoop(payout: Uint8Array, threads: number): Promise<void> {
             xorClear: job.hdr.xorKeyMaskClearBits,
             extraNonce1,
             height: job.hdr.height,
-            onFound: (msg, en12) => {
+            onFound: (msg: Extract<WorkerMsg, { type: 'found' }>, en12: Uint8Array) => {
               void onRpcFound(job, msg, en12);
             },
-          },
-          threads,
-        );
+          };
+        spawnWorkers(spec, threads);
+        const gpuTarget = targetFromCompact(spec.nBits);
+        if (gpuTarget) {
+          spawnGpu(spec, gpuTarget);
+        }
       }
       await sleep(POLL_MS);
     } catch (e) {
@@ -340,8 +400,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
         onNotify: (job) => {
           delay = 0;
           lastError = '';
-          spawnWorkers(
-            {
+          const spec = {
               coinb1: job.coinb1,
               prevHidden: job.prevHidden,
               ntime8: job.ntime8,
@@ -350,16 +409,19 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
               xorClear: 0,
               extraNonce1,
               height: 0,
-              onFound: (msg, _en12) => {
+              onFound: (msg: Extract<WorkerMsg, { type: 'found' }>, _en12: Uint8Array) => {
                 const nonce8 = new Uint8Array(8);
                 writeLe32(nonce8, 0, msg.nonce);
                 writeLe32(nonce8, 4, msg.nonce2);
                 lastHash = toHex(nonce8);
                 client.submit(job.jobId, msg.extraNonce2, msg.ntime8, nonce8);
               },
-            },
-            opts.threads,
-          );
+            };
+          spawnWorkers(spec, opts.threads);
+          const gpuTarget = targetFromCompact(spec.nBits);
+          if (gpuTarget) {
+            spawnGpu(spec, gpuTarget);
+          }
         },
         onSubmitResult: (ok, error) => {
           if (ok) {
@@ -414,6 +476,7 @@ function prepareStart(opts: MinerStartOpts): void {
   activeMode = opts.mode === 'stratum' ? 'stratum' : 'rpc';
   cookieSecret = '';
   stratumSecret = '';
+  activeGpuIds = (opts.gpuIds ?? []).filter((id) => id.trim());
   if (opts.mode === 'stratum') {
     parseHost(opts.host ?? '127.0.0.1');
     parsePort(opts.port ?? STRATUM_PORT_DEFAULT);
@@ -533,6 +596,8 @@ ipcMain.handle('miner:info', (): MinerInfo => {
 });
 
 ipcMain.handle('miner:logHistory', (): LogLine[] => logHistory());
+
+ipcMain.handle('miner:gpus', () => scanGpus());
 
 ipcMain.handle(
   'miner:start',

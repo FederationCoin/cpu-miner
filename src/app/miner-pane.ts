@@ -21,6 +21,8 @@ export class MinerPane implements OnInit {
   protected readonly worker = signal('');
   protected readonly password = signal('x');
   protected readonly threads = signal(4);
+  protected readonly gpuIds = signal<string[]>([]);
+  protected readonly gpuDetecting = signal(false);
   protected readonly formError = signal('');
 
   constructor() {
@@ -57,6 +59,7 @@ export class MinerPane implements OnInit {
         this.threads.set(n);
       }
     }
+    this.gpuIds.set(this.loadGpuIds());
   }
 
   protected config(): ChainConfig {
@@ -139,6 +142,7 @@ export class MinerPane implements OnInit {
         chain,
         mode: 'stratum',
         threads: this.threads(),
+        gpuIds: this.gpuIds(),
         host: this.host(),
         port: this.port(),
         worker: this.worker(),
@@ -149,6 +153,7 @@ export class MinerPane implements OnInit {
       chain,
       mode: 'rpc',
       threads: this.threads(),
+      gpuIds: this.gpuIds(),
       host: this.host(),
       port: this.port(),
       payout: this.payout(),
@@ -191,6 +196,72 @@ export class MinerPane implements OnInit {
     const n = Number.parseInt(value, 10) || 1;
     this.threads.set(n);
     localStorage.setItem(this.key('threads'), String(n));
+  }
+
+  protected gpuList() {
+    return this.mining.gpuDevices();
+  }
+
+  protected gpuDetectDisabled(): boolean {
+    return !this.mining.inElectron() || this.modeLocked() || this.gpuDetecting();
+  }
+
+  protected gpuHint(): string {
+    if (this.gpuDetecting()) {
+      return 'Loading OpenCL. A bad driver can take down this app.';
+    }
+    if (!this.mining.gpuScanned()) {
+      return 'No OpenCL GPUs listed yet. Detect loads the GPU driver in-process (a bad ICD can take down this app; skip this on WSL). CPU threads still mine.';
+    }
+    if (!this.mining.gpuAddon()) {
+      return 'No GPU hasher in this build. CPU threads still mine.';
+    }
+    if (this.gpuList().length === 0) {
+      return 'No OpenCL GPUs. Install NVIDIA, AMD, or Intel GPU drivers (not the CUDA Toolkit). CPU threads still mine.';
+    }
+    return 'Off until you tick a card. CPU workers stay on. Combined hashrate below. ccminer “blake2b” is the wrong PoW.';
+  }
+
+  protected async detectGpus(): Promise<void> {
+    if (this.gpuDetectDisabled()) {
+      return;
+    }
+    this.gpuDetecting.set(true);
+    try {
+      await this.mining.refreshGpus();
+    } finally {
+      this.gpuDetecting.set(false);
+    }
+  }
+
+  protected gpuSelected(id: string): boolean {
+    return this.gpuIds().includes(id);
+  }
+
+  protected toggleGpu(id: string, checked: boolean): void {
+    const next = this.gpuIds().filter((x) => x !== id);
+    if (checked) {
+      next.push(id);
+    }
+    this.gpuIds.set(next);
+    localStorage.setItem(this.key('gpuIds'), JSON.stringify(next));
+  }
+
+  private loadGpuIds(): string[] {
+    const raw = localStorage.getItem(this.key('gpuIds'));
+    if (!raw) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      const known = new Set(this.mining.gpuDevices().map((d) => d.id));
+      return parsed.filter((id): id is string => typeof id === 'string' && (!known.size || known.has(id)));
+    } catch {
+      return [];
+    }
   }
 
   protected async browseDatadir(): Promise<void> {

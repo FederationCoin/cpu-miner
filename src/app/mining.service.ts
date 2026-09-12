@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import type { MinerChain, MinerInfo, MinerStartOpts, MinerStats } from '../miner-api';
+import type { GpuDevice, GpuScan, MinerChain, MinerInfo, MinerStartOpts, MinerStats } from '../miner-api';
 
 export const IDLE_STATS: MinerStats = {
   running: false,
@@ -20,6 +20,9 @@ export class MiningService {
   readonly inElectron = signal(false);
   readonly info = signal<MinerInfo | null>(null);
   readonly stats = signal<MinerStats>(IDLE_STATS);
+  readonly gpuDevices = signal<GpuDevice[]>([]);
+  readonly gpuAddon = signal(false);
+  readonly gpuScanned = signal(false);
   readonly toast = signal('');
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private unsub: (() => void)[] = [];
@@ -75,6 +78,29 @@ export class MiningService {
 
   async stop(): Promise<void> {
     await window.miner?.stop();
+  }
+
+  async refreshGpus(): Promise<GpuScan> {
+    const empty: GpuScan = { devices: [], addon: false };
+    const api = window.miner;
+    if (!api) {
+      this.gpuDevices.set([]);
+      this.gpuAddon.set(false);
+      this.gpuScanned.set(true);
+      return empty;
+    }
+    try {
+      const r = await api.gpus();
+      this.gpuDevices.set(r.devices);
+      this.gpuAddon.set(r.addon);
+      this.gpuScanned.set(true);
+      return r;
+    } catch {
+      this.gpuDevices.set([]);
+      this.gpuAddon.set(false);
+      this.gpuScanned.set(true);
+      return empty;
+    }
   }
 
   pickDatadir(): Promise<string | null> {
