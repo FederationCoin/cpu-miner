@@ -61,19 +61,19 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            dist: dist:linux
+            dist: "dist:linux"
             artifact: linux-x64
           - os: ubuntu-22.04-arm
-            dist: dist:linux
+            dist: "dist:linux"
             artifact: linux-arm64
           - os: windows-2022
-            dist: dist:win
+            dist: "dist:win"
             artifact: win-x64
           - os: macos-14
-            dist: dist:mac
+            dist: "dist:mac"
             artifact: macos-arm64
           - os: macos-15-intel
-            dist: dist:mac
+            dist: "dist:mac"
             artifact: macos-x64
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
