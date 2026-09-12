@@ -16,7 +16,7 @@ describe('datadir / cookie path', () => {
     const root = mkdtempSync(join(tmpdir(), 'fc-datadir-'));
     mkdirSync(join(root, 'testnet3'));
     writeFileSync(join(root, 'testnet3', '.cookie'), '__cookie__:x');
-    expect(cookiePathForDatadir(root)).toBe(join(root, 'testnet3', '.cookie'));
+    expect(cookiePathForDatadir(root, 'testnet')).toBe(join(root, 'testnet3', '.cookie'));
   });
 
   it('uses .cookie when datadir is already testnet3', () => {
@@ -24,7 +24,15 @@ describe('datadir / cookie path', () => {
     const tn = join(root, 'testnet3');
     mkdirSync(tn);
     writeFileSync(join(tn, '.cookie'), '__cookie__:x');
-    expect(cookiePathForDatadir(tn)).toBe(join(tn, '.cookie'));
+    expect(cookiePathForDatadir(tn, 'testnet')).toBe(join(tn, '.cookie'));
+  });
+
+  it('uses datadir/.cookie on main even when testnet3 exists', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fc-main-'));
+    mkdirSync(join(root, 'testnet3'));
+    writeFileSync(join(root, 'testnet3', '.cookie'), '__cookie__:tn');
+    writeFileSync(join(root, '.cookie'), '__cookie__:main');
+    expect(cookiePathForDatadir(root, 'main')).toBe(join(root, '.cookie'));
   });
 });
 

@@ -1,3 +1,5 @@
+export type MinerChain = 'main' | 'testnet';
+
 export type MinerMode = 'rpc' | 'stratum';
 
 export type LogLine = {
@@ -8,6 +10,7 @@ export type LogLine = {
 
 export type MinerStats = {
   running: boolean;
+  chain: MinerChain | null;
   hashrate: number;
   height: number;
   hashes: number;
@@ -27,6 +30,7 @@ export type MinerInfo = {
 };
 
 export type MinerStartOpts = {
+  chain: MinerChain;
   mode: MinerMode;
   threads: number;
   host?: string;

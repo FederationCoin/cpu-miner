@@ -2,20 +2,24 @@
 
 Local **Electron** app: Angular UI in the renderer, Node in the main process.
 Origin is `git@github.com:FederationCoin/cpu-miner.git`. Work on
-`federationcoin`. Two mining modes (neither uses curl or WSL detection):
+`federationcoin`. **Main** is the default tab (dummy genesis; not live).
+**Testnet** is the public net. Two panes share one hasher (`MiningService`).
+Two mining modes (neither uses curl or WSL detection):
 
 - **Node RPC** — cookie + `getblocktemplate` / `submitblock` via Node `fetch`
-  to a host/port you set (default `127.0.0.1:35332`). Main reads
-  `testnet3/.cookie`. The cookie never goes to the renderer. You still set a
-  **tfcn1** payout; the app builds the coinbase.
+  to a host/port you set. Testnet default `127.0.0.1:35332` and
+  `testnet3/.cookie`, payout **tfcn1**. Main default `127.0.0.1:4094` and
+  `<datadir>/.cookie`, payout **fcn1**. The cookie never goes to the renderer.
 - **Stratum** — ASIC-style TCP Stratum v1 (`net.Socket`). Host/port/worker
-  (username) / password (default `x`). Default `127.0.0.1:23334`. A
-  `.worker` suffix is allowed and not parsed specially. No payout field: the
-  pool or proxy builds the coinbase. Solo still uses
+  (username) / password (default `x`). Default `127.0.0.1:23334` (saved per
+  chain). A `.worker` suffix is allowed and not parsed specially. No payout
+  field: the pool or proxy builds the coinbase. Solo still uses
   [`stratum-proxy --payout-address tfcn1…`](../cpu-miner-cpp/README.md) (or
   DATUM `mining.pool_address`); this miner only authorizes as **worker**.
 
-Dummy **MAIN** is off. Threads stay in both modes. PoW is TypeScript
+Dummy **MAIN** is off (`mainIsLive` false). Start on Main stays enabled and
+toasts that MAIN is not live; cookie/RPC failures are expected until
+announcement. Threads stay in both modes. PoW is TypeScript
 (`@noble/hashes` blake2b `dkLen: 32`) with vectors in
 [`testdata/block_header_v2.json`](testdata/block_header_v2.json). Tests do not
 live-grind nonces.
@@ -24,9 +28,9 @@ C++ [`cpu-miner-cpp/`](../cpu-miner-cpp/) (`fcminer` + TCP `stratum-proxy`) is
 the fast CLI in the parent workspace. This app does **not** wrap those
 binaries.
 
-No Electron, Angular, or other vendor trademarks as app icons. Next pass:
-**Federation Miner** robot icon, same fidelity and style as the forked
-Sparrow logo. Do not copy `electron.png` / default Electron icons into git.
+App icon is **Federation Miner** (`build/icon.png`): a robot miner at the
+same fidelity as Federation Sparrow. Do not copy `electron.png` / default
+Electron icons into git.
 
 ## Host and port
 
@@ -43,8 +47,8 @@ Default datadir (RPC cookie parent) follows where the miner process runs:
 - Linux (including WSL): `~/.federationcoin`
 
 If the **node** is the Windows package with `-datadir G:\btc\federation-coin`,
-paste `/mnt/g/btc/federation-coin` (or set `FEDERATIONCOIN_DATADIR`). Cookie is
-`<datadir>/testnet3/.cookie`.
+paste `/mnt/g/btc/federation-coin` (or set `FEDERATIONCOIN_DATADIR`). Testnet
+cookie is `<datadir>/testnet3/.cookie`. Main cookie is `<datadir>/.cookie`.
 
 GBT still waits until the node is out of header/block sync. Wrong-PoW pools
 (ckpool 80-byte SHA256d) will still `high-hash`.

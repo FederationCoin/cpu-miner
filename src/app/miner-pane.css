@@ -1,0 +1,130 @@
+:host {
+  display: block;
+}
+
+:host[hidden] {
+  display: none;
+}
+
+.pane {
+  padding-top: 0.75rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.85rem 0;
+  font-size: 0.9rem;
+}
+
+input {
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  background: #1a1d24;
+  color: #e8eaed;
+  font: inherit;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.path-row {
+  margin: 0 0 0.85rem;
+}
+
+.path-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.check input {
+  width: auto;
+}
+
+.hint {
+  margin: -0.35rem 0 0.85rem;
+  color: #9aa0aa;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+button {
+  padding: 0.45rem 0.9rem;
+  border: 0;
+  border-radius: 4px;
+  background: #3d6ea8;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 1.2rem 0 0;
+}
+
+dt {
+  color: #9aa0aa;
+}
+
+dd {
+  margin: 0;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.err,
+.warn {
+  padding: 0.6rem 0.7rem;
+  border-radius: 4px;
+}
+
+.err {
+  background: #3a1d1d;
+  color: #ffb4b4;
+}
+
+.warn {
+  background: #3a3418;
+  color: #f0d48a;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+fieldset.mode {
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  margin: 0.85rem 0;
+  padding: 0.4rem 0.75rem 0.55rem;
+}
+
+fieldset.mode legend {
+  padding: 0 0.35rem;
+  color: #9aa0aa;
+  font-size: 0.82rem;
+}

@@ -2,7 +2,8 @@ import { DebugElement } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { App } from './app';
-import type { MinerApi, MinerInfo, MinerStartOpts } from '../miner-api';
+import { IDLE_STATS } from './mining.service';
+import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats } from '../miner-api';
 
 const electronInfo: MinerInfo = {
   cookiePath: '/tmp/x/testnet3/.cookie',
@@ -37,17 +38,36 @@ function memoryStorage(): Storage {
 }
 
 function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
-  return {
-    start: vi.fn().mockResolvedValue({ ok: true }),
-    stop: vi.fn().mockResolvedValue(undefined),
+  let statsCb: ((s: MinerStats) => void) | undefined;
+  const api: MinerApi = {
+    start: vi.fn(async (opts: MinerStartOpts) => {
+      statsCb?.({
+        ...IDLE_STATS,
+        running: true,
+        chain: opts.chain,
+        status: 'starting',
+      });
+      return { ok: true };
+    }),
+    stop: vi.fn(async () => {
+      statsCb?.({ ...IDLE_STATS });
+    }),
     pickDatadir: vi.fn().mockResolvedValue(null),
     logHistory: vi.fn().mockResolvedValue([]),
     info: vi.fn().mockResolvedValue(electronInfo),
-    onStats: vi.fn().mockReturnValue(() => undefined),
+    onStats: vi.fn((cb) => {
+      statsCb = cb;
+      return () => {
+        if (statsCb === cb) {
+          statsCb = undefined;
+        }
+      };
+    }),
     onLog: vi.fn().mockReturnValue(() => undefined),
     onToast: vi.fn().mockReturnValue(() => undefined),
     ...overrides,
   };
+  return api;
 }
 
 function queryDe(fixture: ComponentFixture<App>, selector: string): DebugElement {
@@ -69,8 +89,13 @@ function setInput(fixture: ComponentFixture<App>, selector: string, value: strin
   fixture.detectChanges();
 }
 
-function selectMode(fixture: ComponentFixture<App>, mode: 'rpc' | 'stratum'): void {
-  queryDe(fixture, mode === 'stratum' ? '#modeStratum' : '#modeRpc').triggerEventHandler('change');
+function selectMode(fixture: ComponentFixture<App>, chain: 'main' | 'testnet', mode: 'rpc' | 'stratum'): void {
+  queryDe(fixture, `#${chain}-mode${mode === 'stratum' ? 'Stratum' : 'Rpc'}`).triggerEventHandler('change');
+  fixture.detectChanges();
+}
+
+function selectTab(fixture: ComponentFixture<App>, chain: 'main' | 'testnet'): void {
+  queryDe(fixture, `#tab-${chain}`).triggerEventHandler('click');
   fixture.detectChanges();
 }
 
@@ -93,6 +118,7 @@ describe('App', () => {
     fixture?.destroy();
     fixture = undefined;
     delete window.miner;
+    TestBed.resetTestingModule();
     if (localStorageDescriptor) {
       Object.defineProperty(window, 'localStorage', localStorageDescriptor);
     }
@@ -118,56 +144,72 @@ describe('App', () => {
       expect(queryEl(f, 'h1').textContent).toContain('FederationCoin CPU miner');
     });
 
-    it('defaults to Node RPC fields and disables mining', async () => {
+    it('defaults to the Main tab with the not-live warning', async () => {
       const f = await render();
-      expect(queryEl<HTMLInputElement>(f, '#modeRpc').checked).toBe(true);
-      expect(has(f, '#payout')).toBe(true);
-      expect(has(f, '#datadir')).toBe(true);
-      expect(has(f, '#password')).toBe(false);
-      expect(has(f, '#wslMode')).toBe(false);
-      expect(has(f, '.warn')).toBe(true);
-      expect(queryEl<HTMLButtonElement>(f, '#start').disabled).toBe(true);
-      expect(queryEl<HTMLButtonElement>(f, '#stop').disabled).toBe(true);
+      expect(queryEl(f, '#tab-main').getAttribute('aria-selected')).toBe('true');
+      expect(queryEl(f, '#panel-main').hidden).toBe(false);
+      expect(queryEl(f, '#panel-testnet').hidden).toBe(true);
+      expect(has(f, '[data-main-warning]')).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#main-payout').placeholder).toContain('fcn1');
+      expect(queryEl<HTMLInputElement>(f, '#main-port').value).toBe('4094');
+      expect(queryEl<HTMLButtonElement>(f, '#main-start').disabled).toBe(true);
+      expect(queryEl<HTMLButtonElement>(f, '#main-stop').disabled).toBe(true);
+    });
+
+    it('shows Testnet fields after switching tabs', async () => {
+      const f = await render();
+      selectTab(f, 'testnet');
+      expect(queryEl(f, '#panel-testnet').hidden).toBe(false);
+      expect(queryEl(f, '#panel-main').hidden).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#testnet-modeRpc').checked).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#testnet-payout').placeholder).toContain('tfcn1');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-port').value).toBe('35332');
+      expect(queryEl(f, '.warn').textContent).toContain('cpu-miner/');
     });
   });
 
   describe('with Electron', () => {
-    it('hides the ng-serve warning and enables Start', async () => {
+    it('hides the ng-serve warning and enables Start on Main', async () => {
       const f = await render(stubMiner());
-      expect(has(f, '.warn')).toBe(false);
-      expect(queryEl<HTMLButtonElement>(f, '#start').disabled).toBe(false);
-      expect(queryEl<HTMLButtonElement>(f, '#stop').disabled).toBe(true);
+      expect(queryEl(f, '.warn').textContent).toContain('Main is not live');
+      expect(queryEl<HTMLButtonElement>(f, '#main-start').disabled).toBe(false);
+      expect(queryEl<HTMLButtonElement>(f, '#main-stop').disabled).toBe(true);
     });
 
-    it('shows worker and password after switching to Stratum', async () => {
+    it('shows worker and password after switching Testnet to Stratum', async () => {
       const f = await render(stubMiner());
-      selectMode(f, 'stratum');
-      expect(has(f, '#worker')).toBe(true);
-      expect(queryEl<HTMLInputElement>(f, '#password').type).toBe('password');
-      expect(has(f, '#payout')).toBe(false);
-      expect(has(f, '#datadir')).toBe(false);
+      selectTab(f, 'testnet');
+      selectMode(f, 'testnet', 'stratum');
+      expect(has(f, '#testnet-worker')).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#testnet-password').type).toBe('password');
+      expect(has(f, '#testnet-payout')).toBe(false);
+      expect(has(f, '#testnet-datadir')).toBe(false);
       expect(has(f, '#wslMode')).toBe(false);
-      expect(queryEl<HTMLInputElement>(f, '#port').value).toBe('23334');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-port').value).toBe('23334');
     });
 
-    it('persists Stratum mode across a remount', async () => {
+    it('persists Testnet Stratum mode across a remount', async () => {
       const miner = stubMiner();
       const first = await render(miner);
-      selectMode(first, 'stratum');
+      selectTab(first, 'testnet');
+      selectMode(first, 'testnet', 'stratum');
       first.destroy();
       const second = await render(miner);
-      expect(queryEl<HTMLInputElement>(second, '#modeStratum').checked).toBe(true);
-      expect(has(second, '#worker')).toBe(true);
+      selectTab(second, 'testnet');
+      expect(queryEl<HTMLInputElement>(second, '#testnet-modeStratum').checked).toBe(true);
+      expect(has(second, '#testnet-worker')).toBe(true);
     });
 
-    it('Start in Stratum mode sends only stratum fields', async () => {
+    it('Start in Testnet Stratum sends chain and stratum fields', async () => {
       const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ start }));
-      selectMode(f, 'stratum');
-      setInput(f, '#worker', 'tfcn1abc.cpu');
-      queryDe(f, '#start').triggerEventHandler('click');
+      selectTab(f, 'testnet');
+      selectMode(f, 'testnet', 'stratum');
+      setInput(f, '#testnet-worker', 'tfcn1abc.cpu');
+      queryDe(f, '#testnet-start').triggerEventHandler('click');
       await f.whenStable();
       expect(start).toHaveBeenCalledWith({
+        chain: 'testnet',
         mode: 'stratum',
         threads: 4,
         host: '127.0.0.1',
@@ -177,27 +219,62 @@ describe('App', () => {
       });
     });
 
-    it('Start in Node RPC mode sends payout and datadir only', async () => {
+    it('Start in Main RPC sends fcn payout and dummy RPC port', async () => {
       const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ start }));
-      setInput(f, '#payout', 'tfcn1qqq');
-      queryDe(f, '#start').triggerEventHandler('click');
+      setInput(f, '#main-payout', 'fcn1qqq');
+      queryDe(f, '#main-start').triggerEventHandler('click');
       await f.whenStable();
       expect(start).toHaveBeenCalledWith({
+        chain: 'main',
         mode: 'rpc',
         threads: 4,
         host: '127.0.0.1',
-        port: 35332,
-        payout: 'tfcn1qqq',
+        port: 4094,
+        payout: 'fcn1qqq',
         datadir: '/tmp/x',
       });
+    });
+
+    it('Stop is enabled only on the mining pane', async () => {
+      const f = await render(stubMiner());
+      setInput(f, '#main-payout', 'fcn1qqq');
+      queryDe(f, '#main-start').triggerEventHandler('click');
+      await f.whenStable();
+      f.detectChanges();
+      expect(queryEl<HTMLButtonElement>(f, '#main-start').disabled).toBe(true);
+      expect(queryEl<HTMLButtonElement>(f, '#main-stop').disabled).toBe(false);
+      selectTab(f, 'testnet');
+      expect(queryEl<HTMLButtonElement>(f, '#testnet-start').disabled).toBe(false);
+      expect(queryEl<HTMLButtonElement>(f, '#testnet-stop').disabled).toBe(true);
+      expect(queryEl(f, '[data-other-mining]').textContent).toContain('Main');
+    });
+
+    it('Start on Testnet while Main is mining calls stop then start', async () => {
+      const miner = stubMiner();
+      const f = await render(miner);
+      setInput(f, '#main-payout', 'fcn1qqq');
+      queryDe(f, '#main-start').triggerEventHandler('click');
+      await f.whenStable();
+      f.detectChanges();
+      selectTab(f, 'testnet');
+      selectMode(f, 'testnet', 'stratum');
+      setInput(f, '#testnet-worker', 'tfcn1abc.cpu');
+      queryDe(f, '#testnet-start').triggerEventHandler('click');
+      await f.whenStable();
+      expect(miner.stop).toHaveBeenCalled();
+      expect(miner.start).toHaveBeenCalledTimes(2);
+      expect(miner.start).toHaveBeenLastCalledWith(
+        expect.objectContaining({ chain: 'testnet', mode: 'stratum', worker: 'tfcn1abc.cpu' }),
+      );
     });
 
     it('shows a start error from the main process', async () => {
       const start = vi.fn().mockResolvedValue({ ok: false, error: 'worker is empty' });
       const f = await render(stubMiner({ start }));
-      selectMode(f, 'stratum');
-      queryDe(f, '#start').triggerEventHandler('click');
+      selectTab(f, 'testnet');
+      selectMode(f, 'testnet', 'stratum');
+      queryDe(f, '#testnet-start').triggerEventHandler('click');
       await f.whenStable();
       f.detectChanges();
       expect(queryEl(f, '.err').textContent).toContain('worker is empty');

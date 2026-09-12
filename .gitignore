@@ -20,10 +20,10 @@ pnpm-debug.log*
 *.blockmap
 builder-debug.yml
 
-# Do not commit Electron, Angular, or other vendor trademarks as app icons.
-# Next pass: Federation Miner robot icon (same fidelity as Federation Sparrow).
-/public/favicon.ico
-/build/icon.png
+# Vendor Electron marks only. Ours: build/icon.png and public/favicon.png.
+**/electron.png
+**/electron.ico
+**/electron.icns
 /build/icon.ico
 /build/icon.icns
 /build/icons/

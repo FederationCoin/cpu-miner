@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { encodeAddress, testnetPayoutScript } from './bech32.js';
+import { encodeAddress, payoutScript } from './bech32.js';
 import { BLAKE2B_HEADLINE, coinbaseScriptSig } from './coinbase.js';
 import { toHex, u128FromHexReversed, u256FromHex, u256ToHex } from './bytes.js';
 import { blake2b32, sha256 } from './hash.js';
@@ -107,18 +107,33 @@ describe('sha256 / blake2b self-checks', () => {
 });
 
 describe('payout address', () => {
-  it('accepts a tfcn1 taproot address', () => {
+  it('accepts a tfcn1 taproot address on testnet', () => {
     const program = new Uint8Array(32).fill(0x11);
     const addr = encodeAddress('tfcn', 1, program);
     expect(addr).toMatch(/^tfcn1p/);
-    const script = testnetPayoutScript(addr!);
+    const script = payoutScript(addr!, 'testnet');
     expect(script[0]).toBe(0x51);
     expect(script[1]).toBe(32);
   });
 
-  it('refuses fcn1', () => {
+  it('refuses fcn1 on testnet', () => {
     const program = new Uint8Array(32).fill(0x11);
     const addr = encodeAddress('fcn', 1, program);
-    expect(() => testnetPayoutScript(addr!)).toThrow(/dummy MAIN/);
+    expect(() => payoutScript(addr!, 'testnet')).toThrow(/tfcn1, not fcn1/);
+  });
+
+  it('accepts a fcn1 taproot address on main', () => {
+    const program = new Uint8Array(32).fill(0x11);
+    const addr = encodeAddress('fcn', 1, program);
+    expect(addr).toMatch(/^fcn1p/);
+    const script = payoutScript(addr!, 'main');
+    expect(script[0]).toBe(0x51);
+    expect(script[1]).toBe(32);
+  });
+
+  it('refuses tfcn1 on main', () => {
+    const program = new Uint8Array(32).fill(0x11);
+    const addr = encodeAddress('tfcn', 1, program);
+    expect(() => payoutScript(addr!, 'main')).toThrow(/fcn1, not tfcn1/);
   });
 });

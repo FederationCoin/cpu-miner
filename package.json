@@ -16,7 +16,7 @@
     "start": "npm run build:app && electron .",
     "build": "npm run build:app",
     "build:app": "ng build --configuration development && npm run build:electron",
-    "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('miner/log.html','out-electron/log.html')\"",
+    "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\"",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false && npm run test:miner",
     "test:miner": "vitest run --config vitest.miner.config.ts",
@@ -55,6 +55,7 @@
     "directories": {
       "output": "dist-electron"
     },
+    "icon": "build/icon.png",
     "asar": false,
     "forceCodeSigning": false,
     "npmRebuild": false,
@@ -64,8 +65,7 @@
       "dist/renderer/**/*",
       "package.json",
       "node_modules/@noble/hashes/**/*",
-      "!**/*.ico",
-      "!**/*.icns",
+      "build/icon.png",
       "!**/electron.png"
     ],
     "linux": {

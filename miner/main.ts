@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { nextBackoff } from './backoff.js';
-import { testnetPayoutScript } from './bech32.js';
+import { payoutScript } from './bech32.js';
+import { MAIN_IS_LIVE, defaultRpcPort, parseChain, STRATUM_PORT_DEFAULT, type MinerChain } from './chain.js';
 import { concat, toHex, u256ToHex, writeLe32 } from './bytes.js';
 import { serializeBlock } from './coinbase.js';
 import { buildJobFromGbt, fillFromSubmit, jobKey, type GbtResult, type Job } from './gbt.js';
@@ -50,6 +51,7 @@ let loopPromise: Promise<void> | null = null;
 let sleepTimer: ReturnType<typeof setTimeout> | null = null;
 let sleepResolve: (() => void) | null = null;
 let activeMode: MinerMode = 'rpc';
+let activeChain: MinerChain | null = null;
 let stratumClient: StratumClient | null = null;
 let extraNonce1: Uint8Array = new Uint8Array(4);
 let rpcHost = RPC_HOST;
@@ -62,6 +64,7 @@ let stratumSecret = '';
 function stats(): MinerStats {
   return {
     running,
+    chain: running ? activeChain : null,
     hashrate,
     height,
     hashes: hashesTotal,
@@ -407,37 +410,39 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
 }
 
 function prepareStart(opts: MinerStartOpts): void {
+  activeChain = parseChain(opts.chain);
   activeMode = opts.mode === 'stratum' ? 'stratum' : 'rpc';
   cookieSecret = '';
   stratumSecret = '';
   if (opts.mode === 'stratum') {
     parseHost(opts.host ?? '127.0.0.1');
-    parsePort(opts.port ?? 23334);
+    parsePort(opts.port ?? STRATUM_PORT_DEFAULT);
     if (!(opts.worker ?? '').trim()) {
       throw new Error('worker is empty');
     }
     stratumSecret = opts.password ?? 'x';
   } else {
-    testnetPayoutScript(opts.payout ?? '');
+    payoutScript(opts.payout ?? '', activeChain);
     rpcHost = parseHost(opts.host ?? RPC_HOST);
-    rpcPort = parsePort(opts.port ?? RPC_PORT);
+    rpcPort = parsePort(opts.port ?? defaultRpcPort(activeChain));
     const datadir = (opts.datadir ?? '').trim() || defaultDatadir();
-    activeCookieFile = cookiePathForDatadir(datadir);
+    activeCookieFile = cookiePathForDatadir(datadir, activeChain);
     cookieAuth = loadCookie(activeCookieFile);
     cookieSecret = cookieAuth.password;
   }
 }
 
 async function runMiner(opts: MinerStartOpts): Promise<void> {
+  const chain = parseChain(opts.chain);
   if (opts.mode === 'stratum') {
     const host = parseHost(opts.host ?? '127.0.0.1');
-    const port = parsePort(opts.port ?? 23334);
+    const port = parsePort(opts.port ?? STRATUM_PORT_DEFAULT);
     const worker = (opts.worker ?? '').trim();
     const password = opts.password ?? 'x';
     extraNonce1 = new Uint8Array(4);
     await mineStratumLoop({ host, port, worker, password, threads: opts.threads });
   } else {
-    const payout = testnetPayoutScript(opts.payout ?? '');
+    const payout = payoutScript(opts.payout ?? '', chain);
     extraNonce1 = new Uint8Array(4);
     await mineRpcLoop(payout, opts.threads);
   }
@@ -448,6 +453,7 @@ function createWindow(): void {
     width: 760,
     height: 820,
     backgroundColor: '#111318',
+    icon: join(here, 'icon.png'),
     webPreferences: {
       preload: join(here, 'preload.js'),
       contextIsolation: true,
@@ -472,6 +478,7 @@ function openLogWindow(): void {
     height: 480,
     backgroundColor: '#111318',
     title: 'Error log',
+    icon: join(here, 'icon.png'),
     webPreferences: {
       preload: join(here, 'preload.js'),
       contextIsolation: true,
@@ -531,6 +538,10 @@ ipcMain.handle(
   'miner:start',
   async (_e, opts: MinerStartOpts) => {
     try {
+      const chain = parseChain(opts.chain);
+      if (chain === 'main' && !MAIN_IS_LIVE) {
+        win?.webContents.send('miner:toast', 'MAIN is not live');
+      }
       if (running) {
         stopRequested = true;
         stratumClient?.close();
@@ -547,7 +558,7 @@ ipcMain.handle(
       lastRateAt = Date.now();
       lastError = '';
       emitStats();
-      emitLog(activeMode, `start ${activeMode}`);
+      emitLog(activeMode, `start ${activeChain} ${activeMode}`);
       loopPromise = runMiner(opts)
         .catch((e) => {
           lastError = e instanceof Error ? e.message : String(e);
