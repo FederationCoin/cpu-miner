@@ -75,9 +75,9 @@ SmartScreen. Censored OS warnings are expected. If you cannot bypass them,
 don’t run it.
 
 `electron-builder` is a **local** devDependency. Scripts produce unsigned
-Linux / Windows / macOS artifacts under `dist-electron/` (gitignored). No
-`npm publish`, no public Docker, no auto-update feed, no Apple Developer ID,
-no Microsoft Authenticode.
+Linux / Windows / macOS artifacts under `dist-electron/` (gitignored).
+`private: true` so `npm publish` is refused; no public Docker, no
+auto-update feed, no Apple Developer ID, no Microsoft Authenticode.
 
 ```bash
 npm run dist:linux

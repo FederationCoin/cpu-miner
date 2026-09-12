@@ -2,6 +2,7 @@
 # Tag: vMAJOR.MINOR.PATCH-federationcoin.<fork> plus optional .alpha/.beta/.rcN
 # (same shape as Sparrow; MAJOR.MINOR.PATCH is package.json version).
 # CI does not create tags. Do not dispatch this from the test workflow.
+# package.json private: true; no npm/Maven/crates/Docker Hub. No PAT.
 # Apple Developer ID / Microsoft Authenticode: not yet provisioned.
 name: Package
 
@@ -61,31 +62,39 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            dist: "dist:linux"
+            eb: linux
             artifact: linux-x64
           - os: ubuntu-22.04-arm
-            dist: "dist:linux"
+            eb: linux
             artifact: linux-arm64
           - os: windows-2022
-            dist: "dist:win"
+            eb: win
             artifact: win-x64
           - os: macos-14
-            dist: "dist:mac"
+            eb: mac
             artifact: macos-arm64
           - os: macos-15-intel
-            dist: "dist:mac"
+            eb: mac
             artifact: macos-x64
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.tag }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
+      - run: node -v && npm -v
       - run: npm ci
+      # electron-builder v26 treats GITHUB_ACTIONS as "upload a GitHub Release"
+      # and then demands GH_TOKEN. Same as node/Sparrow: no PAT, no GH_TOKEN
+      # on the pack job. --publish never is "do not upload"; npm is private.
       - name: Unsigned electron-builder
-        run: npm run ${{ matrix.dist }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build:app
+          npx --no-install electron-builder --${{ matrix.eb }} --publish never
       # Unsigned only. Do not inherit Electron's icon into git.
       # Future action: https://codesign.federationcoin.org
       # - name: Codesign
