@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Error log</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #111318;
+        color: #e8eaed;
+        font: 13px/1.45 ui-monospace, monospace;
+      }
+      pre {
+        margin: 0;
+        padding: 0.75rem 1rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="log"></pre>
+    <script>
+      const el = document.getElementById('log');
+      const lines = [];
+      function fmt(line) {
+        const d = new Date(line.t).toISOString();
+        return d + ' [' + line.mode + '] ' + line.message;
+      }
+      function render() {
+        el.textContent = lines.map(fmt).join('\n');
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+      const api = window.miner;
+      if (api && api.logHistory && api.onLog) {
+        api.logHistory().then((hist) => {
+          lines.push.apply(lines, hist);
+          render();
+        });
+        api.onLog((line) => {
+          lines.push(line);
+          render();
+        });
+      } else {
+        el.textContent = 'Open this window from Help > Error log in the miner.';
+      }
+    </script>
+  </body>
+</html>

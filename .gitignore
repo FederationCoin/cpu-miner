@@ -1,0 +1,61 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log
+pnpm-debug.log*
+.npm/
+
+# Angular
+/dist
+/.angular/
+/out-tsc
+*.tsbuildinfo
+
+# Electron main (tsc)
+/out-electron
+
+# electron-builder
+/dist-electron
+*.AppImage
+*.blockmap
+builder-debug.yml
+
+# Do not commit Electron, Angular, or other vendor trademarks as app icons.
+# Next pass: Federation Miner robot icon (same fidelity as Federation Sparrow).
+/public/favicon.ico
+/build/icon.png
+/build/icon.ico
+/build/icon.icns
+/build/icons/
+
+# Logs / OS
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.swp
+
+# Secrets / local
+.env
+.env.*
+!.env.example
+*.cookie
+*.pem
+*.key
+credentials.json
+
+# Tests
+coverage/
+__screenshots__/
+.vitest/
+
+# VS Code (keep recommended workspace bits)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+.idea/
+.history/

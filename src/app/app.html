@@ -1,0 +1,189 @@
+<main>
+  <h1>FederationCoin CPU miner</h1>
+  <p class="lead">
+    Testnet only. Dummy MAIN is off. Node RPC talks JSON-RPC with the datadir
+    cookie (never shown here). Stratum is an ASIC-style TCP client. Pick a
+    host and port this process can reach. Unsigned; no Developer account.
+  </p>
+
+  @if (!inElectron()) {
+    <p class="warn">
+      This UI is the Electron renderer. From <code>cpu-miner-app/</code> run
+      <code>npm start</code> (nvm Current Node). <code>ng serve</code> cannot
+      mine.
+    </p>
+  }
+
+  <fieldset class="mode">
+    <legend>Mode</legend>
+    <label class="check" for="modeRpc">
+      <input
+        id="modeRpc"
+        type="radio"
+        name="mode"
+        [checked]="mode() === 'rpc'"
+        [disabled]="stats().running"
+        (change)="setMode('rpc')"
+      />
+      Node RPC
+    </label>
+    <label class="check" for="modeStratum">
+      <input
+        id="modeStratum"
+        type="radio"
+        name="mode"
+        [checked]="mode() === 'stratum'"
+        [disabled]="stats().running"
+        (change)="setMode('stratum')"
+      />
+      Stratum
+    </label>
+  </fieldset>
+
+  @if (mode() === 'rpc') {
+    <label for="host">RPC host</label>
+    <input
+      id="host"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="127.0.0.1"
+      [value]="host()"
+      (input)="setHost($any($event.target).value)"
+    />
+    <label for="port">RPC port</label>
+    <input
+      id="port"
+      type="number"
+      min="1"
+      max="65535"
+      [value]="port()"
+      (input)="setPort($any($event.target).value)"
+    />
+    <label for="datadir">Node data directory</label>
+    <div class="row path-row">
+      <input
+        id="datadir"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="~/.federationcoin"
+        [value]="datadir()"
+        (input)="setDatadir($any($event.target).value)"
+      />
+      <button type="button" [disabled]="!inElectron()" (click)="browseDatadir()">Browse</button>
+    </div>
+    <p class="hint">
+      Cookie is <code>{{ cookieHint() || '…/testnet3/.cookie' }}</code>. Contents stay in
+      the main process. If this miner cannot open the RPC host (for example WSL
+      vs a Windows node’s <code>127.0.0.1</code>), set host to an address that
+      routes here — same as any other client.
+    </p>
+    <label for="payout">
+      Payout address
+      <input
+        id="payout"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="tfcn1…"
+        [value]="payout()"
+        (input)="payout.set($any($event.target).value)"
+      />
+    </label>
+  } @else {
+    <label for="host">Stratum host</label>
+    <input
+      id="host"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="127.0.0.1"
+      [value]="host()"
+      (input)="setHost($any($event.target).value)"
+    />
+    <label for="port">Stratum port</label>
+    <input
+      id="port"
+      type="number"
+      min="1"
+      max="65535"
+      [value]="port()"
+      (input)="setPort($any($event.target).value)"
+    />
+    <label for="worker">Worker</label>
+    <input
+      id="worker"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="tfcn1….cpu"
+      [value]="worker()"
+      (input)="setWorker($any($event.target).value)"
+    />
+    <p class="hint">Username as on firmware. A <code>.worker</code> suffix is allowed.</p>
+    <label for="password">Password</label>
+    <input
+      id="password"
+      type="password"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="x"
+      [value]="password()"
+      (input)="setPassword($any($event.target).value)"
+    />
+    <p class="hint">Usually <code>x</code>. Point at any DATUM-shaped Blake2b Stratum v1.</p>
+  }
+
+  <label for="threads">
+    Threads
+    <input
+      id="threads"
+      type="number"
+      min="1"
+      max="64"
+      [value]="threads()"
+      (input)="threads.set(+$any($event.target).value || 1)"
+    />
+  </label>
+
+  <div class="row">
+    <button type="button" id="start" [disabled]="!inElectron() || stats().running" (click)="start()">
+      Start
+    </button>
+    <button type="button" id="stop" [disabled]="!inElectron() || !stats().running" (click)="stop()">
+      Stop
+    </button>
+  </div>
+
+  @if (formError()) {
+    <p class="err">{{ formError() }}</p>
+  }
+
+  <dl>
+    <dt>Status</dt>
+    <dd>{{ stats().status }}</dd>
+    <dt>Hashrate</dt>
+    <dd>{{ formatRate(stats().hashrate) }}</dd>
+    <dt>Height</dt>
+    <dd>{{ stats().height || '—' }}</dd>
+    <dt>Hashes</dt>
+    <dd>{{ stats().hashes }}</dd>
+    <dt>Accepted</dt>
+    <dd>{{ stats().accepted }}</dd>
+    <dt>Rejected</dt>
+    <dd>{{ stats().rejected }}</dd>
+    <dt>Last hash</dt>
+    <dd class="mono">{{ stats().lastHash || '—' }}</dd>
+    <dt>Endpoint</dt>
+    <dd class="mono">{{ endpointHint() }}</dd>
+  </dl>
+
+  @if (stats().lastError) {
+    <p class="err">{{ stats().lastError }}</p>
+  }
+
+  @if (toast()) {
+    <div class="toast" role="status">{{ toast() }}</div>
+  }
+</main>

@@ -1,0 +1,600 @@
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { availableParallelism } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
+import { nextBackoff } from './backoff.js';
+import { testnetPayoutScript } from './bech32.js';
+import { concat, toHex, u256ToHex, writeLe32 } from './bytes.js';
+import { serializeBlock } from './coinbase.js';
+import { buildJobFromGbt, fillFromSubmit, jobKey, type GbtResult, type Job } from './gbt.js';
+import { logHistory, pushLog, redactSecret, type LogLine } from './log.js';
+import { datumWorkHeader, datumWorkRoot, headerHash, hashMeetsTarget, targetFromCompact } from './pow.js';
+import {
+  cookiePath,
+  cookiePathForDatadir,
+  defaultDatadir,
+  loadCookie,
+  parseHost,
+  parsePort,
+  rpcCall,
+  RPC_HOST,
+  RPC_PORT,
+  type RpcAuth,
+} from './rpc.js';
+import { StratumClient } from './stratum.js';
+import type { MinerInfo, MinerMode, MinerStartOpts, MinerStats } from './preload.js';
+import type { WorkerInit, WorkerMsg } from './worker.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const POLL_MS = 1500;
+
+let win: BrowserWindow | null = null;
+let logWin: BrowserWindow | null = null;
+let running = false;
+let stopRequested = false;
+let workers: Worker[] = [];
+let gen = 0;
+let lastJobKey = '';
+let hashesWindow = 0;
+let hashesTotal = 0;
+let hashrate = 0;
+let lastRateAt = Date.now();
+let accepted = 0;
+let rejected = 0;
+let lastError = '';
+let lastHash = '';
+let height = 0;
+let status = 'idle';
+let loopPromise: Promise<void> | null = null;
+let sleepTimer: ReturnType<typeof setTimeout> | null = null;
+let sleepResolve: (() => void) | null = null;
+let activeMode: MinerMode = 'rpc';
+let stratumClient: StratumClient | null = null;
+let extraNonce1: Uint8Array = new Uint8Array(4);
+let rpcHost = RPC_HOST;
+let rpcPort = RPC_PORT;
+let activeCookieFile = '';
+let cookieAuth: RpcAuth | null = null;
+let cookieSecret = '';
+let stratumSecret = '';
+
+function stats(): MinerStats {
+  return {
+    running,
+    hashrate,
+    height,
+    hashes: hashesTotal,
+    accepted,
+    rejected,
+    lastError: safeText(lastError),
+    lastHash,
+    status,
+  };
+}
+
+function safeText(s: string): string {
+  let out = s;
+  if (cookieSecret) {
+    out = redactSecret(out, cookieSecret);
+  }
+  if (stratumSecret) {
+    out = redactSecret(out, stratumSecret);
+  }
+  return out;
+}
+
+function emitStats(): void {
+  win?.webContents.send('miner:stats', stats());
+}
+
+function emitLog(mode: string, message: string, toast = false): LogLine {
+  const line = pushLog(mode, safeText(message));
+  const payload = { ...line };
+  win?.webContents.send('miner:log', payload);
+  logWin?.webContents.send('miner:log', payload);
+  if (toast) {
+    win?.webContents.send('miner:toast', payload.message);
+  }
+  return line;
+}
+
+function killWorkers(): void {
+  for (const w of workers) {
+    w.terminate();
+  }
+  workers = [];
+}
+
+function cancelSleep(): void {
+  if (sleepTimer) {
+    clearTimeout(sleepTimer);
+    sleepTimer = null;
+  }
+  const r = sleepResolve;
+  sleepResolve = null;
+  r?.();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    sleepResolve = () => resolve();
+    sleepTimer = setTimeout(() => {
+      sleepTimer = null;
+      const r = sleepResolve;
+      sleepResolve = null;
+      r?.();
+    }, ms);
+  });
+}
+
+function noteHashes(n: number): void {
+  hashesWindow += n;
+  hashesTotal += n;
+  const now = Date.now();
+  const dt = (now - lastRateAt) / 1000;
+  if (dt >= 1) {
+    hashrate = hashesWindow / dt;
+    hashesWindow = 0;
+    lastRateAt = now;
+    emitStats();
+  }
+}
+
+type GrindSpec = {
+  coinb1: Uint8Array;
+  prevHidden: Uint8Array;
+  ntime8: Uint8Array;
+  nBits: number;
+  xorKey: Uint8Array;
+  xorClear: number;
+  extraNonce1: Uint8Array;
+  height: number;
+  onFound: (msg: Extract<WorkerMsg, { type: 'found' }>, extraNonce12: Uint8Array) => void;
+};
+
+function spawnWorkers(spec: GrindSpec, threads: number): void {
+  killWorkers();
+  gen++;
+  const target = targetFromCompact(spec.nBits);
+  if (!target) {
+    lastError = 'bad nBits';
+    emitLog(activeMode, lastError, true);
+    emitStats();
+    return;
+  }
+  const n = Math.max(1, Math.min(64, threads | 0));
+  status = spec.height ? `mining height ${spec.height}` : 'mining';
+  height = spec.height;
+  emitStats();
+  for (let i = 0; i < n; i++) {
+    const extraNonce2 = new Uint8Array(8);
+    writeLe32(extraNonce2, 0, i);
+    const extraNonce12 = concat(spec.extraNonce1, extraNonce2);
+    const root = datumWorkRoot(spec.coinb1, extraNonce12);
+    const nonce8 = new Uint8Array(8);
+    const work = datumWorkHeader(spec.prevHidden, nonce8, spec.ntime8, root);
+    const init: WorkerInit = {
+      work,
+      target,
+      xorKey: spec.xorKey,
+      xorClear: spec.xorClear,
+      start: i,
+      stride: n,
+      gen,
+      extraNonce2,
+    };
+    const w = new Worker(join(here, 'worker.js'), { workerData: init });
+    const myGen = gen;
+    w.on('message', (msg: WorkerMsg) => {
+      if (msg.gen !== myGen) {
+        return;
+      }
+      if (msg.type === 'progress') {
+        noteHashes(msg.hashes);
+        return;
+      }
+      noteHashes(msg.hashes);
+      spec.onFound(msg, concat(spec.extraNonce1, msg.extraNonce2));
+    });
+    w.on('error', (err) => {
+      lastError = err.message;
+      emitLog(activeMode, lastError, true);
+      emitStats();
+    });
+    workers.push(w);
+  }
+}
+
+function authCached(fresh?: RpcAuth): RpcAuth {
+  if (fresh) {
+    cookieAuth = fresh;
+  }
+  if (!cookieAuth) {
+    cookieAuth = loadCookie(activeCookieFile || cookiePath());
+  }
+  return cookieAuth;
+}
+
+async function onRpcFound(job: Job, msg: Extract<WorkerMsg, { type: 'found' }>, extraNonce12: Uint8Array): Promise<void> {
+  const nonce8 = new Uint8Array(8);
+  writeLe32(nonce8, 0, msg.nonce);
+  writeLe32(nonce8, 4, msg.nonce2);
+  const hdr = fillFromSubmit(job, extraNonce12, msg.ntime8, nonce8);
+  const hash = headerHash(hdr);
+  lastHash = u256ToHex(hash);
+  const target = targetFromCompact(job.hdr.nBits);
+  if (!target || !hashMeetsTarget(hash, target)) {
+    rejected++;
+    lastError = 'high-hash after reconstruct';
+    emitLog('rpc', lastError, true);
+    emitStats();
+    return;
+  }
+  try {
+    const block = serializeBlock(hdr, job.coinbaseWit, job.txs);
+    const result = await rpcCall(authCached(), 'submitblock', [toHex(block)], {
+      host: rpcHost,
+      port: rpcPort,
+    });
+    if (result === null || result === undefined || result === '') {
+      accepted++;
+      lastError = '';
+      status = `accepted ${lastHash.slice(0, 16)}…`;
+      lastJobKey = '';
+      killWorkers();
+    } else {
+      rejected++;
+      lastError = String(result);
+      emitLog('rpc', lastError, true);
+    }
+  } catch (e) {
+    rejected++;
+    lastError = e instanceof Error ? e.message : String(e);
+    emitLog('rpc', lastError, true);
+  }
+  emitStats();
+}
+
+async function mineRpcLoop(payout: Uint8Array, threads: number): Promise<void> {
+  let delay = 0;
+  lastJobKey = '';
+  while (running && !stopRequested) {
+    try {
+      cookieAuth = loadCookie(activeCookieFile || cookiePath());
+      const raw = (await rpcCall(cookieAuth, 'getblocktemplate', [{ rules: ['segwit', 'blake2b'] }], {
+        host: rpcHost,
+        port: rpcPort,
+      })) as GbtResult;
+      delay = 0;
+      const key = jobKey(raw);
+      if (key !== lastJobKey) {
+        const job = buildJobFromGbt(raw, payout);
+        lastJobKey = key;
+        lastError = '';
+        spawnWorkers(
+          {
+            coinb1: job.coinb1,
+            prevHidden: job.prevHidden,
+            ntime8: job.ntime8,
+            nBits: job.hdr.nBits,
+            xorKey: job.hdr.xorKey,
+            xorClear: job.hdr.xorKeyMaskClearBits,
+            extraNonce1,
+            height: job.hdr.height,
+            onFound: (msg, en12) => {
+              void onRpcFound(job, msg, en12);
+            },
+          },
+          threads,
+        );
+      }
+      await sleep(POLL_MS);
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      killWorkers();
+      delay = nextBackoff(delay);
+      const waitSec = Math.round(delay / 1000);
+      status = `reconnecting in ${waitSec}s`;
+      emitLog('rpc', `${lastError}; retry in ${waitSec}s`, true);
+      emitStats();
+      await sleep(delay);
+    }
+  }
+}
+
+function mineStratumLoop(opts: { host: string; port: number; worker: string; password: string; threads: number }): Promise<void> {
+  return new Promise((resolve) => {
+    let delay = 0;
+    let finished = false;
+
+    const done = (): void => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      stratumClient?.close();
+      stratumClient = null;
+      resolve();
+    };
+
+    const connect = (): void => {
+      if (!running || stopRequested) {
+        done();
+        return;
+      }
+      extraNonce1 = new Uint8Array(4);
+      const client = new StratumClient(opts.host, opts.port, opts.worker, opts.password, {
+        onSubscribed: (sub) => {
+          extraNonce1 = new Uint8Array(sub.extraNonce1);
+          delay = 0;
+        },
+        onAuthorized: () => {
+          delay = 0;
+          status = `authorized ${opts.worker}`;
+          emitStats();
+        },
+        onNotify: (job) => {
+          delay = 0;
+          lastError = '';
+          spawnWorkers(
+            {
+              coinb1: job.coinb1,
+              prevHidden: job.prevHidden,
+              ntime8: job.ntime8,
+              nBits: job.nBits,
+              xorKey: new Uint8Array(16),
+              xorClear: 0,
+              extraNonce1,
+              height: 0,
+              onFound: (msg, _en12) => {
+                const nonce8 = new Uint8Array(8);
+                writeLe32(nonce8, 0, msg.nonce);
+                writeLe32(nonce8, 4, msg.nonce2);
+                lastHash = toHex(nonce8);
+                client.submit(job.jobId, msg.extraNonce2, msg.ntime8, nonce8);
+              },
+            },
+            opts.threads,
+          );
+        },
+        onSubmitResult: (ok, error) => {
+          if (ok) {
+            accepted++;
+            lastError = '';
+            status = 'share accepted';
+            killWorkers();
+          } else {
+            rejected++;
+            lastError = error ?? 'share rejected';
+            emitLog('stratum', lastError, true);
+          }
+          emitStats();
+        },
+        onClose: (reason) => {
+          if (stratumClient !== client) {
+            return;
+          }
+          stratumClient = null;
+          killWorkers();
+          if (!running || stopRequested || finished) {
+            done();
+            return;
+          }
+          lastError = reason;
+          delay = nextBackoff(delay);
+          const waitSec = Math.round(delay / 1000);
+          status = `reconnecting in ${waitSec}s`;
+          emitLog('stratum', `${reason}; retry in ${waitSec}s`, true);
+          emitStats();
+          void sleep(delay).then(() => {
+            if (!running || stopRequested || finished) {
+              done();
+              return;
+            }
+            connect();
+          });
+        },
+      });
+      stratumClient = client;
+      status = `connecting ${opts.host}:${opts.port}`;
+      emitStats();
+      client.connect();
+    };
+
+    connect();
+  });
+}
+
+function prepareStart(opts: MinerStartOpts): void {
+  activeMode = opts.mode === 'stratum' ? 'stratum' : 'rpc';
+  cookieSecret = '';
+  stratumSecret = '';
+  if (opts.mode === 'stratum') {
+    parseHost(opts.host ?? '127.0.0.1');
+    parsePort(opts.port ?? 23334);
+    if (!(opts.worker ?? '').trim()) {
+      throw new Error('worker is empty');
+    }
+    stratumSecret = opts.password ?? 'x';
+  } else {
+    testnetPayoutScript(opts.payout ?? '');
+    rpcHost = parseHost(opts.host ?? RPC_HOST);
+    rpcPort = parsePort(opts.port ?? RPC_PORT);
+    const datadir = (opts.datadir ?? '').trim() || defaultDatadir();
+    activeCookieFile = cookiePathForDatadir(datadir);
+    cookieAuth = loadCookie(activeCookieFile);
+    cookieSecret = cookieAuth.password;
+  }
+}
+
+async function runMiner(opts: MinerStartOpts): Promise<void> {
+  if (opts.mode === 'stratum') {
+    const host = parseHost(opts.host ?? '127.0.0.1');
+    const port = parsePort(opts.port ?? 23334);
+    const worker = (opts.worker ?? '').trim();
+    const password = opts.password ?? 'x';
+    extraNonce1 = new Uint8Array(4);
+    await mineStratumLoop({ host, port, worker, password, threads: opts.threads });
+  } else {
+    const payout = testnetPayoutScript(opts.payout ?? '');
+    extraNonce1 = new Uint8Array(4);
+    await mineRpcLoop(payout, opts.threads);
+  }
+}
+
+function createWindow(): void {
+  win = new BrowserWindow({
+    width: 760,
+    height: 820,
+    backgroundColor: '#111318',
+    webPreferences: {
+      preload: join(here, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  const index = join(here, '../dist/renderer/browser/index.html');
+  void win.loadFile(index);
+  win.on('closed', () => {
+    win = null;
+  });
+}
+
+function openLogWindow(): void {
+  if (logWin) {
+    logWin.focus();
+    return;
+  }
+  logWin = new BrowserWindow({
+    width: 720,
+    height: 480,
+    backgroundColor: '#111318',
+    title: 'Error log',
+    webPreferences: {
+      preload: join(here, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  void logWin.loadFile(join(here, 'log.html'));
+  logWin.on('closed', () => {
+    logWin = null;
+  });
+}
+
+function installMenu(): void {
+  const help: Electron.MenuItemConstructorOptions = {
+    label: 'Help',
+    role: 'help',
+    submenu: [{ label: 'Error log', click: () => openLogWindow() }],
+  };
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      { role: 'fileMenu' },
+      { role: 'editMenu' },
+      { role: 'viewMenu' },
+      help,
+    ]),
+  );
+}
+
+ipcMain.handle('miner:pickDatadir', async () => {
+  const opts = {
+    title: 'Node data directory',
+    defaultPath: defaultDatadir(),
+    properties: ['openDirectory' as const],
+  };
+  const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+  if (r.canceled || !r.filePaths[0]) {
+    return null;
+  }
+  return r.filePaths[0];
+});
+
+ipcMain.handle('miner:info', (): MinerInfo => {
+  const datadir = defaultDatadir();
+  return {
+    cookiePath: cookiePath(datadir),
+    datadir,
+    rpc: `${RPC_HOST}:${RPC_PORT}`,
+    electron: true,
+    defaultThreads: availableParallelism(),
+  };
+});
+
+ipcMain.handle('miner:logHistory', (): LogLine[] => logHistory());
+
+ipcMain.handle(
+  'miner:start',
+  async (_e, opts: MinerStartOpts) => {
+    try {
+      if (running) {
+        stopRequested = true;
+        stratumClient?.close();
+        cancelSleep();
+        await loopPromise;
+      }
+      prepareStart(opts);
+      stopRequested = false;
+      running = true;
+      status = 'starting';
+      hashesTotal = 0;
+      hashesWindow = 0;
+      hashrate = 0;
+      lastRateAt = Date.now();
+      lastError = '';
+      emitStats();
+      emitLog(activeMode, `start ${activeMode}`);
+      loopPromise = runMiner(opts)
+        .catch((e) => {
+          lastError = e instanceof Error ? e.message : String(e);
+          emitLog(activeMode, lastError, true);
+        })
+        .finally(() => {
+          killWorkers();
+          running = false;
+          status = 'stopped';
+          emitStats();
+        });
+      return { ok: true as const };
+    } catch (e) {
+      running = false;
+      lastError = e instanceof Error ? e.message : String(e);
+      emitLog(activeMode, lastError, true);
+      emitStats();
+      return { ok: false as const, error: lastError };
+    }
+  },
+);
+
+ipcMain.handle('miner:stop', async () => {
+  stopRequested = true;
+  running = false;
+  cancelSleep();
+  stratumClient?.close();
+  killWorkers();
+  status = 'stopped';
+  emitLog(activeMode, 'stop');
+  emitStats();
+});
+
+app.whenReady().then(() => {
+  installMenu();
+  createWindow();
+  setInterval(() => {
+    if (running) {
+      emitStats();
+    }
+  }, 1000);
+});
+
+app.on('window-all-closed', () => {
+  stopRequested = true;
+  cancelSleep();
+  stratumClient?.close();
+  killWorkers();
+  app.quit();
+});

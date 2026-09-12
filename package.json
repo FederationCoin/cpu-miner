@@ -1,0 +1,87 @@
+{
+  "name": "cpu-miner-app",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Unsigned FederationCoin CPU miner (RPC or Stratum v1)",
+  "author": "FederationCoin",
+  "license": "MIT",
+  "type": "module",
+  "main": "out-electron/main.js",
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "npm@11.19.1",
+  "scripts": {
+    "ng": "ng",
+    "start": "npm run build:app && electron .",
+    "build": "npm run build:app",
+    "build:app": "ng build --configuration development && npm run build:electron",
+    "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync } from 'node:fs'; copyFileSync('miner/log.html','out-electron/log.html')\"",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test --watch=false && npm run test:miner",
+    "test:miner": "vitest run --config vitest.miner.config.ts",
+    "dist": "npm run build:app && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --linux --win",
+    "dist:linux": "npm run build:app && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --linux",
+    "dist:win": "npm run build:app && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win",
+    "dist:mac": "npm run build:app && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac"
+  },
+  "dependencies": {
+    "@angular/common": "^22.1.0",
+    "@angular/compiler": "^22.1.0",
+    "@angular/core": "^22.1.0",
+    "@angular/forms": "^22.1.0",
+    "@angular/platform-browser": "^22.1.0",
+    "@angular/router": "^22.1.0",
+    "@noble/hashes": "^2.4.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.1.8",
+    "@angular/cli": "^22.1.8",
+    "@angular/compiler-cli": "^22.1.0",
+    "@types/node": "^24.13.4",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.8.1",
+    "jsdom": "^28.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.8"
+  },
+  "build": {
+    "appId": "org.federationcoin.cpuminer",
+    "productName": "FederationCoin CPU Miner",
+    "artifactName": "federationcoin-cpu-miner-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "asar": false,
+    "forceCodeSigning": false,
+    "npmRebuild": false,
+    "publish": [],
+    "files": [
+      "out-electron/**/*",
+      "dist/renderer/**/*",
+      "package.json",
+      "node_modules/@noble/hashes/**/*",
+      "!**/*.ico",
+      "!**/*.icns",
+      "!**/electron.png"
+    ],
+    "linux": {
+      "target": ["AppImage", "zip"],
+      "category": "Utility",
+      "synopsis": "Unsigned FederationCoin CPU miner (RPC or Stratum v1)"
+    },
+    "win": {
+      "signAndEditExecutable": false,
+      "target": ["portable", "zip"]
+    },
+    "mac": {
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "target": ["zip"]
+    }
+  }
+}
