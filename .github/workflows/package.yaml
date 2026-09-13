@@ -95,7 +95,8 @@ jobs:
         shell: pwsh
         run: |
           python --version
-          npm config set msvs_version 2022
+          # npm 11 rejects `npm config set msvs_version`; node-gyp still honors this.
+          echo "GYP_MSVS_VERSION=2022" >> $env:GITHUB_ENV
       - run: npm ci
       - name: Native GPU hasher (Electron ABI)
         env:
