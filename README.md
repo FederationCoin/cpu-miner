@@ -77,7 +77,7 @@ vMAJOR.MINOR.PATCH-federationcoin.<fork>
 vMAJOR.MINOR.PATCH-federationcoin.<fork>.<ext>
 ```
 
-Example: `v0.0.0-federationcoin.0`. electron-builder uses `--publish never`. Package may open a **draft** GitHub Release only. No public Docker, no auto-update feed, no Apple Developer ID, no Microsoft Authenticode. Process: [golive notes](https://github.com/ldelarua/workspace-FederationCoin/blob/master/docs/golive-notes.md).
+Example: `v0.1.0-federationcoin.0`. electron-builder uses `--publish never`. Package may open a **draft** GitHub Release only. No public Docker, no auto-update feed, no Apple Developer ID, no Microsoft Authenticode. Process: [golive notes](https://github.com/ldelarua/workspace-FederationCoin/blob/master/docs/golive-notes.md).
 
 ### Quality
 

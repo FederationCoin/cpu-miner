@@ -45,7 +45,7 @@ jobs:
           set -euo pipefail
           if ! printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-federationcoin\.[A-Za-z0-9]+(\.(alpha[0-9]*|beta[0-9]*|rc[0-9]+))?$'; then
             echo "tag must match vMAJOR.MINOR.PATCH-federationcoin.<fork> with optional .alpha/.beta/.rcN (got: ${TAG})" >&2
-            echo "example: v0.0.0-federationcoin.0 or v0.0.0-federationcoin.0.rc1" >&2
+            echo "example: v0.1.0-federationcoin.0 or v0.1.0-federationcoin.0.rc1" >&2
             exit 1
           fi
           git fetch --no-tags origin "refs/tags/${TAG}:refs/tags/${TAG}"
