@@ -16,18 +16,22 @@ export type RpcOptions = {
 };
 
 /** Windows miner: %LOCALAPPDATA%\FederationCoin. Else ~/.federationcoin. */
-export function defaultDatadir(): string {
-  const env = process.env.FEDERATIONCOIN_DATADIR?.trim();
-  if (env) {
-    return env;
+export function datadirFor(platform: NodeJS.Platform, env: NodeJS.ProcessEnv, home: string): string {
+  const fromEnv = env.FEDERATIONCOIN_DATADIR?.trim();
+  if (fromEnv) {
+    return fromEnv;
   }
-  if (process.platform === 'win32') {
-    const local = process.env.LOCALAPPDATA?.trim();
+  if (platform === 'win32') {
+    const local = env.LOCALAPPDATA?.trim();
     if (local) {
       return join(local, 'FederationCoin');
     }
   }
-  return join(homedir(), '.federationcoin');
+  return join(home, '.federationcoin');
+}
+
+export function defaultDatadir(): string {
+  return datadirFor(process.platform, process.env, homedir());
 }
 
 export function parseHost(raw: string): string {

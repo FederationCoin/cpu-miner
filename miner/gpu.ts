@@ -138,7 +138,25 @@ export function startGpuGrind(opts: {
   onFound: (msg: { nonce: number; nonce2: number; hashes: number }) => void;
   onLog: (msg: string) => void;
 }): boolean {
-  const n = loadNative();
+  return startGpuGrindNative(loadNative(), opts);
+}
+
+/** Missing-addon fork. Tests pass null so this file does not load OpenCL. */
+export function startGpuGrindNative(
+  n: Pick<Native, 'startGrind'> | null,
+  opts: {
+    deviceId: string;
+    work: Uint8Array;
+    target: Uint8Array;
+    xorKey: Uint8Array;
+    xorClear: number;
+    extraNonce2: Uint8Array;
+    gen: number;
+    onProgress: (hashes: number) => void;
+    onFound: (msg: { nonce: number; nonce2: number; hashes: number }) => void;
+    onLog: (msg: string) => void;
+  },
+): boolean {
   if (!n) {
     return false;
   }

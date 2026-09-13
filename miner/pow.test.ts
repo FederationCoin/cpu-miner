@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { encodeAddress, payoutScript } from './bech32.js';
+import { encodeAddress, addressToScript, payoutScript } from './bech32.js';
 import { BLAKE2B_HEADLINE, coinbaseScriptSig } from './coinbase.js';
 import { toHex, u128FromHexReversed, u256FromHex, u256ToHex } from './bytes.js';
 import { blake2b32, sha256 } from './hash.js';
@@ -135,5 +135,24 @@ describe('payout address', () => {
     const program = new Uint8Array(32).fill(0x11);
     const addr = encodeAddress('tfcn', 1, program);
     expect(() => payoutScript(addr!, 'main')).toThrow(/fcn1, not tfcn1/);
+  });
+
+  it('accepts witness v0 tfcn and fcn', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const tfcn = encodeAddress('tfcn', 0, program);
+    const fcn = encodeAddress('fcn', 0, program);
+    const t = addressToScript(tfcn!);
+    const m = addressToScript(fcn!);
+    expect(t?.hrp).toBe('tfcn');
+    expect(t?.script[0]).toBe(0x00);
+    expect(t?.script[1]).toBe(20);
+    expect(m?.hrp).toBe('fcn');
+    expect(m?.script[0]).toBe(0x00);
+  });
+
+  it('rejects Bitcoin HRPs', () => {
+    expect(addressToScript('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4')).toBeNull();
+    expect(addressToScript('tb1qawkzyj2l5yck5jq4wyhkc4837x088580y9uyk8')).toBeNull();
+    expect(() => payoutScript('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', 'testnet')).toThrow(/tfcn1/);
   });
 });

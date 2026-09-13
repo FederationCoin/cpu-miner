@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { cookiePathForDatadir, defaultDatadir, parseHost, parsePort, rpcCall } from './rpc.js';
+import { cookiePathForDatadir, datadirFor, defaultDatadir, parseHost, parsePort, rpcCall } from './rpc.js';
 
 describe('datadir / cookie path', () => {
   it('defaults to ~/.federationcoin on non-Windows', () => {
@@ -10,6 +10,22 @@ describe('datadir / cookie path', () => {
     const d = defaultDatadir();
     expect(d).toBe(join(homedir(), '.federationcoin'));
     expect(d).not.toContain('AppData');
+  });
+
+  it('prefers FEDERATIONCOIN_DATADIR over platform defaults', () => {
+    expect(datadirFor('win32', { FEDERATIONCOIN_DATADIR: ' D:\\fc ', LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me')).toBe(
+      'D:\\fc',
+    );
+  });
+
+  it('uses LOCALAPPDATA\\FederationCoin on Windows', () => {
+    expect(datadirFor('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me')).toBe(
+      join('C:\\Users\\me\\AppData\\Local', 'FederationCoin'),
+    );
+  });
+
+  it('falls back to ~/.federationcoin on Windows without LOCALAPPDATA', () => {
+    expect(datadirFor('win32', {}, 'C:\\Users\\me')).toBe(join('C:\\Users\\me', '.federationcoin'));
   });
 
   it('uses testnet3/.cookie under a top-level datadir', () => {

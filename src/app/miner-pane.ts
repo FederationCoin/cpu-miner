@@ -1,6 +1,7 @@
 import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
 import { IDLE_STATS, MiningService } from './mining.service';
 import { CHAINS, type ChainConfig, type MinerChain } from './chain';
+import { cookiePathHint, formatHashRate, gpuStatusHint, mainIsNotLive } from './miner-format';
 import type { MinerMode, MinerStartOpts, MinerStats } from '../miner-api';
 
 @Component({
@@ -72,7 +73,7 @@ export class MinerPane implements OnInit {
 
   protected showMainWarning(): boolean {
     const cfg = this.config();
-    return cfg.id === 'main' && !cfg.mainIsLive;
+    return mainIsNotLive(cfg.id, cfg.mainIsLive);
   }
 
   protected otherMiningLabel(): string | null {
@@ -207,19 +208,12 @@ export class MinerPane implements OnInit {
   }
 
   protected gpuHint(): string {
-    if (this.gpuDetecting()) {
-      return 'Loading OpenCL. A bad driver can take down this app.';
-    }
-    if (!this.mining.gpuScanned()) {
-      return 'No OpenCL GPUs listed yet. Detect loads the GPU driver in-process (a bad ICD can take down this app; skip this on WSL). CPU threads still mine.';
-    }
-    if (!this.mining.gpuAddon()) {
-      return 'No GPU hasher in this build. CPU threads still mine.';
-    }
-    if (this.gpuList().length === 0) {
-      return 'No OpenCL GPUs. Install NVIDIA, AMD, or Intel GPU drivers (not the CUDA Toolkit). CPU threads still mine.';
-    }
-    return 'Off until you tick a card. CPU workers stay on. Combined hashrate below. ccminer “blake2b” is the wrong PoW.';
+    return gpuStatusHint({
+      detecting: this.gpuDetecting(),
+      scanned: this.mining.gpuScanned(),
+      addon: this.mining.gpuAddon(),
+      deviceCount: this.gpuList().length,
+    });
   }
 
   protected async detectGpus(): Promise<void> {
@@ -272,18 +266,7 @@ export class MinerPane implements OnInit {
   }
 
   protected cookieHint(): string {
-    const d = this.datadir().trim().replace(/[/\\]+$/, '');
-    const cfg = this.config();
-    if (cfg.id === 'main') {
-      return d ? `${d}/.cookie` : '';
-    }
-    if (!d) {
-      return '';
-    }
-    if (d.endsWith('testnet3')) {
-      return `${d}/.cookie`;
-    }
-    return `${d}/testnet3/.cookie`;
+    return cookiePathHint(this.datadir(), this.config().id);
   }
 
   protected endpointHint(): string {
@@ -291,12 +274,6 @@ export class MinerPane implements OnInit {
   }
 
   protected formatRate(n: number): string {
-    if (n >= 1e6) {
-      return `${(n / 1e6).toFixed(2)} MH/s`;
-    }
-    if (n >= 1e3) {
-      return `${(n / 1e3).toFixed(2)} kH/s`;
-    }
-    return `${n.toFixed(0)} H/s`;
+    return formatHashRate(n);
   }
 }
