@@ -1,11 +1,11 @@
-/** Renderer chain configs. Dummy MAIN RPC 4094 / HRP fcn match chainparamsbase. */
+/** Renderer chain configs. Dummy MAIN RPC 4094 / HRP gfcn match chainparamsbase. */
 
 export type MinerChain = 'main' | 'testnet';
 
 export type ChainConfig = {
   id: MinerChain;
   label: string;
-  hrp: 'fcn' | 'tfcn';
+  hrp: 'gfcn' | 'tgfcn';
   rpcPort: number;
   stratumPort: number;
   cookieSubdir: string;
@@ -17,7 +17,7 @@ export const CHAINS: Record<MinerChain, ChainConfig> = {
   main: {
     id: 'main',
     label: 'Main',
-    hrp: 'fcn',
+    hrp: 'gfcn',
     rpcPort: 4094,
     stratumPort: 23334,
     cookieSubdir: '',
@@ -26,7 +26,7 @@ export const CHAINS: Record<MinerChain, ChainConfig> = {
   testnet: {
     id: 'testnet',
     label: 'Testnet',
-    hrp: 'tfcn',
+    hrp: 'tgfcn',
     rpcPort: 35332,
     stratumPort: 23334,
     cookieSubdir: 'testnet3',

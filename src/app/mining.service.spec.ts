@@ -70,7 +70,7 @@ describe('MiningService', () => {
       threads: 4,
       host: '127.0.0.1',
       port: 23334,
-      worker: 'tfcn1abc.cpu',
+      worker: 'tgfcn1abc.cpu',
       password: 'x',
     });
     expect(miner.stop).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('MiningService', () => {
       threads: 4,
       host: '127.0.0.1',
       port: 4094,
-      payout: 'fcn1qqq',
+      payout: 'gfcn1qqq',
       datadir: '/tmp/x',
     });
     expect(miner.stop).toHaveBeenCalledTimes(1);

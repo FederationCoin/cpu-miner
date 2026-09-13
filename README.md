@@ -8,8 +8,8 @@ Local **Federation Miner** app: Angular UI in the renderer, Node in the main pro
 
 Two panes share one hasher. Two mining modes:
 
-- **Node RPC** — cookie + `getblocktemplate` / `submitblock` via Node `fetch` to a host/port you set. Testnet default `127.0.0.1:35332` and `testnet3/.cookie`, payout **tfcn1**. Main default `127.0.0.1:4094` and `<datadir>/.cookie`, payout **fcn1**. The cookie never goes to the renderer.
-- **Stratum** — ASIC-style TCP Stratum v1. Host/port/worker (username) / password (default `x`). Default `127.0.0.1:23334` (saved per chain). A `.worker` suffix is allowed. No payout field: the pool or proxy builds the coinbase. Solo still uses `stratum-proxy --payout-address tfcn1…` from [`cpu-miner-cpp`](https://github.com/ldelarua/workspace-FederationCoin/tree/master/cpu-miner-cpp) (or DATUM `mining.pool_address`); this miner only authorizes as **worker**.
+- **Node RPC** — cookie + `getblocktemplate` / `submitblock` via Node `fetch` to a host/port you set. Testnet default `127.0.0.1:35332` and `testnet3/.cookie`, payout **tgfcn1**. Main default `127.0.0.1:4094` and `<datadir>/.cookie`, payout **gfcn1**. The cookie never goes to the renderer.
+- **Stratum** — ASIC-style TCP Stratum v1. Host/port/worker (username) / password (default `x`). Default `127.0.0.1:23334` (saved per chain). A `.worker` suffix is allowed. No payout field: the pool or proxy builds the coinbase. Solo still uses `stratum-proxy --payout-address tgfcn1…` from [`cpu-miner-cpp`](https://github.com/ldelarua/workspace-FederationCoin/tree/master/cpu-miner-cpp) (or DATUM `mining.pool_address`); this miner only authorizes as **worker**.
 
 GPU hashing is additive and in-process. Tick GPUs in the pane (all off by default, including Intel iGPU). You do **not** run a second app or `fcminer`. You do **not** install the CUDA Toolkit. Install NVIDIA / AMD / Intel **GPU drivers** (OpenCL ICD) if you want devices listed. No driver: empty GPU list, CPU still mines. A GPU driver fault can take down the whole app. ccminer “blake2b” hashes the wrong construction.
 

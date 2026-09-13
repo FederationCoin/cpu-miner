@@ -151,7 +151,7 @@ describe('App', () => {
       expect(queryEl(f, '#panel-main').hidden).toBe(false);
       expect(queryEl(f, '#panel-testnet').hidden).toBe(true);
       expect(has(f, '[data-main-warning]')).toBe(true);
-      expect(queryEl<HTMLInputElement>(f, '#main-payout').placeholder).toContain('fcn1');
+      expect(queryEl<HTMLInputElement>(f, '#main-payout').placeholder).toContain('gfcn1');
       expect(queryEl<HTMLInputElement>(f, '#main-port').value).toBe('4094');
       expect(queryEl<HTMLButtonElement>(f, '#main-start').disabled).toBe(true);
       expect(queryEl<HTMLButtonElement>(f, '#main-stop').disabled).toBe(true);
@@ -163,7 +163,7 @@ describe('App', () => {
       expect(queryEl(f, '#panel-testnet').hidden).toBe(false);
       expect(queryEl(f, '#panel-main').hidden).toBe(true);
       expect(queryEl<HTMLInputElement>(f, '#testnet-modeRpc').checked).toBe(true);
-      expect(queryEl<HTMLInputElement>(f, '#testnet-payout').placeholder).toContain('tfcn1');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-payout').placeholder).toContain('tgfcn1');
       expect(queryEl<HTMLInputElement>(f, '#testnet-port').value).toBe('35332');
       expect(queryEl(f, '.warn').textContent).toContain('cpu-miner/');
     });
@@ -206,7 +206,7 @@ describe('App', () => {
       const f = await render(stubMiner({ start }));
       selectTab(f, 'testnet');
       selectMode(f, 'testnet', 'stratum');
-      setInput(f, '#testnet-worker', 'tfcn1abc.cpu');
+      setInput(f, '#testnet-worker', 'tgfcn1abc.cpu');
       queryDe(f, '#testnet-start').triggerEventHandler('click');
       await f.whenStable();
       expect(start).toHaveBeenCalledWith({
@@ -216,7 +216,7 @@ describe('App', () => {
         gpuIds: [],
         host: '127.0.0.1',
         port: 23334,
-        worker: 'tfcn1abc.cpu',
+        worker: 'tgfcn1abc.cpu',
         password: 'x',
       });
     });
@@ -237,10 +237,10 @@ describe('App', () => {
       expect(queryEl(f, '#main-gpus').textContent).toMatch(/No GPU hasher/);
     });
 
-    it('Start in Main RPC sends fcn payout and dummy RPC port', async () => {
+    it('Start in Main RPC sends gfcn payout and dummy RPC port', async () => {
       const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ start }));
-      setInput(f, '#main-payout', 'fcn1qqq');
+      setInput(f, '#main-payout', 'gfcn1qqq');
       queryDe(f, '#main-start').triggerEventHandler('click');
       await f.whenStable();
       expect(start).toHaveBeenCalledWith({
@@ -250,14 +250,14 @@ describe('App', () => {
         gpuIds: [],
         host: '127.0.0.1',
         port: 4094,
-        payout: 'fcn1qqq',
+        payout: 'gfcn1qqq',
         datadir: '/tmp/x',
       });
     });
 
     it('Stop is enabled only on the mining pane', async () => {
       const f = await render(stubMiner());
-      setInput(f, '#main-payout', 'fcn1qqq');
+      setInput(f, '#main-payout', 'gfcn1qqq');
       queryDe(f, '#main-start').triggerEventHandler('click');
       await f.whenStable();
       f.detectChanges();
@@ -272,19 +272,19 @@ describe('App', () => {
     it('Start on Testnet while Main is mining calls stop then start', async () => {
       const miner = stubMiner();
       const f = await render(miner);
-      setInput(f, '#main-payout', 'fcn1qqq');
+      setInput(f, '#main-payout', 'gfcn1qqq');
       queryDe(f, '#main-start').triggerEventHandler('click');
       await f.whenStable();
       f.detectChanges();
       selectTab(f, 'testnet');
       selectMode(f, 'testnet', 'stratum');
-      setInput(f, '#testnet-worker', 'tfcn1abc.cpu');
+      setInput(f, '#testnet-worker', 'tgfcn1abc.cpu');
       queryDe(f, '#testnet-start').triggerEventHandler('click');
       await f.whenStable();
       expect(miner.stop).toHaveBeenCalled();
       expect(miner.start).toHaveBeenCalledTimes(2);
       expect(miner.start).toHaveBeenLastCalledWith(
-        expect.objectContaining({ chain: 'testnet', mode: 'stratum', worker: 'tfcn1abc.cpu' }),
+        expect.objectContaining({ chain: 'testnet', mode: 'stratum', worker: 'tgfcn1abc.cpu' }),
       );
     });
 

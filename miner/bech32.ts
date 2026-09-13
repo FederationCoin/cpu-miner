@@ -160,13 +160,13 @@ export function bech32Decode(addr: string): { hrp: string; witver: number; progr
   return { hrp, witver, program };
 }
 
-/** Witness v0/v1 scriptPubKey. Accepts tfcn / fcn HRPs; payoutScript checks chain. */
+/** Witness v0/v1 scriptPubKey. Accepts tgfcn / gfcn HRPs; payoutScript checks chain. */
 export function addressToScript(addr: string): { hrp: string; script: Uint8Array } | null {
   const d = bech32Decode(addr);
   if (!d) {
     return null;
   }
-  if (d.hrp !== 'tfcn' && d.hrp !== 'fcn') {
+  if (d.hrp !== 'tgfcn' && d.hrp !== 'gfcn') {
     return null;
   }
   const script = new Uint8Array(2 + d.program.length);
@@ -184,9 +184,9 @@ export function addressToScript(addr: string): { hrp: string; script: Uint8Array
 
 export function payoutScript(addr: string, chain: 'main' | 'testnet'): Uint8Array {
   const decoded = addressToScript(addr.trim());
-  const want = chain === 'main' ? 'fcn' : 'tfcn';
-  const label = chain === 'main' ? 'fcn1' : 'tfcn1';
-  const other = chain === 'main' ? 'tfcn1' : 'fcn1';
+  const want = chain === 'main' ? 'gfcn' : 'tgfcn';
+  const label = chain === 'main' ? 'gfcn1' : 'tgfcn1';
+  const other = chain === 'main' ? 'tgfcn1' : 'gfcn1';
   if (!decoded) {
     throw new Error(`payout must be a ${label} bech32 address`);
   }
