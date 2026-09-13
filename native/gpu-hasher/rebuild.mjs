@@ -21,26 +21,38 @@ try {
   fail('electron package missing; skip gpu-hasher.node');
 }
 
+let gypJs;
+try {
+  gypJs = require.resolve('node-gyp/bin/node-gyp.js');
+} catch {
+  fail('node-gyp package missing; skip gpu-hasher.node');
+}
+
+// Drive node-gyp.js with this Node. spawnSync('npx.cmd') without a shell
+// does not run .cmd files on Windows (ENOENT / EINVAL, no compiler output).
 const gyp = spawnSync(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
+  process.execPath,
   [
-    'node-gyp',
+    gypJs,
     'rebuild',
-    '--directory',
-    here,
     `--target=${electronVersion}`,
     `--arch=${process.arch}`,
     '--dist-url=https://electronjs.org/headers',
   ],
-  { cwd: root, stdio: 'inherit', env: process.env },
+  { cwd: here, stdio: 'inherit', env: process.env },
 );
 
 const dist = join(here, 'dist');
 mkdirSync(dist, { recursive: true });
 copyFileSync(join(here, 'kernel', 'asic_pow.cl'), join(dist, 'asic_pow.cl'));
 
+if (gyp.error) {
+  console.error(gyp.error);
+}
 if (gyp.status !== 0) {
-  fail('gpu-hasher.node build failed (CPU mining still works if the addon is absent)');
+  fail(
+    `gpu-hasher.node build failed (status=${gyp.status} signal=${gyp.signal}; CPU mining still works if the addon is absent)`,
+  );
 }
 
 const built = join(here, 'build', 'Release', 'gpu-hasher.node');

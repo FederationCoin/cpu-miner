@@ -10,6 +10,9 @@
 #include <vector>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -198,7 +201,7 @@ std::string info_str(cl_int (*fn)(void*, cl_uint, size_t, void*, size_t*), void*
     if (fn(obj, key, 0, nullptr, &n) != CL_SUCCESS || n == 0) {
         return {};
     }
-    n = std::min(n, kMaxInfoBytes);
+    n = (std::min)(n, kMaxInfoBytes);
     std::string s(n, '\0');
     if (fn(obj, key, n, s.data(), nullptr) != CL_SUCCESS) {
         return {};
@@ -218,7 +221,7 @@ bool get_device(int platform_index, int device_index, cl_platform_id* plat, cl_d
     if (g_api.GetPlatformIDs(0, nullptr, &np) != CL_SUCCESS || np == 0) {
         return false;
     }
-    np = std::min(np, kMaxPlatforms);
+    np = (std::min)(np, kMaxPlatforms);
     std::vector<cl_platform_id> plats(np);
     if (g_api.GetPlatformIDs(np, plats.data(), nullptr) != CL_SUCCESS) {
         return false;
@@ -232,7 +235,7 @@ bool get_device(int platform_index, int device_index, cl_platform_id* plat, cl_d
     if (g_api.GetDeviceIDs(*plat, types, 0, nullptr, &nd) != CL_SUCCESS || nd == 0) {
         return false;
     }
-    nd = std::min(nd, kMaxDevices);
+    nd = (std::min)(nd, kMaxDevices);
     std::vector<cl_device_id> devs(nd);
     if (g_api.GetDeviceIDs(*plat, types, nd, devs.data(), nullptr) != CL_SUCCESS) {
         return false;
@@ -283,7 +286,7 @@ std::vector<GpuDeviceInfo> list_opencl_devices()
     if (g_api.GetPlatformIDs(0, nullptr, &np) != CL_SUCCESS || np == 0) {
         return out;
     }
-    np = std::min(np, kMaxPlatforms);
+    np = (std::min)(np, kMaxPlatforms);
     std::vector<cl_platform_id> plats(np);
     if (g_api.GetPlatformIDs(np, plats.data(), nullptr) != CL_SUCCESS) {
         return out;
@@ -296,7 +299,7 @@ std::vector<GpuDeviceInfo> list_opencl_devices()
         if (g_api.GetDeviceIDs(plats[p], types, 0, nullptr, &nd) != CL_SUCCESS || nd == 0) {
             continue;
         }
-        nd = std::min(nd, kMaxDevices);
+        nd = (std::min)(nd, kMaxDevices);
         std::vector<cl_device_id> devs(nd);
         if (g_api.GetDeviceIDs(plats[p], types, nd, devs.data(), nullptr) != CL_SUCCESS) {
             continue;
@@ -415,7 +418,7 @@ bool OpenClEngine::init(const GpuDeviceInfo& info, std::string* err)
     if (e != CL_SUCCESS) {
         size_t logn = 0;
         g_api.GetProgramBuildInfo(impl_->prog, impl_->dev, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logn);
-        logn = std::min(logn, kMaxBuildLog);
+        logn = (std::min)(logn, kMaxBuildLog);
         std::string log(logn, '\0');
         if (logn) {
             g_api.GetProgramBuildInfo(impl_->prog, impl_->dev, CL_PROGRAM_BUILD_LOG, logn, log.data(), nullptr);

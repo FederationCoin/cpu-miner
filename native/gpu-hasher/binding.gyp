@@ -11,7 +11,7 @@
         "src/grind.cpp"
       ],
       "include_dirs": ["include", "../../node_modules/node-addon-api"],
-      "defines": ["NAPI_VERSION=8"],
+      "defines": ["NAPI_VERSION=8", "NAPI_CPP_EXCEPTIONS"],
       "cflags!": ["-fno-exceptions"],
       "cflags_cc!": ["-fno-exceptions"],
       "cflags_cc": ["-std=c++17"],
@@ -22,12 +22,15 @@
       "msvs_settings": {
         "VCCLCompilerTool": {
           "ExceptionHandling": 1,
-          "AdditionalOptions": ["-std:c++17"]
+          "AdditionalOptions": ["/std:c++17"]
         }
       },
       "conditions": [
         ["OS=='linux'", { "libraries": ["-ldl"] }],
-        ["OS=='win'", { "libraries": [] }],
+        ["OS=='win'", {
+          "libraries": [],
+          "defines": ["NOMINMAX", "WIN32_LEAN_AND_MEAN"]
+        }],
         ["OS=='mac'", { "libraries": [] }]
       ]
     }
