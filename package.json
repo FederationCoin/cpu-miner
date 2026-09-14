@@ -1,6 +1,6 @@
 {
   "name": "cpu-miner-app",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Unsigned FederationCoin CPU miner (RPC or Stratum v1)",
   "author": "FederationCoin",

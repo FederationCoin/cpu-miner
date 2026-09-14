@@ -107,52 +107,52 @@ describe('sha256 / blake2b self-checks', () => {
 });
 
 describe('payout address', () => {
-  it('accepts a tfcn1 taproot address on testnet', () => {
+  it('accepts a tgfcn1 taproot address on testnet', () => {
     const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('tfcn', 1, program);
-    expect(addr).toMatch(/^tfcn1p/);
+    const addr = encodeAddress('tgfcn', 1, program);
+    expect(addr).toMatch(/^tgfcn1p/);
     const script = payoutScript(addr!, 'testnet');
     expect(script[0]).toBe(0x51);
     expect(script[1]).toBe(32);
   });
 
-  it('refuses fcn1 on testnet', () => {
+  it('refuses gfcn1 on testnet', () => {
     const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('fcn', 1, program);
-    expect(() => payoutScript(addr!, 'testnet')).toThrow(/tfcn1, not fcn1/);
+    const addr = encodeAddress('gfcn', 1, program);
+    expect(() => payoutScript(addr!, 'testnet')).toThrow(/tgfcn1, not gfcn1/);
   });
 
-  it('accepts a fcn1 taproot address on main', () => {
+  it('accepts a gfcn1 taproot address on main', () => {
     const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('fcn', 1, program);
-    expect(addr).toMatch(/^fcn1p/);
+    const addr = encodeAddress('gfcn', 1, program);
+    expect(addr).toMatch(/^gfcn1p/);
     const script = payoutScript(addr!, 'main');
     expect(script[0]).toBe(0x51);
     expect(script[1]).toBe(32);
   });
 
-  it('refuses tfcn1 on main', () => {
+  it('refuses tgfcn1 on main', () => {
     const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('tfcn', 1, program);
-    expect(() => payoutScript(addr!, 'main')).toThrow(/fcn1, not tfcn1/);
+    const addr = encodeAddress('tgfcn', 1, program);
+    expect(() => payoutScript(addr!, 'main')).toThrow(/gfcn1, not tgfcn1/);
   });
 
-  it('accepts witness v0 tfcn and fcn', () => {
+  it('accepts witness v0 tgfcn and gfcn', () => {
     const program = new Uint8Array(20).fill(0x11);
-    const tfcn = encodeAddress('tfcn', 0, program);
-    const fcn = encodeAddress('fcn', 0, program);
-    const t = addressToScript(tfcn!);
-    const m = addressToScript(fcn!);
-    expect(t?.hrp).toBe('tfcn');
+    const tgfcn = encodeAddress('tgfcn', 0, program);
+    const gfcn = encodeAddress('gfcn', 0, program);
+    const t = addressToScript(tgfcn!);
+    const m = addressToScript(gfcn!);
+    expect(t?.hrp).toBe('tgfcn');
     expect(t?.script[0]).toBe(0x00);
     expect(t?.script[1]).toBe(20);
-    expect(m?.hrp).toBe('fcn');
+    expect(m?.hrp).toBe('gfcn');
     expect(m?.script[0]).toBe(0x00);
   });
 
   it('rejects Bitcoin HRPs', () => {
     expect(addressToScript('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4')).toBeNull();
     expect(addressToScript('tb1qawkzyj2l5yck5jq4wyhkc4837x088580y9uyk8')).toBeNull();
-    expect(() => payoutScript('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', 'testnet')).toThrow(/tfcn1/);
+    expect(() => payoutScript('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', 'testnet')).toThrow(/tgfcn1/);
   });
 });

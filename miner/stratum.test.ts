@@ -76,19 +76,19 @@ describe('stratum wire', () => {
   });
 
   it('authorize and submit JSON match fcminer', () => {
-    expect(JSON.parse(authorizeLine(2, 'tfcn1abc.cpu', 'x'))).toEqual({
+    expect(JSON.parse(authorizeLine(2, 'tgfcn1abc.cpu', 'x'))).toEqual({
       id: 2,
       method: 'mining.authorize',
-      params: ['tfcn1abc.cpu', 'x'],
+      params: ['tgfcn1abc.cpu', 'x'],
     });
     const en2 = new Uint8Array(8);
     const ntime = new Uint8Array(8);
     const nonce = new Uint8Array(8);
     en2[0] = 1;
-    const rec = JSON.parse(submitLine(10, 'tfcn1abc.cpu', 'job1', en2, ntime, nonce)) as {
+    const rec = JSON.parse(submitLine(10, 'tgfcn1abc.cpu', 'job1', en2, ntime, nonce)) as {
       params: string[];
     };
-    expect(rec.params[0]).toBe('tfcn1abc.cpu');
+    expect(rec.params[0]).toBe('tgfcn1abc.cpu');
     expect(rec.params[1]).toBe('job1');
     expect(rec.params[2]).toHaveLength(16);
     expect(isAuthorizeOk({ id: 2, result: true, error: null })).toBe(true);
