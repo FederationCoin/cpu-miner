@@ -16,7 +16,7 @@
     "start": "npm run build:app && node native/gpu-hasher/rebuild.mjs && electron .",
     "build": "npm run build:app",
     "build:app": "ng build --configuration development && npm run build:electron",
-    "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\"",
+    "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\" && node scripts/copy-federation-pool.mjs",
     "build:gpu": "node native/gpu-hasher/rebuild.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false && npm run test:miner && npm run test:gpu",
@@ -69,6 +69,11 @@
       {
         "from": "native/gpu-hasher/dist/",
         "to": "gpu-hasher",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "vendor/federation-pool/",
+        "to": "federation-pool",
         "filter": ["**/*"]
       }
     ],

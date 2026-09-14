@@ -1,9 +1,10 @@
 <main>
   <h1>FederationCoin CPU miner</h1>
   <p class="lead">
-    Two chains, one hasher. Node RPC talks JSON-RPC with the datadir cookie
-    (never shown here). Stratum is an ASIC-style TCP client. Pick a host and
-    port this process can reach. Unsigned; no Developer account.
+    Two chains, one hasher, plus a Host a pool tab. Node RPC talks JSON-RPC with
+    the datadir cookie (never shown here). Stratum is an ASIC-style TCP client.
+    Host a pool starts a local DATUM Prime + TIDES process. Unsigned; no
+    Developer account.
   </p>
 
   @if (!mining.inElectron()) {
@@ -14,7 +15,7 @@
     </p>
   }
 
-  <div class="tabs" role="tablist" aria-label="Chain">
+  <div class="tabs" role="tablist" aria-label="Miner">
     <button
       type="button"
       role="tab"
@@ -35,6 +36,16 @@
     >
       Testnet
     </button>
+    <button
+      type="button"
+      role="tab"
+      id="tab-pool"
+      [attr.aria-selected]="tab() === 'pool'"
+      [attr.aria-controls]="'panel-pool'"
+      (click)="selectTab('pool')"
+    >
+      Host a pool
+    </button>
   </div>
 
   <app-miner-pane
@@ -49,6 +60,7 @@
     chain="testnet"
     [hidden]="tab() !== 'testnet'"
   />
+  <app-pool-pane id="panel-pool" role="tabpanel" [hidden]="tab() !== 'pool'" />
 
   @if (mining.toast()) {
     <div class="toast" role="status">{{ mining.toast() }}</div>

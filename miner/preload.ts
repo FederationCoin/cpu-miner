@@ -53,6 +53,32 @@ export type MinerStartOpts = {
   password?: string;
 };
 
+export type PoolStartOpts = {
+  chain: MinerChain;
+  rpcHost: string;
+  rpcPort: number;
+  datadir: string;
+  operator: string;
+  feeBps: number;
+  stratumHost: string;
+  stratumPort: number;
+  datumHost: string;
+  datumPort: number;
+};
+
+export type PoolStats = {
+  running: boolean;
+  chain: MinerChain | null;
+  height: number;
+  workers: number;
+  accepted: number;
+  rejected: number;
+  lastError: string;
+  status: string;
+  stratumPort: number;
+  datumPort: number;
+};
+
 export type { LogLine };
 
 function listen<T>(channel: string, cb: (v: T) => void): () => void {
@@ -71,4 +97,7 @@ contextBridge.exposeInMainWorld('miner', {
   onStats: (cb: (s: MinerStats) => void) => listen('miner:stats', cb),
   onLog: (cb: (line: LogLine) => void) => listen('miner:log', cb),
   onToast: (cb: (message: string) => void) => listen('miner:toast', cb),
+  poolStart: (opts: PoolStartOpts) => ipcRenderer.invoke('pool:start', opts),
+  poolStop: () => ipcRenderer.invoke('pool:stop'),
+  onPoolStats: (cb: (s: PoolStats) => void) => listen('pool:stats', cb),
 });

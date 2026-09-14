@@ -1,0 +1,153 @@
+<div class="pane">
+  <p class="hint">
+    Starts a local DATUM Prime + TIDES + Stratum v1 process against
+    <code>federationcoind</code>. Not the pool of record. Cookie stays in the
+    main process. Dummy MAIN is not live.
+  </p>
+
+  @if (showMainWarning()) {
+    <p class="warn" data-pool-main-warning>
+      Main is not live. Host a pool on Testnet until announcement.
+    </p>
+  }
+
+  <fieldset class="mode">
+    <legend>Chain</legend>
+    <label class="check" for="pool-chainTestnet">
+      <input
+        id="pool-chainTestnet"
+        type="radio"
+        name="pool-chain"
+        [checked]="chain() === 'testnet'"
+        [disabled]="pool.stats().running"
+        (change)="setChain('testnet')"
+      />
+      Testnet
+    </label>
+    <label class="check" for="pool-chainMain">
+      <input
+        id="pool-chainMain"
+        type="radio"
+        name="pool-chain"
+        [checked]="chain() === 'main'"
+        [disabled]="pool.stats().running"
+        (change)="setChain('main')"
+      />
+      Main
+    </label>
+  </fieldset>
+
+  <label for="pool-rpcHost">RPC host</label>
+  <input
+    id="pool-rpcHost"
+    type="text"
+    autocomplete="off"
+    spellcheck="false"
+    [value]="rpcHost()"
+    (input)="setRpcHost($any($event.target).value)"
+  />
+  <label for="pool-rpcPort">RPC port</label>
+  <input
+    id="pool-rpcPort"
+    type="number"
+    min="1"
+    max="65535"
+    [value]="rpcPort()"
+    (input)="setRpcPort($any($event.target).value)"
+  />
+  <label for="pool-datadir">Node data directory</label>
+  <div class="row path-row">
+    <input
+      id="pool-datadir"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      [value]="datadir()"
+      (input)="setDatadir($any($event.target).value)"
+    />
+    <button type="button" [disabled]="!mining.inElectron()" (click)="browseDatadir()">Browse</button>
+  </div>
+  <p class="hint">
+    Cookie is <code>{{ cookieHint() || '…/testnet3/.cookie' }}</code>. Contents stay in the main process.
+  </p>
+
+  <label for="pool-operator">Operator payout ({{ config().hrp }}1)</label>
+  <input
+    id="pool-operator"
+    type="text"
+    autocomplete="off"
+    spellcheck="false"
+    [placeholder]="config().hrp + '1…'"
+    [value]="operator()"
+    (input)="setOperator($any($event.target).value)"
+  />
+  <label for="pool-fee">Fee percent</label>
+  <input
+    id="pool-fee"
+    type="text"
+    inputmode="decimal"
+    [value]="feePercent()"
+    (input)="setFeePercent($any($event.target).value)"
+  />
+
+  <label for="pool-stratumHost">Stratum bind</label>
+  <input
+    id="pool-stratumHost"
+    type="text"
+    autocomplete="off"
+    spellcheck="false"
+    [value]="stratumHost()"
+    (input)="setStratumHost($any($event.target).value)"
+  />
+  <label for="pool-stratumPort">Stratum port</label>
+  <input
+    id="pool-stratumPort"
+    type="number"
+    min="1"
+    max="65535"
+    [value]="stratumPort()"
+    (input)="setStratumPort($any($event.target).value)"
+  />
+  <label for="pool-datumHost">DATUM Prime bind</label>
+  <input
+    id="pool-datumHost"
+    type="text"
+    autocomplete="off"
+    spellcheck="false"
+    [value]="datumHost()"
+    (input)="setDatumHost($any($event.target).value)"
+  />
+  <label for="pool-datumPort">DATUM Prime port</label>
+  <input
+    id="pool-datumPort"
+    type="number"
+    min="1"
+    max="65535"
+    [value]="datumPort()"
+    (input)="setDatumPort($any($event.target).value)"
+  />
+
+  @if (formError()) {
+    <p class="err">{{ formError() }}</p>
+  }
+
+  <div class="row">
+    <button type="button" id="pool-start" [disabled]="startDisabled()" (click)="start()">Start</button>
+    <button type="button" id="pool-stop" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+  </div>
+
+  <dl>
+    <dt>Status</dt>
+    <dd>{{ paneStats().status }}</dd>
+    <dt>Height</dt>
+    <dd>{{ paneStats().height }}</dd>
+    <dt>Workers</dt>
+    <dd>{{ paneStats().workers }}</dd>
+    <dt>Accepted</dt>
+    <dd>{{ paneStats().accepted }}</dd>
+    <dt>Rejected</dt>
+    <dd>{{ paneStats().rejected }}</dd>
+    <dt>Last error</dt>
+    <dd class="mono">{{ paneStats().lastError || '—' }}</dd>
+  </dl>
+</div>

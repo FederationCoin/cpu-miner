@@ -56,6 +56,32 @@ export type MinerStartOpts = {
   password?: string;
 };
 
+export type PoolStartOpts = {
+  chain: MinerChain;
+  rpcHost: string;
+  rpcPort: number;
+  datadir: string;
+  operator: string;
+  feeBps: number;
+  stratumHost: string;
+  stratumPort: number;
+  datumHost: string;
+  datumPort: number;
+};
+
+export type PoolStats = {
+  running: boolean;
+  chain: MinerChain | null;
+  height: number;
+  workers: number;
+  accepted: number;
+  rejected: number;
+  lastError: string;
+  status: string;
+  stratumPort: number;
+  datumPort: number;
+};
+
 export type MinerApi = {
   start: (opts: MinerStartOpts) => Promise<{ ok: boolean; error?: string }>;
   stop: () => Promise<void>;
@@ -66,6 +92,9 @@ export type MinerApi = {
   onStats: (cb: (s: MinerStats) => void) => () => void;
   onLog: (cb: (line: LogLine) => void) => () => void;
   onToast: (cb: (message: string) => void) => () => void;
+  poolStart: (opts: PoolStartOpts) => Promise<{ ok: boolean; error?: string }>;
+  poolStop: () => Promise<void>;
+  onPoolStats: (cb: (s: PoolStats) => void) => () => void;
 };
 
 declare global {
