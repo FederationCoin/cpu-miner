@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { App } from './app';
 import { IDLE_STATS } from './mining.service';
-import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats } from '../miner-api';
+import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from '../miner-api';
 
 const electronInfo: MinerInfo = {
   cookiePath: '/tmp/x/testnet3/.cookie',
@@ -39,6 +39,7 @@ function memoryStorage(): Storage {
 
 function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
   let statsCb: ((s: MinerStats) => void) | undefined;
+  let poolCb: ((s: PoolStats) => void) | undefined;
   const api: MinerApi = {
     start: vi.fn(async (opts: MinerStartOpts) => {
       statsCb?.({
@@ -66,6 +67,43 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
     }),
     onLog: vi.fn().mockReturnValue(() => undefined),
     onToast: vi.fn().mockReturnValue(() => undefined),
+    poolStart: vi.fn(async (opts: PoolStartOpts) => {
+      poolCb?.({
+        running: true,
+        chain: opts.chain,
+        height: 0,
+        workers: 0,
+        accepted: 0,
+        rejected: 0,
+        lastError: '',
+        status: 'starting',
+        stratumPort: opts.stratumPort,
+        datumPort: opts.datumPort,
+      });
+      return { ok: true };
+    }),
+    poolStop: vi.fn(async () => {
+      poolCb?.({
+        running: false,
+        chain: null,
+        height: 0,
+        workers: 0,
+        accepted: 0,
+        rejected: 0,
+        lastError: '',
+        status: 'stopped',
+        stratumPort: 0,
+        datumPort: 0,
+      });
+    }),
+    onPoolStats: vi.fn((cb) => {
+      poolCb = cb;
+      return () => {
+        if (poolCb === cb) {
+          poolCb = undefined;
+        }
+      };
+    }),
     ...overrides,
   };
   return api;
@@ -95,7 +133,7 @@ function selectMode(fixture: ComponentFixture<App>, chain: 'main' | 'testnet', m
   fixture.detectChanges();
 }
 
-function selectTab(fixture: ComponentFixture<App>, chain: 'main' | 'testnet'): void {
+function selectTab(fixture: ComponentFixture<App>, chain: 'main' | 'testnet' | 'pool'): void {
   queryDe(fixture, `#tab-${chain}`).triggerEventHandler('click');
   fixture.detectChanges();
 }
@@ -312,6 +350,64 @@ describe('App', () => {
       sendToast?.('ECONNREFUSED 127.0.0.1:35332');
       f.detectChanges();
       expect(queryEl(f, '[role="status"]').textContent).toContain('ECONNREFUSED');
+    });
+
+    it('places Host a pool after Main and Testnet', async () => {
+      const f = await render(stubMiner());
+      const tabs = f.debugElement.queryAll(By.css('[role="tab"]')).map((d) => (d.nativeElement as HTMLElement).id);
+      expect(tabs).toEqual(['tab-main', 'tab-testnet', 'tab-pool']);
+      expect(queryEl(f, '#panel-pool').hidden).toBe(true);
+      selectTab(f, 'pool');
+      expect(queryEl(f, '#panel-pool').hidden).toBe(false);
+      expect(queryEl(f, '#panel-testnet').hidden).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#pool-chainTestnet').checked).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#pool-stratumPort').value).toBe('23334');
+      expect(queryEl<HTMLInputElement>(f, '#pool-datumPort').value).toBe('28916');
+    });
+
+    it('Start on Host a pool sends spawn IPC without a cookie', async () => {
+      const poolStart = vi.fn<(opts: PoolStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
+      const f = await render(stubMiner({ poolStart }));
+      selectTab(f, 'pool');
+      setInput(f, '#pool-operator', 'tgfcn1abc');
+      queryDe(f, '#pool-start').triggerEventHandler('click');
+      await f.whenStable();
+      expect(poolStart).toHaveBeenCalledWith({
+        chain: 'testnet',
+        rpcHost: '127.0.0.1',
+        rpcPort: 35332,
+        datadir: '/tmp/x',
+        operator: 'tgfcn1abc',
+        feeBps: 200,
+        stratumHost: '127.0.0.1',
+        stratumPort: 23334,
+        datumHost: '127.0.0.1',
+        datumPort: 28916,
+      });
+      expect(JSON.stringify(poolStart.mock.calls[0]?.[0])).not.toMatch(/cookie/i);
+    });
+
+    it('Stop on Host a pool calls poolStop', async () => {
+      const miner = stubMiner();
+      const f = await render(miner);
+      selectTab(f, 'pool');
+      setInput(f, '#pool-operator', 'tgfcn1abc');
+      queryDe(f, '#pool-start').triggerEventHandler('click');
+      await f.whenStable();
+      f.detectChanges();
+      expect(queryEl<HTMLButtonElement>(f, '#pool-stop').disabled).toBe(false);
+      queryDe(f, '#pool-stop').triggerEventHandler('click');
+      await f.whenStable();
+      expect(miner.poolStop).toHaveBeenCalled();
+    });
+
+    it('Host a pool Main warning stays not-live', async () => {
+      const f = await render(stubMiner());
+      selectTab(f, 'pool');
+      queryDe(f, '#pool-chainMain').triggerEventHandler('change');
+      f.detectChanges();
+      expect(has(f, '[data-pool-main-warning]')).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#pool-operator').placeholder).toContain('gfcn1');
     });
   });
 });

@@ -6,10 +6,11 @@ Local **Federation Miner** app: Angular UI in the renderer, Node in the main pro
 
 **Testnet is the public net.** Dummy **MAIN** is not live (`mainIsLive` false). The Main tab stays enabled and toasts that MAIN is not launched; cookie/RPC failures there are expected until announcement.
 
-Two panes share one hasher. Two mining modes:
+Two panes share one hasher. Two mining modes, plus **Host a pool**:
 
 - **Node RPC** — cookie + `getblocktemplate` / `submitblock` via Node `fetch` to a host/port you set. Testnet default `127.0.0.1:35332` and `testnet3/.cookie`, payout **tgfcn1**. Main default `127.0.0.1:4094` and `<datadir>/.cookie`, payout **gfcn1**. The cookie never goes to the renderer.
 - **Stratum** — ASIC-style TCP Stratum v1. Host/port/worker (username) / password (default `x`). Default `127.0.0.1:23334` (saved per chain). A `.worker` suffix is allowed. No payout field: the pool or proxy builds the coinbase. Solo still uses `stratum-proxy --payout-address tgfcn1…` from [`cpu-miner-cpp`](https://github.com/ldelarua/workspace-FederationCoin/tree/master/cpu-miner-cpp) (or DATUM `mining.pool_address`); this miner only authorizes as **worker**.
+- **Host a pool** — third tab (`#tab-pool`), not a third chain. Spawns [`federation-pool`](https://github.com/FederationCoin/federation-pool) (DATUM Prime **28916** + TIDES + Stratum v1 **23334**) against the operator’s `federationcoind`. Testnet default. Main still toasts that MAIN is not live. Cookie stays in the main process. This app does **not** wrap `cpu-miner-cpp` binaries.
 
 GPU hashing is additive and in-process. Tick GPUs in the pane (all off by default, including Intel iGPU). You do **not** run a second app or `fcminer`. You do **not** install the CUDA Toolkit. Install NVIDIA / AMD / Intel **GPU drivers** (OpenCL ICD) if you want devices listed. No driver: empty GPU list, CPU still mines. A GPU driver fault can take down the whole app. ccminer “blake2b” hashes the wrong construction.
 
@@ -52,7 +53,7 @@ npm test
 npm start
 ```
 
-`npm start` builds the renderer + `out-electron/` then the GPU addon (Electron 44 ABI) then launches Electron. If the addon fails to compile, Start still works on CPU.
+`npm start` builds the renderer + `out-electron/` then the GPU addon (Electron 44 ABI) then launches Electron. If the addon fails to compile, Start still works on CPU. **Host a pool** copies `../federation-pool/dist/cli.js` into `vendor/federation-pool` when that sibling exists (`FEDERATION_POOL_CLI` overrides). Build the pool CLI first if you want that tab to spawn a process.
 
 Unsigned artifacts under `dist-electron/` (gitignored):
 

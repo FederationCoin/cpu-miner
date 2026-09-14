@@ -35,6 +35,9 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
     }),
     onLog: vi.fn().mockReturnValue(() => undefined),
     onToast: vi.fn().mockReturnValue(() => undefined),
+    poolStart: vi.fn().mockResolvedValue({ ok: true }),
+    poolStop: vi.fn().mockResolvedValue(undefined),
+    onPoolStats: vi.fn().mockReturnValue(() => undefined),
     ...overrides,
   };
 }

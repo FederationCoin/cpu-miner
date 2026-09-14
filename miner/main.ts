@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,14 @@ import {
   type RpcAuth,
 } from './rpc.js';
 import { gpuExtraNonce2, listGpus, scanGpus, startGpuGrind, stopGpu } from './gpu.js';
+import {
+  IDLE_POOL_STATS,
+  parsePoolStatsLine,
+  poolArgv,
+  resolvePoolCli,
+  type PoolStartOpts,
+  type PoolStats,
+} from './pool.js';
 import { StratumClient } from './stratum.js';
 import type { MinerInfo, MinerMode, MinerStartOpts, MinerStats } from './preload.js';
 import type { WorkerInit, WorkerMsg } from './worker.js';
@@ -62,6 +71,8 @@ let cookieAuth: RpcAuth | null = null;
 let cookieSecret = '';
 let stratumSecret = '';
 let activeGpuIds: string[] = [];
+let poolChild: ChildProcess | null = null;
+let poolStatsState: PoolStats = { ...IDLE_POOL_STATS };
 
 function stats(): MinerStats {
   return {
@@ -102,6 +113,19 @@ function emitLog(mode: string, message: string, toast = false): LogLine {
     win?.webContents.send('miner:toast', payload.message);
   }
   return line;
+}
+
+function emitPoolStats(): void {
+  win?.webContents.send('pool:stats', poolStatsState);
+}
+
+function stopPoolChild(): void {
+  if (poolChild) {
+    poolChild.kill('SIGTERM');
+    poolChild = null;
+  }
+  poolStatsState = { ...IDLE_POOL_STATS, status: 'stopped' };
+  emitPoolStats();
 }
 
 function killWorkers(): void {
@@ -599,6 +623,79 @@ ipcMain.handle('miner:logHistory', (): LogLine[] => logHistory());
 
 ipcMain.handle('miner:gpus', () => scanGpus());
 
+ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
+  try {
+    const chain = parseChain(opts.chain);
+    if (chain === 'main' && !MAIN_IS_LIVE) {
+      win?.webContents.send('miner:toast', 'MAIN is not live');
+    }
+    const args = poolArgv(opts);
+    const cli = resolvePoolCli(process.env, here, process.resourcesPath);
+    if (!cli) {
+      throw new Error('federation-pool CLI not found (build ../federation-pool or set FEDERATION_POOL_CLI)');
+    }
+    stopPoolChild();
+    const child = spawn(process.execPath, [cli, ...args], {
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    poolChild = child;
+    poolStatsState = { ...IDLE_POOL_STATS, running: true, chain, status: 'starting' };
+    emitPoolStats();
+    emitLog('pool', `start ${chain} ${cli}`);
+    let buf = '';
+    child.stdout?.setEncoding('utf8');
+    child.stdout?.on('data', (chunk: string) => {
+      buf += chunk;
+      while (true) {
+        const nl = buf.indexOf('\n');
+        if (nl < 0) {
+          break;
+        }
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        const parsed = parsePoolStatsLine(line);
+        if (parsed) {
+          poolStatsState = parsed;
+          emitPoolStats();
+        }
+      }
+    });
+    child.stderr?.setEncoding('utf8');
+    child.stderr?.on('data', (chunk: string) => {
+      const msg = chunk.trim();
+      if (msg) {
+        poolStatsState = { ...poolStatsState, lastError: msg };
+        emitLog('pool', msg, true);
+        emitPoolStats();
+      }
+    });
+    child.on('exit', (code) => {
+      if (poolChild !== child) {
+        return;
+      }
+      poolChild = null;
+      poolStatsState = {
+        ...IDLE_POOL_STATS,
+        lastError: code ? `pool exit ${code}` : poolStatsState.lastError,
+        status: 'stopped',
+      };
+      emitPoolStats();
+      emitLog('pool', `stopped${code ? ` (${code})` : ''}`);
+    });
+    return { ok: true as const };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    emitLog('pool', error, true);
+    return { ok: false as const, error };
+  }
+});
+
+ipcMain.handle('pool:stop', async () => {
+  emitLog('pool', 'stop');
+  stopPoolChild();
+});
+
 ipcMain.handle(
   'miner:start',
   async (_e, opts: MinerStartOpts) => {
@@ -672,5 +769,6 @@ app.on('window-all-closed', () => {
   cancelSleep();
   stratumClient?.close();
   killWorkers();
+  stopPoolChild();
   app.quit();
 });
