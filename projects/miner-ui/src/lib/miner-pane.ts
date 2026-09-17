@@ -8,10 +8,11 @@ import { IDLE_STATS, MiningService } from './mining.service';
 import { PoolService } from './pool.service';
 import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
 import { DefaultsFold } from './defaults-fold';
+import { WebgpuHelp } from './webgpu-help';
 
 @Component({
   selector: 'app-miner-pane',
-  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold],
+  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold, WebgpuHelp],
   styleUrl: './miner-pane.css',
   templateUrl: './miner-pane.html',
   host: { '[attr.data-chain]': 'chain()' },
@@ -24,6 +25,7 @@ export class MinerPane implements OnInit {
 
   protected readonly gpuIds = signal<string[]>([]);
   protected readonly gpuDetecting = signal(false);
+  protected readonly webgpuHelpAutoOpen = signal(false);
   protected readonly formError = signal('');
 
   protected readonly form = new FormGroup({
@@ -206,6 +208,9 @@ export class MinerPane implements OnInit {
   }
 
   protected appPoolReady(): boolean {
+    if (this.shell.kind === 'webDemo') {
+      return false;
+    }
     const s = this.pool.stats();
     return s.running && s.chain === this.chain();
   }
@@ -367,8 +372,13 @@ export class MinerPane implements OnInit {
       scanned: this.mining.gpuScanned(),
       addon: this.mining.gpuAddon(),
       deviceCount: this.gpuList().length,
+      reason: this.mining.gpuReason(),
     };
     return this.isWebDemo() ? gpuStatusHintWeb(state) : gpuStatusHint(state);
+  }
+
+  protected webGpuHelpVisible(): boolean {
+    return this.isWebDemo() && this.gpuList().length === 0;
   }
 
   protected async detectGpus(): Promise<void> {
@@ -378,6 +388,9 @@ export class MinerPane implements OnInit {
     this.gpuDetecting.set(true);
     try {
       await this.mining.refreshGpus();
+      if (this.webGpuHelpVisible()) {
+        this.webgpuHelpAutoOpen.set(true);
+      }
     } finally {
       this.gpuDetecting.set(false);
     }

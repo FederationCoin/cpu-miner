@@ -269,9 +269,14 @@
   <app-defaults-fold [foldId]="id('gpus-fold')" title="GPUs" [summary]="gpuSummary()">
     <fieldset class="gpus" [attr.id]="id('gpus')">
       <legend>GPUs</legend>
-      <button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
-        {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
-      </button>
+      <div class="row">
+        <button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
+          {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
+        </button>
+        @if (webGpuHelpVisible()) {
+          <app-webgpu-help [chain]="chain()" [autoOpen]="webgpuHelpAutoOpen()" />
+        }
+      </div>
       @if (gpuList().length > 0) {
         @for (dev of gpuList(); track dev.id) {
           <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.id))">

@@ -1,34 +1,59 @@
 import { ASIC_POW_WGSL } from './asic-pow.shader';
-import type { GpuDevice } from './miner-api';
+import type { GpuDevice, GpuScanReason } from './miner-api';
+
+const ADAPTER_REQUEST = { powerPreference: 'high-performance' as const };
+
+export type WebGpuScan = {
+  devices: GpuDevice[];
+  reason: GpuScanReason;
+  detail?: string;
+};
 
 export async function webgpuAvailable(): Promise<boolean> {
   return !!(globalThis.navigator && 'gpu' in navigator);
 }
 
-export async function scanWebGpu(): Promise<GpuDevice[]> {
+async function requestWebGpuAdapter(): Promise<GPUAdapter | null> {
   const gpu = globalThis.navigator?.gpu;
   if (!gpu) {
-    return [];
+    return null;
+  }
+  return gpu.requestAdapter(ADAPTER_REQUEST);
+}
+
+export async function diagnoseWebGpu(): Promise<WebGpuScan> {
+  const gpu = globalThis.navigator?.gpu;
+  if (!gpu) {
+    return { devices: [], reason: 'no-api' };
   }
   try {
-    const adapter = await gpu.requestAdapter();
+    const adapter = await gpu.requestAdapter(ADAPTER_REQUEST);
     if (!adapter) {
-      return [];
+      return { devices: [], reason: 'no-adapter' };
     }
     const info = adapter.info;
-    return [
-      {
-        id: 'webgpu:0',
-        name: info?.device || info?.description || 'WebGPU adapter',
-        vendor: info?.vendor || 'webgpu',
-        memoryMiB: 0,
-        backend: 'webgpu',
-        kind: 'discrete',
-      },
-    ];
-  } catch {
-    return [];
+    return {
+      reason: 'ok',
+      devices: [
+        {
+          id: 'webgpu:0',
+          name: info?.device || info?.description || 'WebGPU adapter',
+          vendor: info?.vendor || 'webgpu',
+          memoryMiB: 0,
+          backend: 'webgpu',
+          kind: 'discrete',
+        },
+      ],
+    };
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return { devices: [], reason: 'error', detail };
   }
+}
+
+export async function scanWebGpu(): Promise<GpuDevice[]> {
+  const scan = await diagnoseWebGpu();
+  return scan.devices;
 }
 
 export type WebGpuHashResult = { hash: Uint8Array } | { error: string };
@@ -41,7 +66,7 @@ export async function webgpuAsicPowHash(work: Uint8Array, mask: Uint8Array = new
   if (work.length !== 80) {
     return { error: 'work must be 80 bytes' };
   }
-  const adapter = await gpu.requestAdapter();
+  const adapter = await requestWebGpuAdapter();
   if (!adapter) {
     return { error: 'no adapter' };
   }
@@ -123,7 +148,7 @@ export async function webgpuGrind(
   if (!gpu) {
     return { hashes: 0 };
   }
-  const adapter = await gpu.requestAdapter();
+  const adapter = await requestWebGpuAdapter();
   if (!adapter) {
     return { hashes: 0 };
   }

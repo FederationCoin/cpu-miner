@@ -1,0 +1,54 @@
+:host {
+  display: inline-block;
+}
+
+dialog {
+  max-width: 36rem;
+  padding: 1.1rem 1.2rem 1rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 6px;
+  background: #151821;
+  color: #e8eaed;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+h2 {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+}
+
+p,
+li {
+  color: #c5c9d1;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+ol {
+  margin: 0.5rem 0 0.85rem;
+  padding-left: 1.2rem;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.88em;
+}
+
+.row {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+button {
+  padding: 0.45rem 0.9rem;
+  border: 0;
+  border-radius: 4px;
+  background: #3d6ea8;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}

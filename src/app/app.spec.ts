@@ -402,6 +402,7 @@ describe('App', () => {
       const f = await render(stubMiner());
       expect(has(f, '#testnet-gpus')).toBe(true);
       expect(queryEl(f, '#testnet-gpus').textContent).toMatch(/OpenCL or CUDA|GPUs listed yet|Off until you tick/);
+      expect(has(f, '#testnet-webgpuHelp')).toBe(false);
     });
 
     it('starts cookie Node RPC and GPUs inside closed folds whose summaries omit secrets and paths', async () => {
@@ -482,6 +483,7 @@ describe('App', () => {
       f.detectChanges();
       expect(gpus).toHaveBeenCalled();
       expect(queryEl(f, '#testnet-gpus').textContent).toMatch(/No GPU hasher/);
+      expect(has(f, '#testnet-webgpuHelp')).toBe(false);
     });
 
     it('GPU checkboxes use safe ids and Start sends the real CUDA id', async () => {
@@ -624,6 +626,9 @@ describe('App', () => {
       selectTab(f, 'testnet', 'finder');
       expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/abundant/i);
       expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/Empty slot/);
+      expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/work in progress/i);
+      expect(queryEl<HTMLButtonElement>(f, '#testnet-finder-register').disabled).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#testnet-finder-name').disabled).toBe(true);
     });
 
     it('Start on pool sends spawn IPC without a cookie', async () => {

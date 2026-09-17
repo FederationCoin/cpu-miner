@@ -1,0 +1,31 @@
+<button type="button" [id]="id('webgpuHelp')" (click)="open()">Help</button>
+<dialog [id]="id('webgpuHelpDialog')" #dlg [attr.aria-labelledby]="id('webgpuHelpTitle')">
+  <h2 [id]="id('webgpuHelpTitle')">Enable WebGPU</h2>
+  <p>
+    Detect lists one browser adapter when <code>navigator.gpu.requestAdapter()</code> succeeds. This
+    page cannot turn Chrome’s GPU block on. CPU threads still mine without an adapter.
+  </p>
+  <ol>
+    <li>
+      Open this miner in Google Chrome or Edge on Windows. Cursor’s embedded browser and Chromium
+      inside WSL almost always launch with <code>--disable-gpu</code>.
+    </li>
+    <li>
+      Visit <code>chrome://gpu</code> (or <code>edge://gpu</code>). Graphics Feature Status should
+      show WebGPU and Gpu compositing as Hardware accelerated.
+    </li>
+    <li>
+      If Problems Detected says WebGPU is disabled via blocklist or the command line, set
+      <code>chrome://flags/#ignore-gpu-blocklist</code> to Enabled and relaunch.
+    </li>
+    <li>
+      Check <code>chrome://version</code> Command Line. Remove
+      <code>--disable-gpu</code>, <code>--disable-webgpu</code>,
+      <code>--disable-gpu-compositing</code>, or SwiftShader, then relaunch.
+    </li>
+    <li>Come back here, click Detect GPUs, and tick <code>webgpu:0</code> before Start.</li>
+  </ol>
+  <div class="row">
+    <button type="button" [id]="id('webgpuHelpClose')" (click)="close()">Close</button>
+  </div>
+</dialog>

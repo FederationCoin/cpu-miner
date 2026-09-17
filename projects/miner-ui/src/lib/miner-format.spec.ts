@@ -3,8 +3,11 @@ import { cookiePathHint, formatHashRate, formatSats, gpuStatusHint, gpuStatusHin
 describe('gpuStatusHintWeb', () => {
   it('covers detecting, unscanned, missing adapter, and ready', () => {
     expect(gpuStatusHintWeb({ detecting: true, scanned: false, addon: false, deviceCount: 0 })).toMatch(/WebGPU adapter/);
-    expect(gpuStatusHintWeb({ detecting: false, scanned: false, addon: false, deviceCount: 0 })).toMatch(/No GPUs listed yet/);
-    expect(gpuStatusHintWeb({ detecting: false, scanned: true, addon: false, deviceCount: 0 })).toMatch(/No WebGPU adapter/);
+    expect(gpuStatusHintWeb({ detecting: false, scanned: false, addon: false, deviceCount: 0 })).toMatch(/Open Help/);
+    expect(gpuStatusHintWeb({ detecting: false, scanned: true, addon: false, deviceCount: 0 })).toMatch(/Open Help/);
+    expect(
+      gpuStatusHintWeb({ detecting: false, scanned: true, addon: false, deviceCount: 0, reason: 'no-api' }),
+    ).toMatch(/no WebGPU API/);
     expect(gpuStatusHintWeb({ detecting: false, scanned: true, addon: true, deviceCount: 1 })).toMatch(/Off until you tick the adapter/);
   });
 });

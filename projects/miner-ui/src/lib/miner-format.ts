@@ -1,4 +1,5 @@
 import type { MinerChain } from './chain';
+import type { GpuScanReason } from './miner-api';
 
 export function mainIsNotLive(chainId: MinerChain, mainIsLive: boolean): boolean {
   return chainId === 'main' && !mainIsLive;
@@ -68,15 +69,19 @@ export function gpuStatusHintWeb(state: {
   scanned: boolean;
   addon: boolean;
   deviceCount: number;
+  reason?: GpuScanReason;
 }): string {
   if (state.detecting) {
     return 'Asking the browser for a WebGPU adapter.';
   }
   if (!state.scanned) {
-    return 'No GPUs listed yet. Detect uses WebGPU in this page (CPU threads still mine if the adapter is missing).';
+    return 'No GPUs listed yet. Detect uses WebGPU. Open Help to check chrome://gpu and enable it. CPU threads still mine.';
   }
   if (!state.addon || state.deviceCount === 0) {
-    return 'No WebGPU adapter. CPU threads in this tab still mine. The desktop app can use CUDA/OpenCL.';
+    if (state.reason === 'no-api') {
+      return 'This browser has no WebGPU API. Open Help to check chrome://gpu and enable it. CPU threads in this tab still mine.';
+    }
+    return 'No WebGPU adapter. Open Help to check chrome://gpu and enable it. CPU threads in this tab still mine.';
   }
   return 'Off until you tick the adapter. CPU workers stay on. Combined hashrate below.';
 }

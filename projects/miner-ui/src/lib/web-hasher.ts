@@ -18,7 +18,7 @@ import type {
 } from './miner-api';
 import type { HostedEndpoints } from './miner-shell';
 import { StratumWsClient, stratumWsUrl, type StratumNotify, type StratumWsTransport } from './stratum-ws';
-import { scanWebGpu, webgpuGrind } from './webgpu';
+import { diagnoseWebGpu, webgpuGrind } from './webgpu';
 
 export const IDLE_WEB_STATS: MinerStats = {
   running: false,
@@ -196,8 +196,8 @@ export class WebHasherHost implements HasherHost {
   }
 
   async gpus(): Promise<GpuScan> {
-    const devices = await scanWebGpu();
-    return { devices, addon: devices.length > 0 };
+    const scan = await diagnoseWebGpu();
+    return { devices: scan.devices, addon: scan.devices.length > 0, reason: scan.reason };
   }
 
   pickDatadir(): Promise<string | null> {

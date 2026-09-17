@@ -17,8 +17,12 @@
     }
   </ul>
 
-  <fieldset class="partition" [formGroup]="form">
-    <legend>Register (stub)</legend>
+  <fieldset class="partition" disabled [formGroup]="form">
+    <legend>Register (work in progress)</legend>
+    <p class="hint">
+      This form is disabled. A verifiable directory is later: coinbase ASCII tag, a Stratum we can
+      connect to, and observed work. A form post is not a listing.
+    </p>
     <label [attr.for]="id('name')">Name</label>
     <input [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
     <label [attr.for]="id('tag')">Coinbase tag</label>
@@ -28,7 +32,7 @@
     <label [attr.for]="id('datum')">DATUM host:port</label>
     <input [id]="id('datum')" type="text" autocomplete="off" spellcheck="false" formControlName="datum" />
     <div class="row">
-      <button type="button" [id]="id('register')" (click)="submit()">Submit listing</button>
+      <button type="button" [id]="id('register')" disabled (click)="submit()">Submit listing</button>
     </div>
     @if (notice()) {
       <p class="hint">{{ notice() }}</p>

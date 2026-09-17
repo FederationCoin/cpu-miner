@@ -94,4 +94,17 @@ describe('MiningService', () => {
     expect(miner.start).toHaveBeenCalledTimes(2);
     expect(miner.start).toHaveBeenLastCalledWith(expect.objectContaining({ chain: 'main' }));
   });
+
+  it('records the WebGPU scan reason', async () => {
+    const miner = stubMiner({
+      gpus: vi.fn().mockResolvedValue({ devices: [], addon: false, reason: 'no-adapter' }),
+    });
+    window.miner = miner;
+    const svc = TestBed.inject(MiningService);
+    const scan = await svc.refreshGpus();
+    expect(scan.reason).toBe('no-adapter');
+    expect(svc.gpuScanned()).toBe(true);
+    expect(svc.gpuReason()).toBe('no-adapter');
+    expect(svc.gpuDevices()).toEqual([]);
+  });
 });

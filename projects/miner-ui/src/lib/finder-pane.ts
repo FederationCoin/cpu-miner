@@ -17,10 +17,10 @@ export class FinderPane {
   protected readonly shell = inject(MINER_SHELL);
   protected readonly notice = signal('');
   protected readonly form = new FormGroup({
-    name: new FormControl('', { nonNullable: true }),
-    tag: new FormControl('', { nonNullable: true }),
-    stratum: new FormControl('', { nonNullable: true }),
-    datum: new FormControl('', { nonNullable: true }),
+    name: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
+    tag: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
+    stratum: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
+    datum: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
   });
 
   protected id(suffix: string): string {
@@ -44,7 +44,7 @@ export class FinderPane {
 
   protected submit(): void {
     this.notice.set(
-      'Register is a stub. A verifiable directory is later: coinbase ASCII tag plus a Stratum we can connect to, and observed work. A form post is not proof.',
+      'Register is work in progress. A verifiable directory is later: coinbase ASCII tag plus a Stratum we can connect to, and observed work. A form post is not a listing.',
     );
   }
 }

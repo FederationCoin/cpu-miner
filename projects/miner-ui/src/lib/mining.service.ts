@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HASHER_HOST } from './hasher-host';
-import type { GpuDevice, GpuScan, MinerChain, MinerInfo, MinerStartOpts, MinerStats, MineToKind } from './miner-api';
+import type { GpuDevice, GpuScan, GpuScanReason, MinerChain, MinerInfo, MinerStartOpts, MinerStats, MineToKind } from './miner-api';
 
 export const IDLE_STATS: MinerStats = {
   running: false,
@@ -26,6 +26,7 @@ export class MiningService {
   readonly gpuDevices = signal<GpuDevice[]>([]);
   readonly gpuAddon = signal(false);
   readonly gpuScanned = signal(false);
+  readonly gpuReason = signal<GpuScanReason | undefined>(undefined);
   readonly toast = signal('');
   readonly sessionKind = signal<MineToKind | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -97,16 +98,18 @@ export class MiningService {
   }
 
   async refreshGpus(): Promise<GpuScan> {
-    const empty: GpuScan = { devices: [], addon: false };
+    const empty: GpuScan = { devices: [], addon: false, reason: 'error' };
     try {
       const r = await this.host.gpus();
       this.gpuDevices.set(r.devices);
       this.gpuAddon.set(r.addon);
+      this.gpuReason.set(r.reason);
       this.gpuScanned.set(true);
       return r;
     } catch {
       this.gpuDevices.set([]);
       this.gpuAddon.set(false);
+      this.gpuReason.set('error');
       this.gpuScanned.set(true);
       return empty;
     }

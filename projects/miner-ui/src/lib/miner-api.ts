@@ -36,9 +36,12 @@ export type GpuDevice = {
   kind: 'discrete' | 'integrated';
 };
 
+export type GpuScanReason = 'ok' | 'no-api' | 'no-adapter' | 'error';
+
 export type GpuScan = {
   devices: GpuDevice[];
   addon: boolean;
+  reason?: GpuScanReason;
 };
 
 export type RpcAuthKind = 'cookie' | 'userpass';
