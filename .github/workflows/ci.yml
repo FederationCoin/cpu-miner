@@ -24,4 +24,6 @@ jobs:
       - run: node -v && npm -v
       - run: sudo apt-get update && sudo apt-get install -y g++ make
       - run: npm ci
+      # Headless: Angular unit-test (jsdom), miner vitest, gpu CPU hash fixtures.
+      # Not Electron, not a live block search (test:live-electron is laptop-only).
       - run: npm test
