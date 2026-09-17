@@ -1,4 +1,5 @@
 import { parseHex, toHex } from './asic-pow';
+import type { MinerChain, PoolStats, TidesPayout } from './miner-api';
 
 export const STRATUM_UA = 'federationcoin-web-miner/0.1';
 
@@ -159,6 +160,69 @@ export function notifyIgnoreReason(msg: unknown): string {
   return 'bad mining.notify';
 }
 
+export function parsePoolStats(msg: unknown): PoolStats | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { method?: unknown; params?: unknown };
+  if (rec.method !== 'client.pool_stats' || !Array.isArray(rec.params) || rec.params.length < 1) {
+    return null;
+  }
+  const raw = rec.params[0];
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const o = raw as {
+    running?: unknown;
+    chain?: unknown;
+    height?: unknown;
+    workers?: unknown;
+    accepted?: unknown;
+    rejected?: unknown;
+    lastError?: unknown;
+    status?: unknown;
+    stratumHost?: unknown;
+    stratumPort?: unknown;
+    datumHost?: unknown;
+    datumPort?: unknown;
+    payouts?: unknown;
+  };
+  const chain: MinerChain | null = o.chain === 'main' ? 'main' : o.chain === 'testnet' ? 'testnet' : null;
+  return {
+    running: o.running !== false,
+    chain,
+    height: Number(o.height) || 0,
+    workers: Number(o.workers) || 0,
+    accepted: Number(o.accepted) || 0,
+    rejected: Number(o.rejected) || 0,
+    lastError: typeof o.lastError === 'string' ? o.lastError : '',
+    status: typeof o.status === 'string' ? o.status : '',
+    stratumHost: typeof o.stratumHost === 'string' ? o.stratumHost : '',
+    stratumPort: Number(o.stratumPort) || 0,
+    datumHost: typeof o.datumHost === 'string' ? o.datumHost : '',
+    datumPort: Number(o.datumPort) || 0,
+    payouts: parseTidesPayouts(o.payouts),
+  };
+}
+
+function parseTidesPayouts(raw: unknown): TidesPayout[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: TidesPayout[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') {
+      continue;
+    }
+    const miner = (row as { miner?: unknown }).miner;
+    const sats = (row as { sats?: unknown }).sats;
+    if (typeof miner === 'string' && (typeof sats === 'string' || typeof sats === 'number')) {
+      out.push({ miner, sats: String(sats) });
+    }
+  }
+  return out;
+}
+
 export function parseSetDifficulty(msg: unknown): number | null {
   if (!msg || typeof msg !== 'object') {
     return null;
@@ -183,6 +247,7 @@ export type StratumWsHandlers = {
   onClose: (reason: string) => void;
   onJobIgnored: (reason: string) => void;
   onDisconnected?: (reason: string) => void;
+  onPoolStats?: (stats: PoolStats) => void;
 };
 
 export type StratumWsClock = {
@@ -312,7 +377,10 @@ export class StratumWsClient {
       if (gen !== this.sockGen) {
         return;
       }
-      const text = typeof ev.data === 'string' ? ev.data : '';
+      if (typeof ev.data !== 'string') {
+        return;
+      }
+      const text = ev.data;
       this.buf += text.endsWith('\n') ? text : `${text}\n`;
       for (;;) {
         const nl = this.buf.indexOf('\n');
@@ -329,10 +397,12 @@ export class StratumWsClient {
         }
       }
     });
+    let deadOnce = false;
     const dead = (reason: string) => {
-      if (gen !== this.sockGen) {
+      if (gen !== this.sockGen || deadOnce) {
         return;
       }
+      deadOnce = true;
       this.onSocketDead(reason);
     };
     ws.addEventListener('error', () => dead('websocket error'));
@@ -476,6 +546,13 @@ export class StratumWsClient {
       return;
     }
     const rec = msg as { method?: unknown; id?: unknown; result?: unknown; error?: unknown };
+    if (rec.method === 'client.pool_stats') {
+      const stats = parsePoolStats(msg);
+      if (stats) {
+        this.handlers.onPoolStats?.(stats);
+      }
+      return;
+    }
     if (rec.method === 'mining.notify') {
       const job = parseNotify(msg);
       if (job) {
@@ -555,6 +632,138 @@ export class StratumWsClient {
    * submit timeouts, socket errors, or WS drops that force a full reconnect),
    * open a breaker and back off instead of amplifying load on our own pool.
    */
+  private scheduleReconnect(): void {
+    if (this.stopped || this.reconnectTimer != null) {
+      return;
+    }
+    this.backoffMs = nextWsBackoff(
+      this.backoffMs,
+      this.transport?.backoffFirstMs ?? WS_BACKOFF_FIRST_MS,
+      this.transport?.backoffMaxMs ?? WS_BACKOFF_MAX_MS,
+    );
+    this.reconnectTimer = this.clock().schedule(() => {
+      this.reconnectTimer = null;
+      if (!this.stopped) {
+        this.connect();
+      }
+    }, this.backoffMs);
+  }
+}
+
+export const WATCH_STATS_LINE = JSON.stringify({ id: null, method: 'client.watch_stats', params: [] });
+
+/** Idle SPA: same /stratum URL, stats only. Close this before opening StratumWsClient. */
+export class PoolStatsClient {
+  private ws: WebSocket | null = null;
+  private stopped = false;
+  private sockGen = 0;
+  private reconnectTimer: number | null = null;
+  private backoffMs = 0;
+
+  constructor(
+    readonly url: string,
+    private readonly onStats: (stats: PoolStats) => void,
+    private readonly transport?: StratumWsTransport,
+  ) {}
+
+  connect(): void {
+    if (this.stopped) {
+      return;
+    }
+    this.sockGen += 1;
+    const gen = this.sockGen;
+    const prev = this.ws;
+    this.ws = null;
+    if (prev) {
+      try {
+        prev.close();
+      } catch {
+        /* ignore */
+      }
+    }
+    const ws = this.transport?.open ? this.transport.open(this.url) : new WebSocket(this.url);
+    this.ws = ws;
+    ws.addEventListener('open', () => {
+      if (gen !== this.sockGen || this.stopped) {
+        return;
+      }
+      if (ws.readyState === 1) {
+        ws.send(`${WATCH_STATS_LINE}\n`);
+      }
+    });
+    ws.addEventListener('message', (ev: MessageEvent<string>) => {
+      if (gen !== this.sockGen || typeof ev.data !== 'string') {
+        return;
+      }
+      for (const part of ev.data.split('\n')) {
+        const line = part.replace(/\r$/, '').trim();
+        if (!line) {
+          continue;
+        }
+        let msg: unknown;
+        try {
+          msg = JSON.parse(line) as unknown;
+        } catch {
+          continue;
+        }
+        const stats = parsePoolStats(msg);
+        if (stats) {
+          this.onStats(stats);
+        }
+      }
+    });
+    let deadOnce = false;
+    const dead = () => {
+      if (gen !== this.sockGen || deadOnce) {
+        return;
+      }
+      deadOnce = true;
+      this.onSocketDead();
+    };
+    ws.addEventListener('error', () => dead());
+    ws.addEventListener('close', () => dead());
+  }
+
+  close(): void {
+    this.stopped = true;
+    this.cancelReconnect();
+    this.sockGen += 1;
+    const ws = this.ws;
+    this.ws = null;
+    try {
+      ws?.close();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private clock(): StratumWsClock {
+    return (
+      this.transport?.clock ?? {
+        now: () => Date.now(),
+        schedule: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+        cancel: (id) => {
+          clearTimeout(id);
+        },
+      }
+    );
+  }
+
+  private onSocketDead(): void {
+    this.ws = null;
+    if (this.stopped) {
+      return;
+    }
+    this.scheduleReconnect();
+  }
+
+  private cancelReconnect(): void {
+    if (this.reconnectTimer != null) {
+      this.clock().cancel(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
   private scheduleReconnect(): void {
     if (this.stopped || this.reconnectTimer != null) {
       return;

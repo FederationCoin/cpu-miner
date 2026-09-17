@@ -3,6 +3,7 @@ import {
   authorizeLine,
   nextWsBackoff,
   parseNotify,
+  parsePoolStats,
   parseSetDifficulty,
   parseSubscribeResult,
   notifyIgnoreReason,
@@ -11,7 +12,9 @@ import {
   stratumWsUrl,
   submitLine,
   subscribeLine,
+  PoolStatsClient,
   StratumWsClient,
+  WATCH_STATS_LINE,
   type StratumWsClock,
   type StratumWsHandlers,
 } from './stratum-ws';
@@ -23,11 +26,11 @@ class FakeWebSocket {
   static CLOSED = 3;
   readyState = FakeWebSocket.CONNECTING;
   sent: string[] = [];
-  private readonly listeners = new Map<string, Array<(ev: { data?: string }) => void>>();
+  private readonly listeners = new Map<string, Array<(ev: { data?: unknown }) => void>>();
 
   constructor(readonly url: string) {}
 
-  addEventListener(type: string, fn: (ev: { data?: string }) => void): void {
+  addEventListener(type: string, fn: (ev: { data?: unknown }) => void): void {
     const list = this.listeners.get(type) ?? [];
     list.push(fn);
     this.listeners.set(type, list);
@@ -45,6 +48,10 @@ class FakeWebSocket {
     this.emit('close');
   }
 
+  errorNow(): void {
+    this.emit('error');
+  }
+
   openNow(): void {
     this.readyState = FakeWebSocket.OPEN;
     this.emit('open');
@@ -54,7 +61,11 @@ class FakeWebSocket {
     this.emit('message', { data: `${JSON.stringify(obj)}\n` });
   }
 
-  private emit(type: string, ev: { data?: string } = {}): void {
+  pushRaw(data: unknown): void {
+    this.emit('message', { data });
+  }
+
+  private emit(type: string, ev: { data?: unknown } = {}): void {
     for (const fn of this.listeners.get(type) ?? []) {
       fn(ev);
     }
@@ -432,6 +443,148 @@ describe('StratumWsClient outbox', () => {
       params: ['j', '11'.repeat(32), '22'.repeat(38), '', [], '20000000', '1e00ffff', '01020304', true],
     });
     expect(ignored).toEqual(['bad mining.notify (coinb1 38 bytes)']);
+    client.close();
+  });
+
+  it('calls onDisconnected once for error then close on the same socket', () => {
+    const sockets: FakeWebSocket[] = [];
+    const clock = testClock();
+    const downs: string[] = [];
+    const client = new StratumWsClient(
+      'ws://pool.test/stratum',
+      'tgfcn1abc.cpu',
+      'x',
+      silentHandlers({
+        onDisconnected: (r) => downs.push(r),
+      }),
+      {
+        open: (url) => {
+          const ws = new FakeWebSocket(url);
+          sockets.push(ws);
+          return ws as unknown as WebSocket;
+        },
+        clock,
+        backoffFirstMs: 60_000,
+        backoffMaxMs: 60_000,
+      },
+    );
+    client.connect();
+    sockets[0]!.openNow();
+    handshake(sockets[0]!);
+    sockets[0]!.errorNow();
+    sockets[0]!.close();
+    expect(downs).toEqual(['websocket error']);
+    client.close();
+  });
+
+  it('does not treat a binary/ping frame as a dead socket', () => {
+    const sockets: FakeWebSocket[] = [];
+    const downs: string[] = [];
+    const client = new StratumWsClient(
+      'ws://pool.test/stratum',
+      'tgfcn1abc.cpu',
+      'x',
+      silentHandlers({
+        onDisconnected: (r) => downs.push(r),
+      }),
+      {
+        open: (url) => {
+          const ws = new FakeWebSocket(url);
+          sockets.push(ws);
+          return ws as unknown as WebSocket;
+        },
+      },
+    );
+    client.connect();
+    sockets[0]!.openNow();
+    handshake(sockets[0]!);
+    sockets[0]!.pushRaw(new ArrayBuffer(2));
+    expect(downs).toEqual([]);
+    client.close();
+  });
+
+  it('parses client.pool_stats', () => {
+    const stats = parsePoolStats({
+      id: null,
+      method: 'client.pool_stats',
+      params: [
+        {
+          running: true,
+          chain: 'testnet',
+          height: 2,
+          workers: 1,
+          accepted: 7,
+          rejected: 0,
+          lastError: '',
+          status: 'height 2',
+          stratumHost: '127.0.0.1',
+          stratumPort: 23334,
+          datumHost: '127.0.0.1',
+          datumPort: 28916,
+          payouts: [{ miner: 'tgfcn1abc', sats: '34180' }],
+        },
+      ],
+    });
+    expect(stats?.height).toBe(2);
+    expect(stats?.payouts).toEqual([{ miner: 'tgfcn1abc', sats: '34180' }]);
+    expect(parsePoolStats({ method: 'mining.notify', params: [] })).toBeNull();
+  });
+
+  it('dispatches client.pool_stats to onPoolStats', () => {
+    const sockets: FakeWebSocket[] = [];
+    const heights: number[] = [];
+    const client = new StratumWsClient(
+      'ws://pool.test/stratum',
+      'tgfcn1abc.cpu',
+      'x',
+      silentHandlers({
+        onPoolStats: (s) => heights.push(s.height),
+      }),
+      {
+        open: (url) => {
+          const ws = new FakeWebSocket(url);
+          sockets.push(ws);
+          return ws as unknown as WebSocket;
+        },
+      },
+    );
+    client.connect();
+    sockets[0]!.openNow();
+    handshake(sockets[0]!);
+    sockets[0]!.pushLine({
+      method: 'client.pool_stats',
+      params: [{ running: true, chain: 'testnet', height: 4, workers: 0, accepted: 0, rejected: 0 }],
+    });
+    expect(heights).toEqual([4]);
+    client.close();
+  });
+});
+
+describe('PoolStatsClient', () => {
+  it('watches stats without mining.subscribe', () => {
+    const sockets: FakeWebSocket[] = [];
+    const heights: number[] = [];
+    const client = new PoolStatsClient(
+      'ws://pool.test/stratum',
+      (s) => heights.push(s.height),
+      {
+        open: (url) => {
+          const ws = new FakeWebSocket(url);
+          sockets.push(ws);
+          return ws as unknown as WebSocket;
+        },
+      },
+    );
+    client.connect();
+    sockets[0]!.openNow();
+    expect(sockets[0]!.sent.some((l) => l.includes('client.watch_stats'))).toBe(true);
+    expect(sockets[0]!.sent.some((l) => l.includes('mining.subscribe'))).toBe(false);
+    expect(WATCH_STATS_LINE).toContain('client.watch_stats');
+    sockets[0]!.pushLine({
+      method: 'client.pool_stats',
+      params: [{ running: true, chain: 'testnet', height: 2 }],
+    });
+    expect(heights).toEqual([2]);
     client.close();
   });
 });

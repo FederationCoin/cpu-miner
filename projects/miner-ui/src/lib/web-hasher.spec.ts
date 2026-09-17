@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_HOSTED_TESTNET } from './miner-shell';
-import { WebHasherHost } from './web-hasher';
-import type { StratumWsClock } from './stratum-ws';
+import { GRIND_GRACE_MS, WebHasherHost } from './web-hasher';
+import { StratumWsClient, type StratumWsClock } from './stratum-ws';
 
 class FakeWebSocket {
   static OPEN = 1;
   readyState = 0;
   sent: string[] = [];
-  private readonly listeners = new Map<string, Array<(ev: { data?: string }) => void>>();
+  private readonly listeners = new Map<string, Array<(ev: { data?: unknown }) => void>>();
   constructor(readonly url: string) {}
-  addEventListener(type: string, fn: (ev: { data?: string }) => void): void {
+  addEventListener(type: string, fn: (ev: { data?: unknown }) => void): void {
     const list = this.listeners.get(type) ?? [];
     list.push(fn);
     this.listeners.set(type, list);
@@ -36,17 +36,30 @@ class FakeWebSocket {
   }
 }
 
-type Timer = { fn: () => void; ms: number };
+type Timer = { fn: () => void; ms: number; due: number };
 
-function testClock(): StratumWsClock & { timers: Map<number, Timer>; runAll: () => void } {
+function testClock(): StratumWsClock & {
+  timers: Map<number, Timer>;
+  runAll: () => void;
+  advance: (ms: number) => void;
+} {
   const timers = new Map<number, Timer>();
   let next = 1;
+  let now = 0;
+  const fireDue = (): void => {
+    for (const [id, t] of [...timers.entries()]) {
+      if (t.due <= now) {
+        timers.delete(id);
+        t.fn();
+      }
+    }
+  };
   return {
     timers,
-    now: () => 0,
+    now: () => now,
     schedule: (fn, ms) => {
       const id = next++;
-      timers.set(id, { fn, ms });
+      timers.set(id, { fn, ms, due: now + ms });
       return id;
     },
     cancel: (id) => {
@@ -58,17 +71,35 @@ function testClock(): StratumWsClock & { timers: Map<number, Timer>; runAll: () 
         t.fn();
       }
     },
+    advance: (ms) => {
+      now += ms;
+      fireDue();
+    },
   };
+}
+
+function handshake(ws: FakeWebSocket, extraNonce1 = 'aabbccdd'): void {
+  ws.pushLine({ id: 1, error: null, result: [[], extraNonce1, 8] });
+  ws.pushLine({ id: 2, error: null, result: true });
+}
+
+function notify(ws: FakeWebSocket, jobId = 'job1'): void {
+  ws.pushLine({
+    method: 'mining.notify',
+    params: [jobId, '11'.repeat(32), '22'.repeat(39), '', [], '1e00ffff', '1e00ffff', '01020304'],
+  });
+}
+
+function mineSocket(sockets: FakeWebSocket[]): FakeWebSocket {
+  return sockets[sockets.length - 1]!;
 }
 
 describe('WebHasherHost reconnect', () => {
   it('reconnects the Stratum socket while mining and stops for real', async () => {
     const origFetch = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ running: true, chain: 'testnet', status: 'ok' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })) as typeof fetch;
+    globalThis.fetch = (async () => {
+      throw new Error('HTTP /api/stats must not be polled');
+    }) as typeof fetch;
     const sockets: FakeWebSocket[] = [];
     const clock = testClock();
     const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
@@ -83,41 +114,37 @@ describe('WebHasherHost reconnect', () => {
     });
     try {
       const stats: string[] = [];
-      host.onStats((s) => stats.push(s.status));
+      const errors: string[] = [];
+      host.onStats((s) => {
+        stats.push(s.status);
+        errors.push(s.lastError);
+      });
       const r = await host.start({
         chain: 'testnet',
         threads: 1,
         mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
       });
       expect(r.ok).toBe(true);
-      sockets[0]!.openNow();
-      sockets[0]!.pushLine({ id: 1, error: null, result: [[], 'aabbccdd', 8] });
-      sockets[0]!.pushLine({ id: 2, error: null, result: true });
+      const mine = mineSocket(sockets);
+      mine.openNow();
+      handshake(mine);
       expect(stats.some((s) => s.includes('authorized'))).toBe(true);
-      sockets[0]!.close();
+      mine.close();
       expect(stats.some((s) => s.includes('reconnecting'))).toBe(true);
+      expect(errors.at(-1)).toBe('');
       clock.runAll();
-      expect(sockets).toHaveLength(2);
+      expect(sockets.length).toBeGreaterThan(1);
       await host.stop();
       const n = sockets.length;
       clock.runAll();
       expect(sockets.length).toBe(n);
     } finally {
       globalThis.fetch = origFetch;
-      const timer = (host as unknown as { pollTimer: ReturnType<typeof setInterval> | null }).pollTimer;
-      if (timer) {
-        clearInterval(timer);
-      }
+      host.stopWatch();
     }
   });
 
   it('toasts when mining.notify coinb1 is not 39 bytes', async () => {
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ running: true, chain: 'testnet', status: 'ok' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      })) as typeof fetch;
     const sockets: FakeWebSocket[] = [];
     const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
       open: (url) => {
@@ -135,21 +162,17 @@ describe('WebHasherHost reconnect', () => {
         mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
       });
       expect(r.ok).toBe(true);
-      sockets[0]!.openNow();
-      sockets[0]!.pushLine({ id: 1, error: null, result: [[], 'aabbccdd', 8] });
-      sockets[0]!.pushLine({ id: 2, error: null, result: true });
-      sockets[0]!.pushLine({
+      const mine = mineSocket(sockets);
+      mine.openNow();
+      handshake(mine);
+      mine.pushLine({
         method: 'mining.notify',
         params: ['j', '11'.repeat(32), '22'.repeat(38), '', [], '20000000', '1e00ffff', '01020304', true],
       });
       expect(toasts).toContain('bad mining.notify (coinb1 38 bytes)');
       await host.stop();
     } finally {
-      globalThis.fetch = origFetch;
-      const timer = (host as unknown as { pollTimer: ReturnType<typeof setInterval> | null }).pollTimer;
-      if (timer) {
-        clearInterval(timer);
-      }
+      host.stopWatch();
     }
   });
 
@@ -171,11 +194,112 @@ describe('WebHasherHost reconnect', () => {
       });
       expect(r.ok).toBe(false);
       expect(r.error).toMatch(/WebSocket port \(443\)/);
+      expect((host as unknown as { pollTimer?: unknown }).pollTimer).toBeUndefined();
     } finally {
-      const timer = (host as unknown as { pollTimer: ReturnType<typeof setInterval> | null }).pollTimer;
-      if (timer) {
-        clearInterval(timer);
-      }
+      host.stopWatch();
+    }
+  });
+
+  it('pauses grind after the grace window while the outbox still retries', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const clock = testClock();
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+      clock,
+      backoffFirstMs: 5,
+      backoffMaxMs: 5,
+      submitRetryMs: 50,
+    });
+    try {
+      const snap: Array<{ hashes: number; hashrate: number; lastError: string; link: string }> = [];
+      host.onStats((s) => snap.push({ hashes: s.hashes, hashrate: s.hashrate, lastError: s.lastError, link: s.link }));
+      const toasts: string[] = [];
+      host.onToast((m) => toasts.push(m));
+      const r = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
+      });
+      expect(r.ok).toBe(true);
+      const mine = mineSocket(sockets);
+      mine.openNow();
+      handshake(mine);
+      notify(mine);
+      await Promise.resolve();
+      clock.advance(0);
+      await Promise.resolve();
+      const hashesBefore = snap.at(-1)?.hashes ?? 0;
+      expect(hashesBefore).toBeGreaterThan(0);
+      const client = (host as unknown as { client: StratumWsClient | null }).client;
+      expect(client).toBeTruthy();
+      client!.submit('job1', new Uint8Array(8), new Uint8Array(8), new Uint8Array(8));
+      mine.close();
+      expect(toasts).toContain('connection closed');
+      expect(snap.at(-1)?.lastError).toBe('');
+      expect(snap.at(-1)?.link).toBe('down');
+      await Promise.resolve();
+      clock.advance(0);
+      const hashesMid = snap.at(-1)?.hashes ?? 0;
+      expect(hashesMid).toBeGreaterThanOrEqual(hashesBefore);
+      clock.advance(GRIND_GRACE_MS);
+      const hashesPaused = snap.at(-1)?.hashes ?? 0;
+      clock.advance(0);
+      clock.advance(0);
+      expect(snap.at(-1)?.hashes).toBe(hashesPaused);
+      expect(snap.at(-1)?.hashrate).toBe(0);
+      clock.advance(5);
+      const resumed = mineSocket(sockets);
+      expect(resumed).not.toBe(mine);
+      resumed.openNow();
+      handshake(resumed);
+      expect(resumed.sent.filter((l) => l.includes('mining.submit')).length).toBeGreaterThan(0);
+      await host.stop();
+    } finally {
+      host.stopWatch();
+    }
+  });
+
+  it('does not poll HTTP /api/stats and applies pushed pool height', async () => {
+    let fetches = 0;
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      fetches += 1;
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+    const sockets: FakeWebSocket[] = [];
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
+    try {
+      const heights: number[] = [];
+      host.onStats((s) => heights.push(s.height));
+      const r = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
+      });
+      expect(r.ok).toBe(true);
+      const mine = mineSocket(sockets);
+      mine.openNow();
+      handshake(mine);
+      mine.pushLine({
+        method: 'client.pool_stats',
+        params: [{ running: true, chain: 'testnet', height: 2, workers: 1, accepted: 0, rejected: 0 }],
+      });
+      expect(heights.at(-1)).toBe(2);
+      expect(fetches).toBe(0);
+      await host.stop();
+    } finally {
+      globalThis.fetch = origFetch;
+      host.stopWatch();
     }
   });
 });

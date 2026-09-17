@@ -86,6 +86,17 @@ let activeGpuIds: string[] = [];
 let poolChild: ChildProcess | null = null;
 let poolStatsState: PoolStats = { ...IDLE_POOL_STATS };
 
+function minerLink(runningNow: boolean, statusNow: string): MinerStats['link'] {
+  if (!runningNow) {
+    return 'idle';
+  }
+  const s = statusNow.toLowerCase();
+  if (s.includes('reconnect') || s === 'disconnected' || s.startsWith('connecting')) {
+    return 'down';
+  }
+  return 'up';
+}
+
 function stats(): MinerStats {
   return {
     running,
@@ -98,6 +109,7 @@ function stats(): MinerStats {
     lastError: safeText(lastError),
     lastHash,
     status,
+    link: minerLink(running, status),
   };
 }
 

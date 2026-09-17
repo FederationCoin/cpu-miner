@@ -186,6 +186,14 @@ describe('web demo shell', () => {
     expect(has(f, '#testnet-webgpuHelp')).toBe(false);
   });
 
+  it('shows an idle Stratum link pill', async () => {
+    const f = await render();
+    const pill = f.nativeElement.querySelector('#testnet-link') as HTMLElement;
+    expect(pill).toBeTruthy();
+    expect(pill.getAttribute('data-link')).toBe('idle');
+    expect(pill.textContent).toContain('Stratum idle');
+  });
+
   it('defaults Stratum to the WebSocket host on 443', async () => {
     const f = await render();
     (f.nativeElement.querySelector('#testnet-mineToStratum') as HTMLInputElement).click();

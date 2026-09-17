@@ -5,6 +5,8 @@ import type { MinerStartOpts } from './mine-to.js';
 export type { MinerChain } from './chain.js';
 export type { MineTo, MineToKind, MinerStartOpts, RpcConnect, RpcAuthConnect, RpcAuthKind, StratumConnect, DatumConnect } from './mine-to.js';
 
+export type MinerLink = 'idle' | 'up' | 'down';
+
 export type MinerStats = {
   running: boolean;
   chain: import('./chain.js').MinerChain | null;
@@ -16,6 +18,7 @@ export type MinerStats = {
   lastError: string;
   lastHash: string;
   status: string;
+  link: MinerLink;
 };
 
 export type MinerInfo = {

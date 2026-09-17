@@ -300,6 +300,10 @@
   </app-defaults-fold>
 
   <dl>
+    <dt>Link</dt>
+    <dd>
+      <span class="link-pill" [attr.data-link]="paneStats().link" [attr.id]="id('link')">{{ linkLabel() }}</span>
+    </dd>
     <dt>Status</dt>
     <dd>{{ paneStats().status }}</dd>
     <dt>Hashrate</dt>
@@ -317,8 +321,4 @@
     <dt>Endpoint</dt>
     <dd class="mono">{{ endpointHint() }}</dd>
   </dl>
-
-  @if (paneStats().lastError) {
-    <p class="err">{{ paneStats().lastError }}</p>
-  }
 </div>

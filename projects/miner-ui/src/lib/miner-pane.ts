@@ -151,6 +151,17 @@ export class MinerPane implements OnInit {
     return this.mining.activeChain() === this.chain() ? this.mining.stats() : IDLE_STATS;
   }
 
+  protected linkLabel(): string {
+    switch (this.paneStats().link) {
+      case 'up':
+        return 'Stratum up';
+      case 'down':
+        return 'Stratum down';
+      default:
+        return 'Stratum idle';
+    }
+  }
+
   protected startDisabled(): boolean {
     return !this.mining.canMine() || this.mining.activeChain() === this.chain();
   }

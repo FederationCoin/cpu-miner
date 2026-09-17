@@ -13,6 +13,7 @@ export const IDLE_STATS: MinerStats = {
   lastError: '',
   lastHash: '',
   status: 'idle',
+  link: 'idle',
 };
 
 /** One hasher session; panes only hold form state. */

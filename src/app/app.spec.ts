@@ -599,6 +599,42 @@ describe('App', () => {
       expect(queryEl(f, '[role="status"]').textContent).toContain('ECONNREFUSED');
     });
 
+    it('shows a persistent link pill and no error bar after a flap plus authorize', async () => {
+      let sendStats: ((s: MinerStats) => void) | undefined;
+      const f = await render(
+        stubMiner({
+          onStats: (cb) => {
+            sendStats = cb;
+            return () => undefined;
+          },
+        }),
+      );
+      expect(queryEl(f, '#testnet-link').textContent).toContain('Stratum idle');
+      sendStats?.({
+        ...IDLE_STATS,
+        running: true,
+        chain: 'testnet',
+        status: 'reconnecting (connection closed)',
+        link: 'down',
+        lastError: '',
+      });
+      f.detectChanges();
+      expect(queryEl(f, '#testnet-link').getAttribute('data-link')).toBe('down');
+      expect(queryEl(f, '#testnet-link').textContent).toContain('Stratum down');
+      expect(has(f, '.err')).toBe(false);
+      sendStats?.({
+        ...IDLE_STATS,
+        running: true,
+        chain: 'testnet',
+        status: 'authorized tgfcn1abc.cpu',
+        link: 'up',
+        lastError: '',
+      });
+      f.detectChanges();
+      expect(queryEl(f, '#testnet-link').getAttribute('data-link')).toBe('up');
+      expect(has(f, '.err')).toBe(false);
+    });
+
     it('stacks RpcConnect host, port, and datadir in the pool pane', async () => {
       const f = await render(stubMiner());
       selectTab(f, 'testnet', 'pool');

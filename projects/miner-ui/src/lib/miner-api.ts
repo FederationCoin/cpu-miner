@@ -6,6 +6,9 @@ export type LogLine = {
   message: string;
 };
 
+/** Always set on MinerStats. idle = not mining; up/down is the Stratum link. */
+export type MinerLink = 'idle' | 'up' | 'down';
+
 export type MinerStats = {
   running: boolean;
   chain: MinerChain | null;
@@ -17,6 +20,7 @@ export type MinerStats = {
   lastError: string;
   lastHash: string;
   status: string;
+  link: MinerLink;
 };
 
 export type MinerInfo = {
