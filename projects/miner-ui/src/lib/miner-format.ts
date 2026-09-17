@@ -62,3 +62,21 @@ export function formatSats(sats: string): string {
   const frac = (v % 100000000n).toString().padStart(8, '0');
   return `${neg ? '-' : ''}${whole}.${frac}`;
 }
+
+export function gpuStatusHintWeb(state: {
+  detecting: boolean;
+  scanned: boolean;
+  addon: boolean;
+  deviceCount: number;
+}): string {
+  if (state.detecting) {
+    return 'Asking the browser for a WebGPU adapter.';
+  }
+  if (!state.scanned) {
+    return 'No GPUs listed yet. Detect uses WebGPU in this page (CPU threads still mine if the adapter is missing).';
+  }
+  if (!state.addon || state.deviceCount === 0) {
+    return 'No WebGPU adapter. CPU threads in this tab still mine. The desktop app can use CUDA/OpenCL.';
+  }
+  return 'Off until you tick the adapter. CPU workers stay on. Combined hashrate below.';
+}

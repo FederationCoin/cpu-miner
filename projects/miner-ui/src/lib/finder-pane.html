@@ -1,0 +1,37 @@
+<div class="pane" [attr.id]="id('root')">
+  <p class="hint">
+    Pools should be abundant. This list is curated for the demo. A public registry that proves the
+    name you post is the worker who hashed is still a TODO: coinbase tag, advertised Stratum, and
+    observed hashrate. DNS TXT is correlation, not cryptographic identity.
+  </p>
+
+  <ul class="finder-list">
+    @for (p of listings(); track p.id) {
+      <li>
+        <strong>{{ p.name }}</strong>
+        <span class="hint-inline">{{ p.tag }}</span>
+        <p class="mono">{{ p.stratum }}</p>
+        <p class="mono">{{ p.datum }}</p>
+        <p class="hint">{{ listingHint(p) }}</p>
+      </li>
+    }
+  </ul>
+
+  <fieldset class="partition" [formGroup]="form">
+    <legend>Register (stub)</legend>
+    <label [attr.for]="id('name')">Name</label>
+    <input [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
+    <label [attr.for]="id('tag')">Coinbase tag</label>
+    <input [id]="id('tag')" type="text" autocomplete="off" spellcheck="false" formControlName="tag" placeholder="/YourPool/" />
+    <label [attr.for]="id('stratum')">Stratum host:port</label>
+    <input [id]="id('stratum')" type="text" autocomplete="off" spellcheck="false" formControlName="stratum" />
+    <label [attr.for]="id('datum')">DATUM host:port</label>
+    <input [id]="id('datum')" type="text" autocomplete="off" spellcheck="false" formControlName="datum" />
+    <div class="row">
+      <button type="button" [id]="id('register')" (click)="submit()">Submit listing</button>
+    </div>
+    @if (notice()) {
+      <p class="hint">{{ notice() }}</p>
+    }
+  </fieldset>
+</div>

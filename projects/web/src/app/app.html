@@ -1,11 +1,10 @@
 <main>
   <header class="header">
     <div>
-      <h1>FederationCoin CPU miner</h1>
+      <h1>FederationCoin miner</h1>
       <p class="lead">
-        Network is the tenant. Mine, pool, docs, and finder sit under the toggle.
-        Mine to a node, Stratum, DATUM Prime, or the app-hosted pool when it is running.
-        Unsigned; no Developer account.
+        Web demo. Network is the tenant. In-page mining is WebSocket Stratum (WebGPU or CPU).
+        DATUM and node RPC stay on the desktop app with your own node. MAIN house pool is off.
       </p>
     </div>
     <label class="network-toggle" for="network-toggle">
@@ -20,14 +19,6 @@
       </select>
     </label>
   </header>
-
-  @if (!mining.canMine()) {
-    <p class="warn">
-      This UI is the Electron renderer. From <code>cpu-miner/</code> run
-      <code>npm start</code> (nvm Current Node). <code>ng serve</code> cannot
-      mine.
-    </p>
-  }
 
   <app-network-workspace chain="testnet" [hidden]="network.chain() !== 'testnet'" />
   <app-network-workspace chain="main" [hidden]="network.chain() !== 'main'" />

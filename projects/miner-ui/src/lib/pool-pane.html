@@ -1,0 +1,114 @@
+<div class="pane" [formGroup]="form" [attr.data-tides]="tidesJson()">
+  @if (hostedMainDisabled()) {
+    <p class="warn" data-pool-main-warning>
+      Federation pool is not supported on main. It is offered only as a demonstration piece on
+      testnet. Point a miner at another pool if you have one. DATUM on main still needs your own
+      node and the desktop app.
+    </p>
+  } @else if (isHosted()) {
+    <h3>{{ hostedLabel() }}</h3>
+    <p class="hint">
+      This pool is already set up and running if you want to mine. Settings are read-only; the
+      server image owns the config. Not the pool of record.
+    </p>
+    <dl>
+      <dt>Stratum TCP</dt>
+      <dd class="mono">{{ hostedStratum() }}</dd>
+      <dt>Stratum WSS</dt>
+      <dd class="mono">{{ hostedWss() }}</dd>
+      <dt>DATUM TCP</dt>
+      <dd class="mono">{{ hostedDatum() }}</dd>
+      <dt>DATUM WSS</dt>
+      <dd class="mono">{{ hostedDatumWss() }}</dd>
+    </dl>
+    <p class="hint">
+      DATUM is bring your own node. The desktop app can connect DATUM to these TCP ports with
+      <em>your</em> bitcoind. Pool <code>WSS /datum</code> is the coinbaser wrap only. This page
+      will not proxy ours.
+    </p>
+  } @else {
+    <p class="hint">
+      Starts a local DATUM Prime + TIDES + Stratum v1 process against
+      <code>federationcoind</code>. This is a <strong>friends-and-family</strong> pool: one
+      process, JSONL on disk, not hardened. If a share is dropped you can get right with people
+      you know. That is a problem at scale (strangers, public hashrate). Not the pool of record.
+      Cookie stays in the main process. Dummy MAIN is not live.
+    </p>
+
+    @if (showMainWarning()) {
+      <p class="warn" data-pool-main-warning>
+        Main is not live. Host a pool on Testnet until announcement.
+      </p>
+    }
+
+    <fieldset class="partition">
+      <legend>Node RPC</legend>
+      <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain() + '-pool'" [chain]="chain()" />
+    </fieldset>
+
+    <label [attr.for]="id('operator')">Operator payout ({{ config().hrp }}1)</label>
+    <input
+      [id]="id('operator')"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      [placeholder]="config().hrp + '1…'"
+      formControlName="operator"
+    />
+    <label [attr.for]="id('fee')">Fee percent</label>
+    <input [id]="id('fee')" type="text" inputmode="decimal" formControlName="feePercent" />
+
+    <fieldset class="partition">
+      <legend>Stratum bind</legend>
+      <label [attr.for]="id('stratumHost')">Host</label>
+      <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="stratumHost" />
+      <label [attr.for]="id('stratumPort')">Port</label>
+      <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="stratumPort" />
+    </fieldset>
+
+    <fieldset class="partition">
+      <legend>DATUM Prime bind</legend>
+      <label [attr.for]="id('datumHost')">Host</label>
+      <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="datumHost" />
+      <label [attr.for]="id('datumPort')">Port</label>
+      <input [id]="id('datumPort')" type="number" min="1" max="65535" formControlName="datumPort" />
+    </fieldset>
+
+    @if (formError()) {
+      <p class="err">{{ formError() }}</p>
+    }
+
+    <div class="row">
+      <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
+      <button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+    </div>
+  }
+
+  <dl>
+    <dt>Status</dt>
+    <dd>{{ paneStats().status }}</dd>
+    <dt>Height</dt>
+    <dd>{{ paneStats().height }}</dd>
+    <dt>Workers</dt>
+    <dd>{{ paneStats().workers }}</dd>
+    <dt>Accepted</dt>
+    <dd>{{ paneStats().accepted }}</dd>
+    <dt>Rejected</dt>
+    <dd>{{ paneStats().rejected }}</dd>
+    <dt>Last error</dt>
+    <dd class="mono">{{ paneStats().lastError || '—' }}</dd>
+  </dl>
+
+  @if (paneStats().payouts.length > 0) {
+    <fieldset class="partition" [attr.id]="id('tides')">
+      <legend>TIDES coinbase</legend>
+      <p class="hint">Paid in the next block’s coinbase. Share log is kept if this pool process restarts.</p>
+      <dl>
+        @for (p of paneStats().payouts; track p.miner) {
+          <dt class="mono">{{ p.miner }}</dt>
+          <dd>{{ formatPayout(p.sats) }}</dd>
+        }
+      </dl>
+    </fieldset>
+  }
+</div>

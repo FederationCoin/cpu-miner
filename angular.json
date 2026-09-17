@@ -67,7 +67,81 @@
           "defaultConfiguration": "development"
         },
         "test": {
-          "builder": "@angular/build:unit-test"
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "include": [
+              "**/*.spec.ts",
+              "../projects/miner-ui/src/lib/**/*.spec.ts"
+            ],
+            "exclude": [
+              "../projects/miner-ui/src/lib/asic-pow.spec.ts",
+              "../projects/miner-ui/src/lib/stratum-ws.spec.ts",
+              "../projects/miner-ui/src/lib/web-hasher.spec.ts"
+            ]
+          }
+        }
+      }
+    },
+    "miner-web": {
+      "projectType": "application",
+      "schematics": {},
+      "root": "projects/web",
+      "sourceRoot": "projects/web/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "projects/web/src/main.ts",
+            "index": "projects/web/src/index.html",
+            "tsConfig": "projects/web/tsconfig.app.json",
+            "baseHref": "/",
+            "outputPath": {
+              "base": "dist/web"
+            },
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
+            "styles": ["projects/web/src/styles.css"]
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "750kB",
+                  "maximumError": "1.5MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "miner-web:build:production"
+            },
+            "development": {
+              "buildTarget": "miner-web:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
         }
       }
     }

@@ -1,8 +1,9 @@
 import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import type { PoolStartOpts } from '../miner-api';
+import type { PoolStartOpts } from './miner-api';
 import { CHAINS, type MinerChain } from './chain';
 import { formatSats, mainIsNotLive } from './miner-format';
+import { MINER_SHELL } from './miner-shell';
 import { MiningService } from './mining.service';
 import { IDLE_POOL_STATS, PoolService } from './pool.service';
 import { RpcConnect, rpcConnectGroup, rpcConnectValue } from './rpc-connect';
@@ -17,6 +18,7 @@ export class PoolPane implements OnInit {
   readonly chain = input.required<MinerChain>();
   protected readonly mining = inject(MiningService);
   protected readonly pool = inject(PoolService);
+  protected readonly shell = inject(MINER_SHELL);
   protected readonly formError = signal('');
 
   protected readonly form = new FormGroup({
@@ -80,6 +82,9 @@ export class PoolPane implements OnInit {
   }
 
   protected paneStats() {
+    if (this.isHosted() && !this.hostedMainDisabled()) {
+      return this.pool.stats();
+    }
     const s = this.pool.stats();
     return s.running && s.chain === this.chain() ? s : IDLE_POOL_STATS;
   }
@@ -93,11 +98,47 @@ export class PoolPane implements OnInit {
   }
 
   protected startDisabled(): boolean {
-    return !this.mining.inElectron() || this.pool.stats().running;
+    return this.isHosted() || !this.mining.inElectron() || this.pool.stats().running;
   }
 
   protected stopDisabled(): boolean {
-    return !this.mining.inElectron() || !this.pool.stats().running || this.pool.stats().chain !== this.chain();
+    return this.isHosted() || !this.mining.inElectron() || !this.pool.stats().running || this.pool.stats().chain !== this.chain();
+  }
+
+  protected isHosted(): boolean {
+    return this.shell.kind === 'webDemo';
+  }
+
+  protected hostedMainDisabled(): boolean {
+    return this.isHosted() && this.chain() === 'main';
+  }
+
+  protected hostedLabel(): string {
+    return this.shell.kind === 'webDemo' ? this.shell.hosted.label : 'FederationCoin testnet pool';
+  }
+
+  protected hostedStratum(): string {
+    if (this.shell.kind !== 'webDemo') {
+      return '';
+    }
+    const t = this.shell.hosted.stratumTcp;
+    return `${t.host}:${t.port}`;
+  }
+
+  protected hostedDatum(): string {
+    if (this.shell.kind !== 'webDemo') {
+      return '';
+    }
+    const t = this.shell.hosted.datumTcp;
+    return `${t.host}:${t.port}`;
+  }
+
+  protected hostedWss(): string {
+    return this.shell.kind === 'webDemo' ? this.shell.hosted.stratumWss : '';
+  }
+
+  protected hostedDatumWss(): string {
+    return this.shell.kind === 'webDemo' ? this.shell.hosted.datumWss : '';
   }
 
   protected async start(): Promise<void> {

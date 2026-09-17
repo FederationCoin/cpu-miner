@@ -1,8 +1,9 @@
 import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import type { MineTo, MineToKind, MinerStartOpts, MinerStats } from '../miner-api';
+import type { MineTo, MineToKind, MinerStartOpts, MinerStats } from './miner-api';
 import { CHAINS, type ChainConfig, type MinerChain } from './chain';
-import { formatHashRate, gpuStatusHint, mainIsNotLive } from './miner-format';
+import { formatHashRate, gpuStatusHint, gpuStatusHintWeb, mainIsNotLive } from './miner-format';
+import { MINER_SHELL } from './miner-shell';
 import { IDLE_STATS, MiningService } from './mining.service';
 import { PoolService } from './pool.service';
 import { RpcConnect, rpcConnectGroup, rpcConnectValue } from './rpc-connect';
@@ -18,6 +19,7 @@ export class MinerPane implements OnInit {
   readonly chain = input.required<MinerChain>();
   protected readonly mining = inject(MiningService);
   protected readonly pool = inject(PoolService);
+  protected readonly shell = inject(MINER_SHELL);
 
   protected readonly gpuIds = signal<string[]>([]);
   protected readonly gpuDetecting = signal(false);
@@ -47,6 +49,10 @@ export class MinerPane implements OnInit {
       worker: new FormControl('', { nonNullable: true }),
       rpc: rpcConnectGroup(35332),
     }),
+    hostedPoolStratum: new FormGroup({
+      worker: new FormControl('', { nonNullable: true }),
+      password: new FormControl('x', { nonNullable: true }),
+    }),
     threads: new FormControl(4, { nonNullable: true }),
   });
 
@@ -75,7 +81,13 @@ export class MinerPane implements OnInit {
     const cfg = this.config();
     this.form.controls.rpc.patchValue(this.loadRpc('rpc', cfg.rpcPort));
     this.form.controls.stratum.patchValue({
-      host: localStorage.getItem(this.key('stratum.host'))?.trim() || '127.0.0.1',
+      host:
+        localStorage.getItem(this.key('stratum.host'))?.trim() ||
+        (this.shell.kind === 'webDemo'
+          ? this.chain() === 'testnet'
+            ? this.shell.hosted.stratumTcp.host
+            : ''
+          : '127.0.0.1'),
       port: this.loadNum('stratum.port', cfg.stratumPort),
       worker: localStorage.getItem(this.key('stratum.worker')) ?? '',
       password: localStorage.getItem(this.key('stratum.password')) ?? 'x',
@@ -94,6 +106,10 @@ export class MinerPane implements OnInit {
       worker: localStorage.getItem(this.key('appPoolDatum.worker')) ?? '',
       rpc: this.loadRpc('appPoolDatum.rpc', cfg.rpcPort),
     });
+    this.form.controls.hostedPoolStratum.patchValue({
+      worker: localStorage.getItem(this.key('hostedPoolStratum.worker')) ?? '',
+      password: localStorage.getItem(this.key('hostedPoolStratum.password')) ?? 'x',
+    });
     this.form.controls.payout.setValue(localStorage.getItem(this.key('payout')) ?? '');
     const savedThreads = localStorage.getItem(this.key('threads'));
     if (savedThreads) {
@@ -102,8 +118,9 @@ export class MinerPane implements OnInit {
       this.form.controls.threads.setValue(this.mining.info()!.defaultThreads);
     }
     const savedKind = localStorage.getItem(this.key('kind')) as MineToKind | null;
-    const allowed: MineToKind[] = ['node', 'stratum', 'datum', 'appPoolStratum', 'appPoolDatum'];
-    this.form.controls.kind.setValue(savedKind && allowed.includes(savedKind) ? savedKind : 'node');
+    const allowed = this.allowedKinds();
+    const fallback: MineToKind = this.shell.kind === 'webDemo' ? (this.chain() === 'testnet' ? 'hostedPoolStratum' : 'stratum') : 'node';
+    this.form.controls.kind.setValue(savedKind && allowed.includes(savedKind) ? savedKind : fallback);
     this.gpuIds.set(this.loadGpuIds());
     this.form.valueChanges.subscribe(() => this.persist());
   }
@@ -134,11 +151,53 @@ export class MinerPane implements OnInit {
   }
 
   protected startDisabled(): boolean {
-    return !this.mining.inElectron() || this.mining.activeChain() === this.chain();
+    return !this.mining.canMine() || this.mining.activeChain() === this.chain();
   }
 
   protected stopDisabled(): boolean {
-    return !this.mining.inElectron() || this.mining.activeChain() !== this.chain();
+    return !this.mining.canMine() || this.mining.activeChain() !== this.chain();
+  }
+
+  protected isWebDemo(): boolean {
+    return this.shell.kind === 'webDemo';
+  }
+
+  protected nodeRpcDisabled(): boolean {
+    return this.isWebDemo();
+  }
+
+  protected datumDisabled(): boolean {
+    return this.isWebDemo();
+  }
+
+  protected hostedPoolReady(): boolean {
+    return this.shell.kind === 'webDemo' && this.chain() === 'testnet';
+  }
+
+  protected hostedLabel(): string {
+    return this.shell.kind === 'webDemo' ? this.shell.hosted.label : 'FederationCoin testnet pool';
+  }
+
+  protected frozenHostedStratum(): string {
+    if (this.shell.kind !== 'webDemo') {
+      return '';
+    }
+    return this.shell.hosted.stratumWss;
+  }
+
+  protected allowedKinds(): MineToKind[] {
+    if (this.shell.kind === 'webDemo') {
+      const kinds: MineToKind[] = ['stratum'];
+      if (this.chain() === 'testnet') {
+        kinds.unshift('hostedPoolStratum');
+      }
+      return kinds;
+    }
+    const kinds: MineToKind[] = ['node', 'stratum', 'datum'];
+    if (this.appPoolReady()) {
+      kinds.push('appPoolStratum', 'appPoolDatum');
+    }
+    return kinds;
   }
 
   protected kindLocked(): boolean {
@@ -210,6 +269,10 @@ export class MinerPane implements OnInit {
       const v = this.form.controls.appPoolStratum.getRawValue();
       return { kind: 'appPoolStratum', worker: v.worker, password: v.password };
     }
+    if (kind === 'hostedPoolStratum') {
+      const v = this.form.controls.hostedPoolStratum.getRawValue();
+      return { kind: 'hostedPoolStratum', worker: v.worker, password: v.password };
+    }
     const v = this.form.controls.appPoolDatum.getRawValue();
     return {
       kind: 'appPoolDatum',
@@ -234,6 +297,8 @@ export class MinerPane implements OnInit {
     localStorage.setItem(this.key('appPoolStratum.worker'), v.appPoolStratum.worker);
     localStorage.setItem(this.key('appPoolStratum.password'), v.appPoolStratum.password);
     localStorage.setItem(this.key('appPoolDatum.worker'), v.appPoolDatum.worker);
+    localStorage.setItem(this.key('hostedPoolStratum.worker'), v.hostedPoolStratum.worker);
+    localStorage.setItem(this.key('hostedPoolStratum.password'), v.hostedPoolStratum.password);
     this.persistRpc('appPoolDatum.rpc', v.appPoolDatum.rpc);
     localStorage.setItem(this.key('threads'), String(v.threads));
   }
@@ -292,16 +357,17 @@ export class MinerPane implements OnInit {
   }
 
   protected gpuDetectDisabled(): boolean {
-    return !this.mining.inElectron() || this.kindLocked() || this.gpuDetecting();
+    return !this.mining.canMine() || this.kindLocked() || this.gpuDetecting();
   }
 
   protected gpuHint(): string {
-    return gpuStatusHint({
+    const state = {
       detecting: this.gpuDetecting(),
       scanned: this.mining.gpuScanned(),
       addon: this.mining.gpuAddon(),
       deviceCount: this.gpuList().length,
-    });
+    };
+    return this.isWebDemo() ? gpuStatusHintWeb(state) : gpuStatusHint(state);
   }
 
   protected async detectGpus(): Promise<void> {
@@ -366,6 +432,9 @@ export class MinerPane implements OnInit {
     }
     if (kind === 'appPoolStratum') {
       return `${this.frozenStratum()} (app pool stratum)`;
+    }
+    if (kind === 'hostedPoolStratum') {
+      return `${this.frozenHostedStratum()} (hosted stratum)`;
     }
     const rpc = rpcConnectValue(this.form.controls.appPoolDatum.controls.rpc);
     return `${this.frozenDatum()} (app pool datum) · ${rpc.host}:${rpc.port} (node)`;

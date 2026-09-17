@@ -241,6 +241,10 @@ async function selectFirstGpu(cdp) {
   return { selected: firstDev.id, checkbox, checked, scan };
 }
 
+function clickTestnetTab(tab) {
+  return `document.getElementById(${JSON.stringify('testnet-tab-' + tab)})?.click()`;
+}
+
 function snapshot(cdp) {
   return cdp.eval(`(() => {
     const txt = (sel) => document.querySelector(sel)?.textContent?.trim() ?? '';
@@ -254,6 +258,10 @@ function snapshot(cdp) {
         [...dl.querySelectorAll('dt')].map((dt, i) => [dt.textContent.trim(), dl.querySelectorAll('dd')[i]?.textContent.trim() ?? '']),
       );
     };
+    document.getElementById('testnet-tab-mine')?.click();
+    const miningRec = rec('#testnet-mining');
+    document.getElementById('testnet-tab-pool')?.click();
+    const poolRec = rec('#testnet-pool');
     let tides = [];
     try {
       tides = JSON.parse(document.querySelector('#testnet-pool [data-tides]')?.getAttribute('data-tides') || '[]');
@@ -263,11 +271,11 @@ function snapshot(cdp) {
     return {
       network: val('network-toggle'),
       operator: val('testnet-pool-operator'),
-      poolStatus: rec('#testnet-pool').Status ?? '',
-      poolHeight: rec('#testnet-pool').Height ?? '',
-      poolWorkers: rec('#testnet-pool').Workers ?? '',
-      poolAccepted: rec('#testnet-pool').Accepted ?? '',
-      mineStatus: rec('#testnet-mining').Status ?? '',
+      poolStatus: poolRec.Status ?? '',
+      poolHeight: poolRec.Height ?? '',
+      poolWorkers: poolRec.Workers ?? '',
+      poolAccepted: poolRec.Accepted ?? '',
+      mineStatus: miningRec.Status ?? '',
       kind: {
         node: checked('testnet-mineToNode'),
         stratum: checked('testnet-mineToStratum'),
@@ -283,8 +291,8 @@ function snapshot(cdp) {
       stopDisabled: !!document.getElementById('testnet-stop')?.disabled,
       poolStartDisabled: !!document.getElementById('testnet-pool-start')?.disabled,
       poolStopDisabled: !!document.getElementById('testnet-pool-stop')?.disabled,
-      mining: rec('#testnet-mining'),
-      pool: rec('#testnet-pool'),
+      mining: miningRec,
+      pool: poolRec,
       tides,
     };
   })()`);
@@ -292,6 +300,7 @@ function snapshot(cdp) {
 
 async function readRpcForm(cdp) {
   return cdp.eval(`(() => {
+    document.getElementById('testnet-tab-pool')?.click();
     const cookie = !!document.getElementById('testnet-pool-authCookie')?.checked;
     return {
       host: document.getElementById('testnet-pool-rpcHost')?.value ?? '127.0.0.1',
@@ -335,6 +344,7 @@ async function main() {
   if (net !== 'testnet') {
     throw new Error(`network is ${net}, expected testnet`);
   }
+  await cdp.eval(`document.getElementById('testnet-tab-pool')?.click()`);
   await selectCookieAuth(cdp, 'testnet-pool');
   const rpcForm = await readRpcForm(cdp);
   const { auth, rpcOpts } = nodeAuth(rpcForm);
@@ -345,6 +355,7 @@ async function main() {
   if (out.pasteOperator.value !== operator) {
     throw new Error('operator paste failed');
   }
+  await cdp.eval(`document.getElementById('testnet-tab-pool')?.click()`);
   await cdp.eval(`document.getElementById('testnet-pool-start').click()`);
   out.poolAfterStart = await waitFor(
     cdp,
@@ -353,12 +364,18 @@ async function main() {
       const dts = [...(dl?.querySelectorAll('dt') ?? [])].map((n) => n.textContent.trim());
       const dds = [...(dl?.querySelectorAll('dd') ?? [])].map((n) => n.textContent.trim());
       const rec = Object.fromEntries(dts.map((k, i) => [k, dds[i] ?? '']));
-      const radios = !!document.getElementById('testnet-mineToAppPoolStratum');
       const status = rec.Status || '';
-      return (radios && /height/i.test(status)) ? { status, height: Number(rec.Height || 0), radios } : null;
+      return /height/i.test(status) ? { status, height: Number(rec.Height || 0) } : null;
     })()`,
     25000,
     'pool start',
+  );
+  await cdp.eval(`document.getElementById('testnet-tab-mine')?.click()`);
+  out.poolRadios = await waitFor(
+    cdp,
+    `document.getElementById('testnet-mineToAppPoolStratum') ? { radios: true } : null`,
+    10000,
+    'app-pool radios',
   );
 
   await cdp.eval(`document.getElementById('testnet-mineToAppPoolStratum').click()`);
@@ -418,6 +435,7 @@ async function main() {
     90000,
     'app-pool datum hasher',
   );
+  await cdp.eval(`document.getElementById('testnet-tab-pool')?.click()`);
   await waitFor(
     cdp,
     `(() => {

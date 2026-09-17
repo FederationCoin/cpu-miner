@@ -1,0 +1,58 @@
+<div class="pane" [attr.id]="id('root')">
+  <h3>Pool grades</h3>
+  <p class="hint">
+    The <strong>app-hosted</strong> pool (desktop child process, loopback, JSONL on disk) is for
+    friends, family, LAN, and mesh. One process, no HA, no RDS-style backups. If the process dies
+    or the file is lost, some accepted work can vanish from the TIDES window. With people you know,
+    you can make that right. At scale (strangers, public hashrate, mainnet) it is an incident.
+  </p>
+  <p class="hint">
+    A <strong>pro pool</strong> needs a shared share store (Postgres), replicas only after that
+    store exists, and backups. Sticky sessions are not TIDES. Templates:
+    <code>infra/k8s/federationcoin/values-pool-ha.yaml</code> and
+    <code>infra/cloudformation/pool-rds.yaml</code>. Do not apply RDS onto the current demo cluster
+    unless you mean to.
+  </p>
+  <p class="hint">
+    Node and mempool databases can stay cheap. If other peers still hold the chain, a wiped node can
+    IBD. Mempool MariaDB is a cache. <strong>Pool shares cannot be recovered from P2P.</strong>
+  </p>
+
+  <h3>This house pool</h3>
+  <p class="hint">
+    The EKS testnet deploy is a demonstration piece, not the pool of record. MAIN is not served.
+    Config is in the image / ConfigMap, not edited here.
+  </p>
+
+  <h3>DATUM is bring your own node</h3>
+  <p class="hint">
+    The pool DATUM port is the coinbaser. Template construction stays on <em>your</em> bitcoind.
+    This cloud UI will not proxy our node (that would defeat DATUM). Supported path: desktop app +
+    your node + TCP DATUM to the advertised pool host.
+  </p>
+  <p class="hint">
+    <strong>Explore (not implemented):</strong> a JSON-RPC-over-WebSocket spec for <em>your</em>
+    node, then a separate <code>RpcConnectWs</code> partition. A browser could combine pool
+    <code>WSS /datum</code> with that node URI. Until a spec exists, there is no live URI box.
+    Pool <code>WSS /datum</code> is the coinbaser wrap only.
+  </p>
+
+  <h3>WebSocket Stratum</h3>
+  <p class="hint">
+    The web SPA is <code>mine.federationcoin.org</code> (network is the in-app dropdown). In-page
+    mining uses <code>wss://pool.testnet.federationcoin.org/stratum</code> (same jobs as TCP 23334).
+    Native miners keep TCP. Third-party Stratum from the browser also needs a WebSocket endpoint.
+  </p>
+
+  @if (isWeb()) {
+    <p class="hint">You are on the web demo shell. Desktop <code>npm start</code> is the LAN/mesh product.</p>
+  } @else {
+    <p class="hint">You are on the desktop shell. Bind loopback unless you mean to share on a LAN.</p>
+  }
+
+  <h3>Standalone clustered pool (later)</h3>
+  <p class="hint">
+    eksctl + Helm overlay for two pool replicas only after Postgres. CloudFormation RDS for the
+    hardened option. Same pool binary as the app child; the store binding is what changes the grade.
+  </p>
+</div>

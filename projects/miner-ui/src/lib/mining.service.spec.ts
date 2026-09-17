@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
+import { ElectronHasherHost } from './electron-hasher';
+import { HASHER_HOST } from './hasher-host';
 import { IDLE_STATS, MiningService } from './mining.service';
-import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats } from '../miner-api';
+import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats } from './miner-api';
 
 const electronInfo: MinerInfo = {
   cookiePath: '/tmp/x/testnet3/.cookie',
@@ -46,7 +48,9 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
 describe('MiningService', () => {
   beforeEach(() => {
     delete window.miner;
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [{ provide: HASHER_HOST, useClass: ElectronHasherHost }],
+    });
   });
 
   afterEach(() => {

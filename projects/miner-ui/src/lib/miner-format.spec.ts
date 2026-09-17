@@ -1,4 +1,13 @@
-import { cookiePathHint, formatHashRate, formatSats, gpuStatusHint, mainIsNotLive } from './miner-format';
+import { cookiePathHint, formatHashRate, formatSats, gpuStatusHint, gpuStatusHintWeb, mainIsNotLive } from './miner-format';
+
+describe('gpuStatusHintWeb', () => {
+  it('covers detecting, unscanned, missing adapter, and ready', () => {
+    expect(gpuStatusHintWeb({ detecting: true, scanned: false, addon: false, deviceCount: 0 })).toMatch(/WebGPU adapter/);
+    expect(gpuStatusHintWeb({ detecting: false, scanned: false, addon: false, deviceCount: 0 })).toMatch(/No GPUs listed yet/);
+    expect(gpuStatusHintWeb({ detecting: false, scanned: true, addon: false, deviceCount: 0 })).toMatch(/No WebGPU adapter/);
+    expect(gpuStatusHintWeb({ detecting: false, scanned: true, addon: true, deviceCount: 1 })).toMatch(/Off until you tick the adapter/);
+  });
+});
 
 describe('mainIsNotLive', () => {
   it('is true only for dummy MAIN', () => {

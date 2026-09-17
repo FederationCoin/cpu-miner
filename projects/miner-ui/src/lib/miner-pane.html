@@ -14,17 +14,53 @@
   <fieldset class="mode">
     <legend>Mine to</legend>
     <label class="check" [attr.for]="id('mineToNode')">
-      <input [id]="id('mineToNode')" type="radio" formControlName="kind" value="node" [attr.disabled]="kindLocked() ? true : null" />
+      <input
+        [id]="id('mineToNode')"
+        type="radio"
+        formControlName="kind"
+        value="node"
+        [attr.disabled]="kindLocked() || nodeRpcDisabled() ? true : null"
+      />
       Node RPC
     </label>
+    @if (nodeRpcDisabled()) {
+      <p class="hint" [attr.id]="id('rpcDisabledHint')" title="The browser is not a node, and this demo will not host yours. Use the desktop app on loopback or your LAN node.">
+        Node RPC is grayed out here. The browser is not a node, and this demo will not host yours.
+        The desktop app talks to loopback (or your LAN node) instead.
+      </p>
+    }
     <label class="check" [attr.for]="id('mineToStratum')">
       <input [id]="id('mineToStratum')" type="radio" formControlName="kind" value="stratum" [attr.disabled]="kindLocked() ? true : null" />
       Stratum
     </label>
     <label class="check" [attr.for]="id('mineToDatum')">
-      <input [id]="id('mineToDatum')" type="radio" formControlName="kind" value="datum" [attr.disabled]="kindLocked() ? true : null" />
+      <input
+        [id]="id('mineToDatum')"
+        type="radio"
+        formControlName="kind"
+        value="datum"
+        [attr.disabled]="kindLocked() || datumDisabled() ? true : null"
+      />
       DATUM Prime
     </label>
+    @if (datumDisabled()) {
+      <p class="hint" [attr.id]="id('datumDisabledHint')" title="DATUM is bring your own node, so you cannot use ours.">
+        DATUM is bring your own node, so you cannot use ours. To run DATUM to this pool, use the
+        desktop app with your own node (TCP DATUM to the advertised pool host).
+      </p>
+    }
+    @if (hostedPoolReady()) {
+      <label class="check" [attr.for]="id('mineToHostedPoolStratum')">
+        <input
+          [id]="id('mineToHostedPoolStratum')"
+          type="radio"
+          formControlName="kind"
+          value="hostedPoolStratum"
+          [attr.disabled]="kindLocked() ? true : null"
+        />
+        {{ hostedLabel() }} (Stratum)
+      </label>
+    }
     @if (appPoolReady()) {
       <label class="check" [attr.for]="id('mineToAppPoolStratum')">
         <input
@@ -161,6 +197,30 @@
           spellcheck="false"
           [placeholder]="config().hrp + '1….cpu'"
           formControlName="worker"
+        />
+      </fieldset>
+    }
+    @case ('hostedPoolStratum') {
+      <fieldset class="partition" formGroupName="hostedPoolStratum">
+        <legend>{{ hostedLabel() }} (Stratum)</legend>
+        <p class="hint">This pool is already running. Host and path come from the server.</p>
+        <p class="mono frozen">{{ frozenHostedStratum() }}</p>
+        <label [attr.for]="id('hostedPoolStratumWorker')">Worker</label>
+        <input
+          [id]="id('hostedPoolStratumWorker')"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          [placeholder]="config().hrp + '1….cpu'"
+          formControlName="worker"
+        />
+        <label [attr.for]="id('hostedPoolStratumPassword')">Password</label>
+        <input
+          [id]="id('hostedPoolStratumPassword')"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          formControlName="password"
         />
       </fieldset>
     }

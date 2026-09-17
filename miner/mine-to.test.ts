@@ -102,5 +102,8 @@ describe('parseMineTo', () => {
       /worker is empty/,
     );
     expect(() => parseMineTo({ kind: 'rpc' }, 'testnet')).toThrow(/unknown mineTo kind/);
+    expect(() =>
+      parseMineTo({ kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' }, 'testnet'),
+    ).toThrow(/unknown mineTo kind/);
   });
 });

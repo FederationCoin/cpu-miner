@@ -1,0 +1,69 @@
+<div class="workspace">
+  <nav class="tabs" role="tablist">
+    <button
+      type="button"
+      role="tab"
+      [id]="chain() + '-tab-mine'"
+      [class.active]="tab() === 'mine'"
+      [attr.aria-selected]="tab() === 'mine'"
+      (click)="selectTab('mine')"
+    >
+      Mine
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [id]="chain() + '-tab-pool'"
+      [class.active]="tab() === 'pool'"
+      [attr.aria-selected]="tab() === 'pool'"
+      (click)="selectTab('pool')"
+    >
+      Pool
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [id]="chain() + '-tab-docs'"
+      [class.active]="tab() === 'docs'"
+      [attr.aria-selected]="tab() === 'docs'"
+      (click)="selectTab('docs')"
+    >
+      Docs
+    </button>
+    <button
+      type="button"
+      role="tab"
+      [id]="chain() + '-tab-finder'"
+      [class.active]="tab() === 'finder'"
+      [attr.aria-selected]="tab() === 'finder'"
+      (click)="selectTab('finder')"
+    >
+      Finder
+    </button>
+  </nav>
+
+  @if (tab() === 'mine') {
+    <section class="pane-col" [attr.id]="chain() + '-mining'">
+      <h2>Mining</h2>
+      <app-miner-pane [chain]="chain()" />
+    </section>
+  }
+  @if (tab() === 'pool') {
+    <section class="pane-col" [attr.id]="chain() + '-pool'">
+      <h2>Pool</h2>
+      <app-pool-pane [chain]="chain()" />
+    </section>
+  }
+  @if (tab() === 'docs') {
+    <section class="pane-col" [attr.id]="chain() + '-docs'">
+      <h2>Docs</h2>
+      <app-docs-pane [chain]="chain()" />
+    </section>
+  }
+  @if (tab() === 'finder') {
+    <section class="pane-col" [attr.id]="chain() + '-finder'">
+      <h2>Pool finder</h2>
+      <app-finder-pane [chain]="chain()" />
+    </section>
+  }
+</div>

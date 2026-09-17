@@ -2,8 +2,9 @@ import { DebugElement } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { App } from './app';
-import { IDLE_STATS } from './mining.service';
-import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from '../miner-api';
+import { appConfig } from './app.config';
+import { IDLE_STATS } from '@federationcoin/miner-ui';
+import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from '@federationcoin/miner-ui';
 
 const electronInfo: MinerInfo = {
   cookiePath: '/tmp/x/testnet3/.cookie',
@@ -150,6 +151,12 @@ function selectKind(fixture: ComponentFixture<App>, chain: 'main' | 'testnet', k
   fixture.detectChanges();
 }
 
+
+function selectTab(fixture: ComponentFixture<App>, chain: 'main' | 'testnet', tab: 'mine' | 'pool' | 'docs' | 'finder'): void {
+  queryEl<HTMLButtonElement>(fixture, `#${chain}-tab-${tab}`).click();
+  fixture.detectChanges();
+}
+
 function selectAuth(fixture: ComponentFixture<App>, prefix: string, kind: 'Cookie' | 'Userpass'): void {
   const el = queryEl<HTMLInputElement>(fixture, `#${prefix}-auth${kind}`);
   el.click();
@@ -172,6 +179,7 @@ describe('App', () => {
     delete window.miner;
     await TestBed.configureTestingModule({
       imports: [App],
+      providers: [...appConfig.providers],
     }).compileComponents();
   });
 
@@ -215,6 +223,11 @@ describe('App', () => {
       expect(queryEl<HTMLInputElement>(f, '#testnet-rpcPort').value).toBe('35332');
       expect(queryEl<HTMLButtonElement>(f, '#testnet-start').disabled).toBe(true);
       expect(queryEl<HTMLButtonElement>(f, '#testnet-stop').disabled).toBe(true);
+      expect(has(f, '#testnet-tab-mine')).toBe(true);
+      expect(has(f, '#testnet-tab-pool')).toBe(true);
+      expect(has(f, '#testnet-tab-docs')).toBe(true);
+      expect(has(f, '#testnet-tab-finder')).toBe(true);
+      selectTab(f, 'testnet', 'pool');
       expect(has(f, '#testnet-pool-operator')).toBe(true);
     });
 
@@ -505,6 +518,7 @@ describe('App', () => {
 
     it('stacks RpcConnect host, port, and datadir in the pool pane', async () => {
       const f = await render(stubMiner());
+      selectTab(f, 'testnet', 'pool');
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-rpcHost').value).toBe('127.0.0.1');
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-rpcPort').value).toBe('35332');
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-datadir').value).toBe('/tmp/x');
@@ -514,17 +528,27 @@ describe('App', () => {
       expect(has(f, '#testnet-pool-rpcUser')).toBe(false);
     });
 
-    it('keeps mining and pool visible together', async () => {
+    it('has Mine Pool Docs Finder tabs under the network toggle', async () => {
       const f = await render(stubMiner());
-      expect(has(f, '#tab-main')).toBe(false);
-      expect(has(f, '#tab-pool')).toBe(false);
+      expect(has(f, '#testnet-tab-mine')).toBe(true);
+      expect(has(f, '#testnet-tab-pool')).toBe(true);
+      expect(has(f, '#testnet-tab-docs')).toBe(true);
+      expect(has(f, '#testnet-tab-finder')).toBe(true);
+      expect(has(f, '#testnet-mineToHostedPoolStratum')).toBe(false);
+      selectTab(f, 'testnet', 'pool');
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-stratumPort').value).toBe('23334');
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-datumPort').value).toBe('28916');
+      selectTab(f, 'testnet', 'docs');
+      expect(queryEl(f, '#testnet-docs-root').textContent).toMatch(/friends/i);
+      selectTab(f, 'testnet', 'finder');
+      expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/abundant/i);
+      expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/Empty slot/);
     });
 
     it('Start on pool sends spawn IPC without a cookie', async () => {
       const poolStart = vi.fn<(opts: PoolStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ poolStart }));
+      selectTab(f, 'testnet', 'pool');
       setInput(f, '#testnet-pool-operator', 'tgfcn1abc');
       queryDe(f, '#testnet-pool-start').triggerEventHandler('click');
       await f.whenStable();
@@ -544,6 +568,7 @@ describe('App', () => {
     it('Stop on pool calls poolStop', async () => {
       const miner = stubMiner();
       const f = await render(miner);
+      selectTab(f, 'testnet', 'pool');
       setInput(f, '#testnet-pool-operator', 'tgfcn1abc');
       queryDe(f, '#testnet-pool-start').triggerEventHandler('click');
       await f.whenStable();
@@ -557,10 +582,12 @@ describe('App', () => {
     it('app-pool mine-to appears only while the pool is running', async () => {
       const f = await render(stubMiner());
       expect(has(f, '#testnet-mineToAppPoolStratum')).toBe(false);
+      selectTab(f, 'testnet', 'pool');
       setInput(f, '#testnet-pool-operator', 'tgfcn1abc');
       queryDe(f, '#testnet-pool-start').triggerEventHandler('click');
       await f.whenStable();
       f.detectChanges();
+      selectTab(f, 'testnet', 'mine');
       expect(has(f, '#testnet-mineToAppPoolStratum')).toBe(true);
       expect(has(f, '#testnet-mineToAppPoolDatum')).toBe(true);
       selectKind(f, 'testnet', 'AppPoolStratum');
@@ -573,10 +600,12 @@ describe('App', () => {
     it('Start app-pool Stratum omits host and port', async () => {
       const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ start }));
+      selectTab(f, 'testnet', 'pool');
       setInput(f, '#testnet-pool-operator', 'tgfcn1abc');
       queryDe(f, '#testnet-pool-start').triggerEventHandler('click');
       await f.whenStable();
       f.detectChanges();
+      selectTab(f, 'testnet', 'mine');
       selectKind(f, 'testnet', 'AppPoolStratum');
       setInput(f, '#testnet-appPoolStratumWorker', 'tgfcn1abc.cpu');
       queryDe(f, '#testnet-start').triggerEventHandler('click');
@@ -592,10 +621,12 @@ describe('App', () => {
     it('Start app-pool DATUM sends hasher Node RPC without DATUM host or port', async () => {
       const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ start }));
+      selectTab(f, 'testnet', 'pool');
       setInput(f, '#testnet-pool-operator', 'tgfcn1abc');
       queryDe(f, '#testnet-pool-start').triggerEventHandler('click');
       await f.whenStable();
       f.detectChanges();
+      selectTab(f, 'testnet', 'mine');
       selectKind(f, 'testnet', 'AppPoolDatum');
       setInput(f, '#testnet-appPoolDatum-rpcHost', '10.0.0.9');
       setInput(f, '#testnet-appPoolDatumWorker', 'tgfcn1abc.cpu');
@@ -623,6 +654,7 @@ describe('App', () => {
           },
         }),
       );
+      selectTab(f, 'testnet', 'pool');
       sendPool?.({
         running: true,
         chain: 'testnet',
@@ -649,6 +681,7 @@ describe('App', () => {
     it('Host a pool Main warning stays not-live', async () => {
       const f = await render(stubMiner());
       selectNetwork(f, 'main');
+      selectTab(f, 'main', 'pool');
       expect(has(f, '[data-pool-main-warning]')).toBe(true);
       expect(queryEl<HTMLInputElement>(f, '#main-pool-operator').placeholder).toContain('gfcn1');
     });

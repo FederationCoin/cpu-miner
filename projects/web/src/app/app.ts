@@ -33,11 +33,6 @@ export class App {
       void this.mining.stop();
       this.mining.warn(`Stopped mining; switched to ${CHAINS[id].label}.`);
     }
-    const pool = this.pool.stats();
-    if (pool.running && pool.chain && pool.chain !== id) {
-      void this.pool.stop();
-      this.mining.warn(`Stopped pool; switched to ${CHAINS[id].label}.`);
-    }
     this.network.setChain(id);
   }
 }

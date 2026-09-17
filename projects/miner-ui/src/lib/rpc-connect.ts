@@ -1,6 +1,6 @@
 import { Component, inject, input } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import type { MinerChain, RpcAuthKind, RpcConnect as RpcConnectValue } from '../miner-api';
+import type { MinerChain, RpcAuthKind, RpcConnect as RpcConnectValue } from './miner-api';
 import { cookiePathHint } from './miner-format';
 import { MiningService } from './mining.service';
 

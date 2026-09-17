@@ -11,10 +11,13 @@
     "node": ">=26"
   },
   "packageManager": "npm@11.19.1",
+  "workspaces": ["projects/miner-ui"],
   "scripts": {
     "ng": "ng",
     "start": "npm run build:app && node native/gpu-hasher/rebuild.mjs && electron .",
+    "start:web": "ng serve miner-web",
     "build": "npm run build:app",
+    "build:web": "ng build miner-web --configuration production",
     "build:app": "ng build --configuration development && npm run build:electron",
     "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\" && node scripts/copy-federation-pool.mjs",
     "build:gpu": "node native/gpu-hasher/rebuild.mjs",

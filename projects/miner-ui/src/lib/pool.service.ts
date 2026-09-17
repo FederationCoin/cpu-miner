@@ -1,5 +1,6 @@
-import { Injectable, signal } from '@angular/core';
-import type { PoolStartOpts, PoolStats } from '../miner-api';
+import { Injectable, inject, signal } from '@angular/core';
+import { HASHER_HOST } from './hasher-host';
+import type { PoolStartOpts, PoolStats } from './miner-api';
 
 export const IDLE_POOL_STATS: PoolStats = {
   running: false,
@@ -19,6 +20,7 @@ export const IDLE_POOL_STATS: PoolStats = {
 
 @Injectable({ providedIn: 'root' })
 export class PoolService {
+  private readonly host = inject(HASHER_HOST);
   readonly stats = signal<PoolStats>(IDLE_POOL_STATS);
   private bound = false;
   private unsub: (() => void)[] = [];
@@ -31,23 +33,15 @@ export class PoolService {
     if (this.bound) {
       return;
     }
-    const api = window.miner;
-    if (!api?.poolStart) {
-      return;
-    }
     this.bound = true;
-    this.unsub.push(api.onPoolStats((s) => this.stats.set(s)));
+    this.unsub.push(this.host.onPoolStats((s) => this.stats.set(s)));
   }
 
   async start(opts: PoolStartOpts): Promise<string | null> {
-    const api = window.miner;
-    if (!api?.poolStart) {
-      return 'Open this app with npm start (Electron), not ng serve.';
+    if (this.stats().running && this.host.inElectron) {
+      await this.host.poolStop();
     }
-    if (this.stats().running) {
-      await api.poolStop();
-    }
-    const r = await api.poolStart(opts);
+    const r = await this.host.poolStart(opts);
     if (!r.ok) {
       return r.error ?? 'pool start failed';
     }
@@ -55,6 +49,6 @@ export class PoolService {
   }
 
   async stop(): Promise<void> {
-    await window.miner?.poolStop();
+    await this.host.poolStop();
   }
 }
