@@ -6,11 +6,12 @@ import { formatHashRate, gpuStatusHint, gpuStatusHintWeb, mainIsNotLive } from '
 import { MINER_SHELL } from './miner-shell';
 import { IDLE_STATS, MiningService } from './mining.service';
 import { PoolService } from './pool.service';
-import { RpcConnect, rpcConnectGroup, rpcConnectValue } from './rpc-connect';
+import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
+import { DefaultsFold } from './defaults-fold';
 
 @Component({
   selector: 'app-miner-pane',
-  imports: [ReactiveFormsModule, RpcConnect],
+  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold],
   styleUrl: './miner-pane.css',
   templateUrl: './miner-pane.html',
   host: { '[attr.data-chain]': 'chain()' },
@@ -442,5 +443,22 @@ export class MinerPane implements OnInit {
 
   protected formatRate(n: number): string {
     return formatHashRate(n);
+  }
+
+  protected rpcCookie(form: RpcConnectForm): boolean {
+    return form.controls.authKind.value === 'cookie';
+  }
+
+  protected rpcSummary(form: RpcConnectForm): string {
+    const v = form.getRawValue();
+    return `${v.host}:${v.port}`;
+  }
+
+  protected gpuSummary(): string {
+    const selected = this.gpuList().filter((d) => this.gpuSelected(d.id));
+    if (selected.length === 0) {
+      return 'none';
+    }
+    return selected.map((d) => d.name).join(', ');
   }
 }

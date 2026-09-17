@@ -10,6 +10,7 @@ export * from './lib/mining.service';
 export * from './lib/pool.service';
 export * from './lib/network-context';
 export { rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './lib/rpc-connect';
+export { DefaultsFold } from './lib/defaults-fold';
 export * from './lib/miner-pane';
 export * from './lib/pool-pane';
 export * from './lib/docs-pane';

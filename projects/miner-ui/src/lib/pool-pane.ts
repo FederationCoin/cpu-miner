@@ -6,11 +6,12 @@ import { formatSats, mainIsNotLive } from './miner-format';
 import { MINER_SHELL } from './miner-shell';
 import { MiningService } from './mining.service';
 import { IDLE_POOL_STATS, PoolService } from './pool.service';
-import { RpcConnect, rpcConnectGroup, rpcConnectValue } from './rpc-connect';
+import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
+import { DefaultsFold } from './defaults-fold';
 
 @Component({
   selector: 'app-pool-pane',
-  imports: [ReactiveFormsModule, RpcConnect],
+  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold],
   styleUrl: './miner-pane.css',
   templateUrl: './pool-pane.html',
 })
@@ -192,5 +193,18 @@ export class PoolPane implements OnInit {
       datumHost: v.datumHost,
       datumPort: v.datumPort,
     };
+  }
+
+  protected rpcCookie(form: RpcConnectForm): boolean {
+    return form.controls.authKind.value === 'cookie';
+  }
+
+  protected rpcSummary(form: RpcConnectForm): string {
+    const v = form.getRawValue();
+    return `${v.host}:${v.port}`;
+  }
+
+  protected bindSummary(host: string, port: number): string {
+    return `${host}:${port}`;
   }
 }

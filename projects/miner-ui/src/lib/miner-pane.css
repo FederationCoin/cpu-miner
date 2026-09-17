@@ -147,6 +147,22 @@ fieldset.partition {
   padding: 0.55rem 0.85rem 0.75rem;
 }
 
+app-defaults-fold {
+  display: block;
+}
+
+app-defaults-fold fieldset.partition,
+app-defaults-fold fieldset.gpus {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+app-defaults-fold fieldset.partition > legend,
+app-defaults-fold fieldset.gpus > legend {
+  display: none;
+}
+
 .frozen {
   margin: 0.35rem 0 0.85rem;
 }

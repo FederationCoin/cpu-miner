@@ -41,10 +41,16 @@
       </p>
     }
 
-    <fieldset class="partition">
-      <legend>Node RPC</legend>
-      <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain() + '-pool'" [chain]="chain()" />
-    </fieldset>
+    @if (rpcCookie(form.controls.rpc)) {
+      <app-defaults-fold [foldId]="id('rpc-fold')" title="Node RPC" [summary]="rpcSummary(form.controls.rpc)">
+        <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain() + '-pool'" [chain]="chain()" />
+      </app-defaults-fold>
+    } @else {
+      <fieldset class="partition">
+        <legend>Node RPC</legend>
+        <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain() + '-pool'" [chain]="chain()" />
+      </fieldset>
+    }
 
     <label [attr.for]="id('operator')">Operator payout ({{ config().hrp }}1)</label>
     <input
@@ -58,21 +64,25 @@
     <label [attr.for]="id('fee')">Fee percent</label>
     <input [id]="id('fee')" type="text" inputmode="decimal" formControlName="feePercent" />
 
-    <fieldset class="partition">
-      <legend>Stratum bind</legend>
-      <label [attr.for]="id('stratumHost')">Host</label>
-      <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="stratumHost" />
-      <label [attr.for]="id('stratumPort')">Port</label>
-      <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="stratumPort" />
-    </fieldset>
+    <app-defaults-fold [foldId]="id('stratum-fold')" title="Stratum bind" [summary]="bindSummary(form.controls.stratumHost.value, form.controls.stratumPort.value)">
+      <fieldset class="partition">
+        <legend>Stratum bind</legend>
+        <label [attr.for]="id('stratumHost')">Host</label>
+        <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="stratumHost" />
+        <label [attr.for]="id('stratumPort')">Port</label>
+        <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="stratumPort" />
+      </fieldset>
+    </app-defaults-fold>
 
-    <fieldset class="partition">
-      <legend>DATUM Prime bind</legend>
-      <label [attr.for]="id('datumHost')">Host</label>
-      <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="datumHost" />
-      <label [attr.for]="id('datumPort')">Port</label>
-      <input [id]="id('datumPort')" type="number" min="1" max="65535" formControlName="datumPort" />
-    </fieldset>
+    <app-defaults-fold [foldId]="id('datum-fold')" title="DATUM Prime bind" [summary]="bindSummary(form.controls.datumHost.value, form.controls.datumPort.value)">
+      <fieldset class="partition">
+        <legend>DATUM Prime bind</legend>
+        <label [attr.for]="id('datumHost')">Host</label>
+        <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="datumHost" />
+        <label [attr.for]="id('datumPort')">Port</label>
+        <input [id]="id('datumPort')" type="number" min="1" max="65535" formControlName="datumPort" />
+      </fieldset>
+    </app-defaults-fold>
 
     @if (formError()) {
       <p class="err">{{ formError() }}</p>

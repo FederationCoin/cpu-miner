@@ -87,19 +87,25 @@
 
   @switch (kind()) {
     @case ('node') {
-      <fieldset class="partition">
-        <legend>Node</legend>
-        <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain()" [chain]="chain()" />
-        <label [attr.for]="id('payout')">Payout address</label>
-        <input
-          [id]="id('payout')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1…'"
-          formControlName="payout"
-        />
-      </fieldset>
+      @if (rpcCookie(form.controls.rpc)) {
+        <app-defaults-fold [foldId]="id('rpc-fold')" title="Node RPC" [summary]="rpcSummary(form.controls.rpc)">
+          <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain()" [chain]="chain()" />
+        </app-defaults-fold>
+      } @else {
+        <fieldset class="partition">
+          <legend>Node RPC</legend>
+          <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain()" [chain]="chain()" />
+        </fieldset>
+      }
+      <label [attr.for]="id('payout')">Payout address</label>
+      <input
+        [id]="id('payout')"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        [placeholder]="config().hrp + '1…'"
+        formControlName="payout"
+      />
     }
     @case ('stratum') {
       <fieldset class="partition" formGroupName="stratum">
@@ -129,11 +135,18 @@
       </fieldset>
     }
     @case ('datum') {
-      <fieldset class="partition">
-        <legend>Node RPC</legend>
-        <p class="hint">DATUM Prime coordinates with the DATUM host. This node is yours; they are not assumed to be the same machine.</p>
-        <app-rpc-connect [form]="form.controls.datum.controls.rpc" [idPrefix]="id('datum')" [chain]="chain()" />
-      </fieldset>
+      @if (rpcCookie(form.controls.datum.controls.rpc)) {
+        <app-defaults-fold [foldId]="id('datum-rpc-fold')" title="Node RPC" [summary]="rpcSummary(form.controls.datum.controls.rpc)">
+          <p class="hint">DATUM Prime coordinates with the DATUM host. This node is yours; they are not assumed to be the same machine.</p>
+          <app-rpc-connect [form]="form.controls.datum.controls.rpc" [idPrefix]="id('datum')" [chain]="chain()" />
+        </app-defaults-fold>
+      } @else {
+        <fieldset class="partition">
+          <legend>Node RPC</legend>
+          <p class="hint">DATUM Prime coordinates with the DATUM host. This node is yours; they are not assumed to be the same machine.</p>
+          <app-rpc-connect [form]="form.controls.datum.controls.rpc" [idPrefix]="id('datum')" [chain]="chain()" />
+        </fieldset>
+      }
       <fieldset class="partition" formGroupName="datum">
         <legend>DATUM Prime</legend>
         <label [attr.for]="id('datumHost')">Host</label>
@@ -176,15 +189,30 @@
       </fieldset>
     }
     @case ('appPoolDatum') {
-      <fieldset class="partition">
-        <legend>Node RPC</legend>
-        <p class="hint">The app pool DATUM bind is frozen. This node is the hasher's node; it is not assumed to be the pool's RPC host.</p>
-        <app-rpc-connect
-          [form]="form.controls.appPoolDatum.controls.rpc"
-          [idPrefix]="id('appPoolDatum')"
-          [chain]="chain()"
-        />
-      </fieldset>
+      @if (rpcCookie(form.controls.appPoolDatum.controls.rpc)) {
+        <app-defaults-fold
+          [foldId]="id('appPoolDatum-rpc-fold')"
+          title="Node RPC"
+          [summary]="rpcSummary(form.controls.appPoolDatum.controls.rpc)"
+        >
+          <p class="hint">The app pool DATUM bind is frozen. This node is the hasher's node; it is not assumed to be the pool's RPC host.</p>
+          <app-rpc-connect
+            [form]="form.controls.appPoolDatum.controls.rpc"
+            [idPrefix]="id('appPoolDatum')"
+            [chain]="chain()"
+          />
+        </app-defaults-fold>
+      } @else {
+        <fieldset class="partition">
+          <legend>Node RPC</legend>
+          <p class="hint">The app pool DATUM bind is frozen. This node is the hasher's node; it is not assumed to be the pool's RPC host.</p>
+          <app-rpc-connect
+            [form]="form.controls.appPoolDatum.controls.rpc"
+            [idPrefix]="id('appPoolDatum')"
+            [chain]="chain()"
+          />
+        </fieldset>
+      }
       <fieldset class="partition" formGroupName="appPoolDatum">
         <legend>App pool (DATUM)</legend>
         <p class="hint">Host and port come from the running pool on this network.</p>
@@ -229,29 +257,6 @@
   <label [attr.for]="id('threads')">Threads</label>
   <input [id]="id('threads')" type="number" min="1" max="64" formControlName="threads" />
 
-  <fieldset class="gpus" [attr.id]="id('gpus')">
-    <legend>GPUs</legend>
-    <button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
-      {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
-    </button>
-    @if (gpuList().length > 0) {
-      @for (dev of gpuList(); track dev.id) {
-        <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.id))">
-          <input
-            [id]="id('gpu-' + gpuDomId(dev.id))"
-            type="checkbox"
-            [checked]="gpuSelected(dev.id)"
-            [attr.disabled]="kindLocked() ? true : null"
-            (change)="toggleGpu(dev.id, $any($event.target).checked)"
-          />
-          {{ dev.name }}
-          <span class="hint-inline">{{ dev.vendor }} · {{ dev.memoryMiB }} MiB · {{ dev.kind }}</span>
-        </label>
-      }
-    }
-    <p class="hint">{{ gpuHint() }}</p>
-  </fieldset>
-
   <div class="row">
     <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
     <button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
@@ -260,6 +265,31 @@
   @if (formError()) {
     <p class="err">{{ formError() }}</p>
   }
+
+  <app-defaults-fold [foldId]="id('gpus-fold')" title="GPUs" [summary]="gpuSummary()">
+    <fieldset class="gpus" [attr.id]="id('gpus')">
+      <legend>GPUs</legend>
+      <button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
+        {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
+      </button>
+      @if (gpuList().length > 0) {
+        @for (dev of gpuList(); track dev.id) {
+          <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.id))">
+            <input
+              [id]="id('gpu-' + gpuDomId(dev.id))"
+              type="checkbox"
+              [checked]="gpuSelected(dev.id)"
+              [attr.disabled]="kindLocked() ? true : null"
+              (change)="toggleGpu(dev.id, $any($event.target).checked)"
+            />
+            {{ dev.name }}
+            <span class="hint-inline">{{ dev.vendor }} · {{ dev.memoryMiB }} MiB · {{ dev.kind }}</span>
+          </label>
+        }
+      }
+      <p class="hint">{{ gpuHint() }}</p>
+    </fieldset>
+  </app-defaults-fold>
 
   <dl>
     <dt>Status</dt>

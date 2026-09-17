@@ -393,6 +393,76 @@ describe('App', () => {
       expect(queryEl(f, '#testnet-gpus').textContent).toMatch(/OpenCL or CUDA|GPUs listed yet|Off until you tick/);
     });
 
+    it('starts cookie Node RPC and GPUs inside closed folds whose summaries omit secrets and paths', async () => {
+      const f = await render(stubMiner());
+      const rpc = queryEl<HTMLDetailsElement>(f, '#testnet-rpc-fold');
+      expect(rpc.open).toBe(false);
+      expect(rpc.textContent).toContain('Node RPC · 127.0.0.1:35332');
+      expect(rpc.querySelector('summary')?.textContent).not.toContain('/tmp/x');
+      expect(rpc.querySelector('summary')?.textContent).not.toMatch(/cookie|password/i);
+      expect(rpc.contains(queryEl(f, '#testnet-payout'))).toBe(false);
+      expect(rpc.contains(queryEl(f, '#testnet-start'))).toBe(false);
+      setInput(f, '#testnet-rpcHost', '10.0.0.4');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-rpcHost').value).toBe('10.0.0.4');
+      expect(queryEl(f, '#testnet-rpc-fold summary').textContent).toContain('10.0.0.4:35332');
+      selectNetwork(f, 'main');
+      const mainRpc = queryEl<HTMLDetailsElement>(f, '#main-rpc-fold');
+      expect(mainRpc.open).toBe(false);
+      expect(mainRpc.querySelector('summary')?.textContent).toContain('127.0.0.1:4094');
+      selectNetwork(f, 'testnet');
+      const gpus = queryEl<HTMLDetailsElement>(f, '#testnet-gpus-fold');
+      expect(gpus.open).toBe(false);
+      expect(gpus.querySelector('summary')?.textContent).toContain('GPUs · none');
+      selectAuth(f, 'testnet', 'Userpass');
+      expect(has(f, '#testnet-rpc-fold')).toBe(false);
+      expect(has(f, '#testnet-rpcUser')).toBe(true);
+      expect(has(f, '#testnet-rpcPassword')).toBe(true);
+    });
+
+    it('does not fold Stratum worker or payout into a closed disclosure', async () => {
+      const f = await render(stubMiner());
+      expect(has(f, '#testnet-payout')).toBe(true);
+      selectKind(f, 'testnet', 'Stratum');
+      const worker = queryEl(f, '#testnet-stratumWorker');
+      for (const details of f.nativeElement.querySelectorAll('details.defaults-fold') as NodeListOf<HTMLDetailsElement>) {
+        if (!details.open) {
+          expect(details.contains(worker)).toBe(false);
+        }
+      }
+    });
+
+    it('folds DATUM cookie Node RPC and leaves worker outside the fold', async () => {
+      const f = await render(stubMiner());
+      selectKind(f, 'testnet', 'Datum');
+      const rpc = queryEl<HTMLDetailsElement>(f, '#testnet-datum-rpc-fold');
+      expect(rpc.open).toBe(false);
+      expect(rpc.querySelector('summary')?.textContent).toContain('127.0.0.1:35332');
+      expect(rpc.contains(queryEl(f, '#testnet-datumWorker'))).toBe(false);
+      setInput(f, '#testnet-datum-rpcHost', '192.168.1.4');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-datum-rpcHost').value).toBe('192.168.1.4');
+    });
+
+    it('folds pool cookie RPC and bind partitions; operator stays outside', async () => {
+      const f = await render(stubMiner());
+      selectTab(f, 'testnet', 'pool');
+      const rpc = queryEl<HTMLDetailsElement>(f, '#testnet-pool-rpc-fold');
+      const stratum = queryEl<HTMLDetailsElement>(f, '#testnet-pool-stratum-fold');
+      const datum = queryEl<HTMLDetailsElement>(f, '#testnet-pool-datum-fold');
+      expect(rpc.open).toBe(false);
+      expect(stratum.open).toBe(false);
+      expect(datum.open).toBe(false);
+      expect(rpc.querySelector('summary')?.textContent).toContain('127.0.0.1:35332');
+      expect(rpc.querySelector('summary')?.textContent).not.toContain('/tmp/x');
+      expect(stratum.querySelector('summary')?.textContent).toContain('127.0.0.1:23334');
+      expect(datum.querySelector('summary')?.textContent).toContain('127.0.0.1:28916');
+      expect(rpc.contains(queryEl(f, '#testnet-pool-operator'))).toBe(false);
+      setInput(f, '#testnet-pool-rpcHost', '10.0.0.7');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-pool-rpcHost').value).toBe('10.0.0.7');
+      selectAuth(f, 'testnet-pool', 'Userpass');
+      expect(has(f, '#testnet-pool-rpc-fold')).toBe(false);
+      expect(has(f, '#testnet-pool-rpcUser')).toBe(true);
+    });
+
     it('Detect GPUs reports when the hasher addon is missing', async () => {
       const gpus = vi.fn().mockResolvedValue({ devices: [], addon: false });
       const f = await render(stubMiner({ gpus }));
