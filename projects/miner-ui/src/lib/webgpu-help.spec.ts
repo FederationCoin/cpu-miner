@@ -40,8 +40,11 @@ describe('WebgpuHelp', () => {
     expect(dialogOpen(fixture)).toBe(true);
     const text = fixture.nativeElement.querySelector('#testnet-webgpuHelpDialog')?.textContent ?? '';
     expect(text).toMatch(/chrome:\/\/gpu/);
+    expect(text).toMatch(/enable-unsafe-webgpu/);
     expect(text).toMatch(/ignore-gpu-blocklist/);
     expect(text).toMatch(/--disable-gpu/);
+    expect(text).toMatch(/Software only/);
+    expect(text).toMatch(/developer\.chrome\.com/);
   });
 
   it('auto-opens once when autoOpen becomes true', () => {

@@ -143,7 +143,10 @@ describe('web demo shell', () => {
     const dlg = f.nativeElement.querySelector('#testnet-webgpuHelpDialog') as HTMLDialogElement;
     expect(dlg.open || dlg.hasAttribute('open')).toBe(true);
     expect(dlg.textContent).toMatch(/chrome:\/\/gpu/);
+    expect(dlg.textContent).toMatch(/enable-unsafe-webgpu/);
     expect(dlg.textContent).toMatch(/ignore-gpu-blocklist/);
+    expect(dlg.textContent).toMatch(/Software only/);
+    expect(dlg.textContent).toMatch(/developer\.chrome\.com/);
   });
 
   it('opens the WebGPU dialog after Detect finds no adapter', async () => {

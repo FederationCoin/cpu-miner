@@ -3,7 +3,8 @@
   <h2 [id]="id('webgpuHelpTitle')">Enable WebGPU</h2>
   <p>
     Detect lists one browser adapter when <code>navigator.gpu.requestAdapter()</code> succeeds. This
-    page cannot turn Chrome’s GPU block on. CPU threads still mine without an adapter.
+    page cannot turn Chrome’s GPU block on. CPU threads still mine without an adapter. Chrome does
+    not publish a supported-adapter catalog; <code>chrome://gpu</code> is this machine.
   </p>
   <ol>
     <li>
@@ -16,7 +17,13 @@
     </li>
     <li>
       If Problems Detected says WebGPU is disabled via blocklist or the command line, set
-      <code>chrome://flags/#ignore-gpu-blocklist</code> to Enabled and relaunch.
+      <code>chrome://flags/#enable-unsafe-webgpu</code> (WebGPU adapter blocklist) and
+      <code>chrome://flags/#ignore-gpu-blocklist</code> (software-rendering list) to Enabled and
+      relaunch. Linux experimental support also needs <code>chrome://flags/#enable-vulkan</code>.
+    </li>
+    <li>
+      If Feature Status is Software only, hardware acceleration unavailable, update GPU drivers from
+      NVIDIA, AMD, or Intel (not the CUDA Toolkit), then relaunch and Detect again.
     </li>
     <li>
       Check <code>chrome://version</code> Command Line. Remove
@@ -25,6 +32,10 @@
     </li>
     <li>Come back here, click Detect GPUs, and tick <code>webgpu:0</code> before Start.</li>
   </ol>
+  <p>
+    Chrome’s steps:
+    <a href="https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips" target="_blank" rel="noopener noreferrer">developer.chrome.com WebGPU troubleshooting</a>.
+  </p>
   <div class="row">
     <button type="button" [id]="id('webgpuHelpClose')" (click)="close()">Close</button>
   </div>
