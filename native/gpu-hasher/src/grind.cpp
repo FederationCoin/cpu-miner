@@ -1,16 +1,17 @@
 #include "grind.hpp"
+#include "cuda_runtime.hpp"
 #include "gpu_pow.hpp"
+#include "grind_launch.hpp"
 #include "opencl_engine.hpp"
 
 #include <atomic>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
 namespace gpu {
 namespace {
-
-constexpr uint32_t kBatch = 1u << 18;
 
 struct Running {
     std::atomic<bool> stop{false};
@@ -35,9 +36,18 @@ void grind_loop(GpuJob job, FoundFn found, ProgressFn progress, LogFn log, DoneF
     try {
         uint8_t mask[32];
         xor_key_mask_bytes(job.xor_key, job.xor_clear, mask);
-        OpenClEngine eng;
+        const bool cuda = job.device.id.rfind("cuda:", 0) == 0;
+        CudaEngine cudaEng;
+        OpenClEngine oclEng;
         std::string err;
-        if (!eng.init(job.device, &err)) {
+        if (cuda) {
+            if (!cudaEng.init(job.device, &err) || !cudaEng.load_job(job.work, mask, job.target, &err)) {
+                if (log) {
+                    log(std::string("gpu: ") + err);
+                }
+                return;
+            }
+        } else if (!oclEng.init(job.device, &err) || !oclEng.load_job(job.work, mask, job.target, &err)) {
             if (log) {
                 log(std::string("gpu: ") + err);
             }
@@ -47,16 +57,20 @@ void grind_loop(GpuJob job, FoundFn found, ProgressFn progress, LogFn log, DoneF
         uint64_t hashes = 0;
         while (!stop->load(std::memory_order_relaxed)) {
             OpenClFound hit{};
-            if (!eng.grind_batch(job.work, mask, job.target, static_cast<uint32_t>(cursor),
-                    static_cast<uint32_t>(cursor >> 32), kBatch, &hit, &err)) {
+            const bool ok = cuda
+                ? cudaEng.grind_batch(static_cast<uint32_t>(cursor), static_cast<uint32_t>(cursor >> 32),
+                      kLaunchHashes, &hit, &err)
+                : oclEng.grind_batch(static_cast<uint32_t>(cursor), static_cast<uint32_t>(cursor >> 32),
+                      kLaunchHashes, &hit, &err);
+            if (!ok) {
                 if (log) {
                     log(std::string("gpu: ") + err);
                 }
                 break;
             }
-            hashes += kBatch;
+            hashes += kLaunchHashes;
             if (progress) {
-                progress(kBatch);
+                progress(kLaunchHashes);
             }
             if (hit.hit) {
                 if (found) {
@@ -64,7 +78,7 @@ void grind_loop(GpuJob job, FoundFn found, ProgressFn progress, LogFn log, DoneF
                 }
                 break;
             }
-            cursor += kBatch;
+            cursor += kLaunchHashes;
         }
     } catch (...) {
         if (log) {

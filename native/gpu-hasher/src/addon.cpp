@@ -1,3 +1,4 @@
+#include "cuda_runtime.hpp"
 #include "gpu_pow.hpp"
 #include "grind.hpp"
 #include "opencl_engine.hpp"
@@ -10,6 +11,24 @@
 #include <vector>
 
 namespace {
+
+std::vector<gpu::GpuDeviceInfo> list_pow_devices()
+{
+    std::vector<gpu::GpuDeviceInfo> list;
+    try {
+        list = gpu::list_cuda_devices();
+    } catch (...) {
+        list.clear();
+    }
+    if (list.empty()) {
+        try {
+            list = gpu::list_opencl_devices();
+        } catch (...) {
+            list.clear();
+        }
+    }
+    return list;
+}
 
 bool copy_buf(const Napi::Value& v, uint8_t* dst, size_t n)
 {
@@ -44,7 +63,7 @@ Napi::Value ListDevices(const Napi::CallbackInfo& info)
     Napi::Env env = info.Env();
     std::vector<gpu::GpuDeviceInfo> list;
     try {
-        list = gpu::list_opencl_devices();
+        list = list_pow_devices();
     } catch (...) {
         return Napi::Array::New(env, 0);
     }
@@ -56,11 +75,27 @@ Napi::Value ListDevices(const Napi::CallbackInfo& info)
         o.Set("name", d.name);
         o.Set("vendor", d.vendor);
         o.Set("memoryMiB", Napi::Number::New(env, static_cast<double>(d.memory_mib)));
-        o.Set("backend", "opencl");
+            o.Set("backend", d.backend.empty() ? "opencl" : d.backend);
         o.Set("kind", d.kind);
         arr.Set(i, o);
     }
     return arr;
+}
+
+Napi::Value SetPtxSource(const Napi::CallbackInfo& info)
+{
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "ptx source string").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    std::string src = info[0].As<Napi::String>().Utf8Value();
+    if (src.size() > 2 * 1024 * 1024) {
+        Napi::TypeError::New(env, "ptx source too large").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    gpu::set_cuda_ptx_source(std::move(src));
+    return env.Undefined();
 }
 
 Napi::Value SetKernelSource(const Napi::CallbackInfo& info)
@@ -124,7 +159,7 @@ Napi::Value StartGrind(const Napi::CallbackInfo& info)
         Napi::TypeError::New(env, "deviceId string").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    auto devices = gpu::list_opencl_devices();
+    auto devices = list_pow_devices();
     std::string id = job.Get("deviceId").As<Napi::String>().Utf8Value();
     gpu::GpuDeviceInfo match;
     bool ok = false;
@@ -191,6 +226,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
 {
     exports.Set("listDevices", Napi::Function::New(env, ListDevices));
     exports.Set("setKernelSource", Napi::Function::New(env, SetKernelSource));
+    exports.Set("setPtxSource", Napi::Function::New(env, SetPtxSource));
     exports.Set("asicPowHash", Napi::Function::New(env, AsicPowHash));
     exports.Set("startGrind", Napi::Function::New(env, StartGrind));
     exports.Set("stopGrind", Napi::Function::New(env, StopGrind));

@@ -5,6 +5,12 @@
   "compilerOptions": {
     "types": []
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "projects/miner-ui/src/**/*.ts",
+    "projects/miner-ui/src/**/*.d.ts",
+    "projects/miner-ui/src/**/*.json"
+  ],
+  "exclude": ["src/**/*.spec.ts", "projects/miner-ui/src/**/*.spec.ts"]
 }

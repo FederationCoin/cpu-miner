@@ -6,10 +6,25 @@ Local **Federation Miner** app: Angular UI in the renderer, Node in the main pro
 
 **Testnet is the public net.** Dummy **MAIN** is not live (`mainIsLive` false). The Main tab stays enabled and toasts that MAIN is not launched; cookie/RPC failures there are expected until announcement.
 
-Two panes share one hasher. Two mining modes:
+Network is the tenant (toggle upper right). Tabs under it are **Mine | Pool |
+Docs | Finder**. Desktop and the web demo share `@federationcoin/miner-ui`
+(path-mapped workspace; do not `npm publish`). Desktop hashes with CUDA/OpenCL
+or CPU. The web shell is [mine.federationcoin.org](https://mine.federationcoin.org)
+(network dropdown in-app) and hashes with WebGPU or CPU over
+`wss://pool.testnet.federationcoin.org/stratum`. Unexpected WSS close
+reconnects with capped backoff and retries in-flight `mining.submit`
+until the pool’s accept/reject arrives. A later circuit breaker
+(429/502/503, timeouts, WS rebuilds) is
+[docs/pool-directory-todo.md](https://github.com/ldelarua/workspace-FederationCoin/blob/master/docs/pool-directory-todo.md);
+do not add it in this pass.
+
+Mine-to kinds:
 
 - **Node RPC** — cookie + `getblocktemplate` / `submitblock` via Node `fetch` to a host/port you set. Testnet default `127.0.0.1:35332` and `testnet3/.cookie`, payout **tgfcn1**. Main default `127.0.0.1:4094` and `<datadir>/.cookie`, payout **gfcn1**. The cookie never goes to the renderer.
 - **Stratum** — ASIC-style TCP Stratum v1. Host/port/worker (username) / password (default `x`). Default `127.0.0.1:23334` (saved per chain). A `.worker` suffix is allowed. No payout field: the pool or proxy builds the coinbase. Solo still uses `stratum-proxy --payout-address tgfcn1…` from [`cpu-miner-cpp`](https://github.com/ldelarua/workspace-FederationCoin/tree/master/cpu-miner-cpp) (or DATUM `mining.pool_address`); this miner only authorizes as **worker**.
+- **DATUM Prime** — desktop only, with **your** node (TCP 28916). The web demo greys this out: DATUM is bring your own node, and the house pool will not proxy cluster bitcoind.
+- **Host a pool** — Pool tab on desktop. Spawns [`federation-pool`](https://github.com/FederationCoin/federation-pool) (DATUM Prime **28916** + TIDES + Stratum v1 **23334**) against the operator’s `federationcoind`. Friends-and-family grade (JSONL, one process). Testnet default. Main still toasts that MAIN is not live. Cookie stays in the main process. This app does **not** wrap `cpu-miner-cpp` binaries. The web demo’s Pool tab is read-only status for the house testnet pool (MAIN house pool is off).
+- **Docs / Finder** — pool grades, DATUM is bring-your-own-node, and a curated list plus stub register (no fake PKI).
 
 GPU hashing is additive and in-process. Tick GPUs in the pane (all off by default, including Intel iGPU). You do **not** run a second app or `fcminer`. You do **not** install the CUDA Toolkit. Install NVIDIA / AMD / Intel **GPU drivers** (OpenCL ICD) if you want devices listed. No driver: empty GPU list, CPU still mines. A GPU driver fault can take down the whole app. ccminer “blake2b” hashes the wrong construction.
 
@@ -50,9 +65,11 @@ nvm use
 npm install
 npm test
 npm start
+# web demo (WebGPU / CPU, WSS Stratum to pool.testnet). SPA is mine.federationcoin.org.
+npm run start:web
 ```
 
-`npm start` builds the renderer + `out-electron/` then the GPU addon (Electron 44 ABI) then launches Electron. If the addon fails to compile, Start still works on CPU.
+`npm start` builds the renderer + `out-electron/` then the GPU addon (Electron 44 ABI) then launches Electron. If the addon fails to compile, Start still works on CPU. **Host a pool** copies `../federation-pool/dist/cli.js` into `vendor/federation-pool` when that sibling exists (`FEDERATION_POOL_CLI` overrides). Build the pool CLI first if you want that tab to spawn a process.
 
 Unsigned artifacts under `dist-electron/` (gitignored):
 

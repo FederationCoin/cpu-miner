@@ -1,0 +1,96 @@
+:host {
+  display: block;
+}
+
+.rpc-connect {
+  display: flex;
+  flex-direction: column;
+}
+
+label {
+  display: block;
+  margin: 0.85rem 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  background: #1a1d24;
+  color: #e8eaed;
+  font: inherit;
+  user-select: text;
+}
+
+.path-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.path-row input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.hint {
+  margin: 0.35rem 0 0.85rem;
+  color: #9aa0aa;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+button {
+  padding: 0.45rem 0.9rem;
+  border: 0;
+  border-radius: 4px;
+  background: #3d6ea8;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+fieldset.mode,
+fieldset.partition {
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  margin: 0.85rem 0;
+  padding: 0.55rem 0.85rem 0.75rem;
+}
+
+fieldset.mode {
+  padding: 0.4rem 0.75rem 0.55rem;
+}
+
+fieldset.mode legend,
+fieldset.partition legend {
+  padding: 0 0.35rem;
+  color: #9aa0aa;
+  font-size: 0.82rem;
+}
+
+.check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+}
+
+.check input {
+  width: auto;
+}

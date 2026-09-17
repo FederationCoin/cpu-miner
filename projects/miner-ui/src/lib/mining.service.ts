@@ -1,5 +1,6 @@
-import { Injectable, signal } from '@angular/core';
-import type { GpuDevice, GpuScan, MinerChain, MinerInfo, MinerStartOpts, MinerStats } from '../miner-api';
+import { Injectable, inject, signal } from '@angular/core';
+import { HASHER_HOST } from './hasher-host';
+import type { GpuDevice, GpuScan, GpuScanReason, MinerChain, MinerInfo, MinerStartOpts, MinerStats, MineToKind } from './miner-api';
 
 export const IDLE_STATS: MinerStats = {
   running: false,
@@ -12,18 +13,23 @@ export const IDLE_STATS: MinerStats = {
   lastError: '',
   lastHash: '',
   status: 'idle',
+  link: 'idle',
 };
 
-/** Sole window.miner client. One hasher session; panes only hold form state. */
+/** One hasher session; panes only hold form state. */
 @Injectable({ providedIn: 'root' })
 export class MiningService {
+  private readonly host = inject(HASHER_HOST);
   readonly inElectron = signal(false);
+  readonly canMine = signal(false);
   readonly info = signal<MinerInfo | null>(null);
   readonly stats = signal<MinerStats>(IDLE_STATS);
   readonly gpuDevices = signal<GpuDevice[]>([]);
   readonly gpuAddon = signal(false);
   readonly gpuScanned = signal(false);
+  readonly gpuReason = signal<GpuScanReason | undefined>(undefined);
   readonly toast = signal('');
+  readonly sessionKind = signal<MineToKind | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private unsub: (() => void)[] = [];
   private bound = false;
@@ -32,21 +38,24 @@ export class MiningService {
     this.bind();
   }
 
-  /** Subscribe once. Tests that set window.miner after construct call this again. */
   bind(): void {
     if (this.bound) {
       return;
     }
-    const api = window.miner;
-    this.inElectron.set(!!api);
-    if (!api) {
-      return;
-    }
+    this.inElectron.set(this.host.inElectron);
+    this.canMine.set(this.host.canMine);
     this.bound = true;
-    void api.info().then((i) => this.info.set(i));
-    this.unsub.push(api.onStats((s) => this.stats.set(s)));
+    void this.host.info().then((i) => this.info.set(i));
     this.unsub.push(
-      api.onToast((message) => {
+      this.host.onStats((s) => {
+        this.stats.set({ ...s });
+        if (!s.running) {
+          this.sessionKind.set(null);
+        }
+      }),
+    );
+    this.unsub.push(
+      this.host.onToast((message) => {
         this.toast.set(message);
         if (this.toastTimer) {
           clearTimeout(this.toastTimer);
@@ -62,48 +71,52 @@ export class MiningService {
   }
 
   async start(opts: MinerStartOpts): Promise<string | null> {
-    const api = window.miner;
-    if (!api) {
+    if (!this.host.canMine) {
       return 'Open this app with npm start (Electron), not ng serve.';
     }
     if (this.stats().running) {
-      await api.stop();
+      await this.host.stop();
     }
-    const r = await api.start(opts);
+    const r = await this.host.start(opts);
     if (!r.ok) {
       return r.error ?? 'start failed';
     }
+    this.sessionKind.set(opts.mineTo.kind);
     return null;
   }
 
   async stop(): Promise<void> {
-    await window.miner?.stop();
+    await this.host.stop();
+    this.sessionKind.set(null);
+  }
+
+  warn(message: string): void {
+    this.toast.set(message);
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = setTimeout(() => this.toast.set(''), 5000);
   }
 
   async refreshGpus(): Promise<GpuScan> {
-    const empty: GpuScan = { devices: [], addon: false };
-    const api = window.miner;
-    if (!api) {
-      this.gpuDevices.set([]);
-      this.gpuAddon.set(false);
-      this.gpuScanned.set(true);
-      return empty;
-    }
+    const empty: GpuScan = { devices: [], addon: false, reason: 'error' };
     try {
-      const r = await api.gpus();
+      const r = await this.host.gpus();
       this.gpuDevices.set(r.devices);
       this.gpuAddon.set(r.addon);
+      this.gpuReason.set(r.reason);
       this.gpuScanned.set(true);
       return r;
     } catch {
       this.gpuDevices.set([]);
       this.gpuAddon.set(false);
+      this.gpuReason.set('error');
       this.gpuScanned.set(true);
       return empty;
     }
   }
 
   pickDatadir(): Promise<string | null> {
-    return window.miner?.pickDatadir() ?? Promise.resolve(null);
+    return this.host.pickDatadir();
   }
 }

@@ -8,6 +8,7 @@ export const MAIN_IS_LIVE = false;
 export const RPC_PORT_MAIN = 4094;
 export const RPC_PORT_TESTNET = 35332;
 export const STRATUM_PORT_DEFAULT = 23334;
+export const DATUM_PORT_DEFAULT = 28916;
 
 export function parseChain(raw: unknown): MinerChain {
   if (raw === 'main' || raw === 'testnet') {

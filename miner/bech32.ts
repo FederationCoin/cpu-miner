@@ -1,4 +1,4 @@
-/** BIP173 bech32 / BIP350 bech32m decode. Witness v0/v1 scriptPubKey. */
+/** BIP173 bech32 / BIP350 bech32m decode. Payouts are witness v0 only. */
 
 const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
@@ -160,7 +160,7 @@ export function bech32Decode(addr: string): { hrp: string; witver: number; progr
   return { hrp, witver, program };
 }
 
-/** Witness v0/v1 scriptPubKey. Accepts tgfcn / gfcn HRPs; payoutScript checks chain. */
+/** Witness scriptPubKey codec. Accepts tgfcn / gfcn HRPs; payoutScript allows v0 only. */
 export function addressToScript(addr: string): { hrp: string; script: Uint8Array } | null {
   const d = bech32Decode(addr);
   if (!d) {
@@ -192,6 +192,11 @@ export function payoutScript(addr: string, chain: 'main' | 'testnet'): Uint8Arra
   }
   if (decoded.hrp !== want) {
     throw new Error(`payout must be ${label}, not ${other}`);
+  }
+  if (decoded.script[0] !== 0x00) {
+    throw new Error(
+      `payout must be witness v0 bech32 (P2WPKH/P2WSH). Witness v1 / bech32m (Taproot) is not supported`,
+    );
   }
   return decoded.script;
 }

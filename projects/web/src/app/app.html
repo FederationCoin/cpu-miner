@@ -1,0 +1,31 @@
+<main>
+  <header class="header">
+    <div>
+      <h1>FederationCoin miner</h1>
+      <p class="lead">
+        Web demo. Network is the tenant. In-page mining is WebSocket Stratum (WebGPU or CPU).
+        DATUM and node RPC stay on the desktop app with your own node. MAIN house pool is off.
+      </p>
+    </div>
+    <label class="network-toggle" for="network-toggle">
+      Network
+      <select
+        id="network-toggle"
+        [value]="network.chain()"
+        (change)="selectNetwork($any($event.target).value)"
+      >
+        <option value="testnet">Testnet</option>
+        <option value="main">Main</option>
+      </select>
+    </label>
+  </header>
+
+  <app-network-workspace chain="testnet" [hidden]="network.chain() !== 'testnet'" />
+  <app-network-workspace chain="main" [hidden]="network.chain() !== 'main'" />
+
+  <app-miner-footer />
+
+  @if (mining.toast()) {
+    <div class="toast" role="status">{{ mining.toast() }}</div>
+  }
+</main>

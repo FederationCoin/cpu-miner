@@ -107,34 +107,44 @@ describe('sha256 / blake2b self-checks', () => {
 });
 
 describe('payout address', () => {
-  it('accepts a tgfcn1 taproot address on testnet', () => {
-    const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('tgfcn', 1, program);
-    expect(addr).toMatch(/^tgfcn1p/);
+  it('accepts a tgfcn1 P2WPKH address on testnet', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('tgfcn', 0, program);
+    expect(addr).toMatch(/^tgfcn1q/);
     const script = payoutScript(addr!, 'testnet');
-    expect(script[0]).toBe(0x51);
-    expect(script[1]).toBe(32);
+    expect(script[0]).toBe(0x00);
+    expect(script[1]).toBe(20);
   });
 
   it('refuses gfcn1 on testnet', () => {
-    const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('gfcn', 1, program);
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('gfcn', 0, program);
     expect(() => payoutScript(addr!, 'testnet')).toThrow(/tgfcn1, not gfcn1/);
   });
 
-  it('accepts a gfcn1 taproot address on main', () => {
-    const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('gfcn', 1, program);
-    expect(addr).toMatch(/^gfcn1p/);
+  it('accepts a gfcn1 P2WPKH address on main', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('gfcn', 0, program);
+    expect(addr).toMatch(/^gfcn1q/);
     const script = payoutScript(addr!, 'main');
-    expect(script[0]).toBe(0x51);
-    expect(script[1]).toBe(32);
+    expect(script[0]).toBe(0x00);
+    expect(script[1]).toBe(20);
   });
 
   it('refuses tgfcn1 on main', () => {
-    const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('tgfcn', 1, program);
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('tgfcn', 0, program);
     expect(() => payoutScript(addr!, 'main')).toThrow(/gfcn1, not tgfcn1/);
+  });
+
+  it('refuses witness v1 / bech32m on testnet and main', () => {
+    const program = new Uint8Array(32).fill(0x11);
+    const tgfcn = encodeAddress('tgfcn', 1, program);
+    const gfcn = encodeAddress('gfcn', 1, program);
+    expect(tgfcn).toMatch(/^tgfcn1p/);
+    expect(gfcn).toMatch(/^gfcn1p/);
+    expect(() => payoutScript(tgfcn!, 'testnet')).toThrow(/witness v0|bech32m|Taproot/i);
+    expect(() => payoutScript(gfcn!, 'main')).toThrow(/witness v0|bech32m|Taproot/i);
   });
 
   it('accepts witness v0 tgfcn and gfcn', () => {

@@ -8,6 +8,7 @@ export type ChainConfig = {
   hrp: 'gfcn' | 'tgfcn';
   rpcPort: number;
   stratumPort: number;
+  datumPort: number;
   cookieSubdir: string;
   /** false until announcement. Flip in golive (Miner when MAIN is restored). */
   mainIsLive: boolean;
@@ -20,6 +21,7 @@ export const CHAINS: Record<MinerChain, ChainConfig> = {
     hrp: 'gfcn',
     rpcPort: 4094,
     stratumPort: 23334,
+    datumPort: 28916,
     cookieSubdir: '',
     mainIsLive: false,
   },
@@ -29,6 +31,7 @@ export const CHAINS: Record<MinerChain, ChainConfig> = {
     hrp: 'tgfcn',
     rpcPort: 35332,
     stratumPort: 23334,
+    datumPort: 28916,
     cookieSubdir: 'testnet3',
     mainIsLive: true,
   },

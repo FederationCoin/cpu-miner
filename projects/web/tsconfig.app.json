@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": [
+    "src/**/*.ts",
+    "../miner-ui/src/**/*.ts",
+    "../miner-ui/src/**/*.d.ts",
+    "../miner-ui/src/**/*.json"
+  ],
+  "exclude": ["src/**/*.spec.ts", "../miner-ui/src/**/*.spec.ts"]
+}

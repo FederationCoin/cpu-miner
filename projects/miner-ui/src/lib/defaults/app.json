@@ -1,0 +1,32 @@
+{
+  "chains": {
+    "testnet": {
+      "mineToKind": "node",
+      "rpc": { "host": "127.0.0.1", "port": 35332 },
+      "stratum": { "host": "127.0.0.1", "port": 23334, "password": "x" },
+      "datum": { "host": "127.0.0.1", "port": 28916 },
+      "datumWebsocket": { "url": "wss://pool.testnet.federationcoin.org/datum" },
+      "pool": {
+        "stratumHost": "127.0.0.1",
+        "stratumPort": 23334,
+        "datumHost": "127.0.0.1",
+        "datumPort": 28916,
+        "feePercent": "2"
+      }
+    },
+    "main": {
+      "mineToKind": "node",
+      "rpc": { "host": "127.0.0.1", "port": 4094 },
+      "stratum": { "host": "127.0.0.1", "port": 23334, "password": "x" },
+      "datum": { "host": "127.0.0.1", "port": 28916 },
+      "datumWebsocket": { "url": "wss://pool.testnet.federationcoin.org/datum" },
+      "pool": {
+        "stratumHost": "127.0.0.1",
+        "stratumPort": 23334,
+        "datumHost": "127.0.0.1",
+        "datumPort": 28916,
+        "feePercent": "2"
+      }
+    }
+  }
+}

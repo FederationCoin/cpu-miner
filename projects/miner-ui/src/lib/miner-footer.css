@@ -1,0 +1,32 @@
+:host {
+  display: block;
+  margin-top: max(8rem, 55vh);
+  padding: 1.25rem 0 0.5rem;
+}
+
+.miner-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem 1.75rem;
+  min-width: 600px;
+  border-top: 1px solid #3a3f4b;
+  padding-top: 1rem;
+}
+
+a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #e8eaed;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+a:hover {
+  color: #fff;
+}
+
+svg {
+  flex-shrink: 0;
+}

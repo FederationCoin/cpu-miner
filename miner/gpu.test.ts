@@ -30,4 +30,30 @@ describe('GPU extraNonce2', () => {
       }),
     ).toBe(false);
   });
+
+  it('startGpuGrindNative logs and returns false when startGrind throws', () => {
+    const logs: string[] = [];
+    expect(
+      startGpuGrindNative(
+        {
+          startGrind: () => {
+            throw new Error('unknown GPU id');
+          },
+        },
+        {
+          deviceId: 'cuda:0:card',
+          work: new Uint8Array(80),
+          target: new Uint8Array(32),
+          xorKey: new Uint8Array(16),
+          xorClear: 0,
+          extraNonce2: new Uint8Array(8),
+          gen: 0,
+          onProgress: () => undefined,
+          onFound: () => undefined,
+          onLog: (m) => logs.push(m),
+        },
+      ),
+    ).toBe(false);
+    expect(logs.some((m) => /unknown GPU id/.test(m))).toBe(true);
+  });
 });

@@ -1,0 +1,56 @@
+:host {
+  display: block;
+}
+
+.defaults-fold {
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  margin: 0.85rem 0;
+  background: transparent;
+}
+
+.defaults-fold > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.55rem 0.85rem;
+  color: #e8eaed;
+  font-size: 0.9rem;
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+
+.defaults-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.defaults-fold > summary::before {
+  content: '';
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid #9aa0aa;
+  border-bottom: 2px solid #9aa0aa;
+  transform: rotate(-45deg);
+  margin-right: 0.25rem;
+}
+
+.defaults-fold[open] > summary::before {
+  transform: rotate(45deg);
+  margin-top: -0.15rem;
+}
+
+.fold-body {
+  padding: 0 0.85rem 0.75rem;
+}
+
+.fold-body > fieldset.partition,
+.fold-body > fieldset.gpus {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.fold-body > fieldset.partition > legend,
+.fold-body > fieldset.gpus > legend {
+  display: none;
+}

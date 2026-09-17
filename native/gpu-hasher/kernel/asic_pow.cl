@@ -177,12 +177,10 @@ __kernel void asic_pow_hash_one(__global const uchar* work80, __global const uch
 }
 
 __kernel void asic_pow_grind(__global const uchar* work80, __global const uchar* mask32, __global const uchar* target32,
-    uint nonce_lo, uint nonce_hi, __global uint* found)
+    uint nonce_lo, uint nonce_hi, uint iter, __global uint* found)
 {
     uint gid = get_global_id(0);
-    ulong full = (ulong)nonce_lo + (ulong)gid;
-    uint n = (uint)full;
-    uint n2 = nonce_hi + (uint)(full >> 32);
+    ulong start = (ulong)nonce_lo + (ulong)gid * (ulong)iter;
 
     uchar work[80];
     uchar mask[32];
@@ -195,19 +193,28 @@ __kernel void asic_pow_grind(__global const uchar* work80, __global const uchar*
         mask[i] = mask32[i];
         target[i] = target32[i];
     }
-    work[32] = (uchar)n;
-    work[33] = (uchar)(n >> 8);
-    work[34] = (uchar)(n >> 16);
-    work[35] = (uchar)(n >> 24);
-    work[36] = (uchar)n2;
-    work[37] = (uchar)(n2 >> 8);
-    work[38] = (uchar)(n2 >> 16);
-    work[39] = (uchar)(n2 >> 24);
-    asic_final(work, mask, out);
-    if (meets_target(out, target)) {
-        if (atomic_cmpxchg(found, 0, 1) == 0) {
-            found[1] = n;
-            found[2] = n2;
+    for (uint k = 0; k < iter; ++k) {
+        if ((k & 63u) == 0u && atomic_or(found, 0u) != 0u) {
+            return;
+        }
+        ulong full = start + k;
+        uint n = (uint)full;
+        uint n2 = nonce_hi + (uint)(full >> 32);
+        work[32] = (uchar)n;
+        work[33] = (uchar)(n >> 8);
+        work[34] = (uchar)(n >> 16);
+        work[35] = (uchar)(n >> 24);
+        work[36] = (uchar)n2;
+        work[37] = (uchar)(n2 >> 8);
+        work[38] = (uchar)(n2 >> 16);
+        work[39] = (uchar)(n2 >> 24);
+        asic_final(work, mask, out);
+        if (meets_target(out, target)) {
+            if (atomic_cmpxchg(found, 0, 1) == 0) {
+                found[1] = n;
+                found[2] = n2;
+            }
+            return;
         }
     }
 }

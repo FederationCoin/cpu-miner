@@ -1,0 +1,71 @@
+<div class="rpc-connect" [formGroup]="form()">
+  <label [attr.for]="idPrefix() + '-rpcHost'">RPC host</label>
+  <input
+    [id]="idPrefix() + '-rpcHost'"
+    type="text"
+    autocomplete="off"
+    spellcheck="false"
+    formControlName="host"
+  />
+  <label [attr.for]="idPrefix() + '-rpcPort'">RPC port</label>
+  <input [id]="idPrefix() + '-rpcPort'" type="number" min="1" max="65535" formControlName="port" />
+
+  <fieldset class="mode">
+    <legend>RPC auth</legend>
+    <label class="check" [attr.for]="idPrefix() + '-authCookie'">
+      <input [id]="idPrefix() + '-authCookie'" type="radio" formControlName="authKind" value="cookie" />
+      Cookie
+    </label>
+    <label class="check" [attr.for]="idPrefix() + '-authUserpass'">
+      <input [id]="idPrefix() + '-authUserpass'" type="radio" formControlName="authKind" value="userpass" />
+      Username and password
+    </label>
+  </fieldset>
+
+  @switch (authKind()) {
+    @case ('cookie') {
+      <fieldset class="partition" formGroupName="cookie">
+        <legend>Cookie</legend>
+        <label [attr.for]="idPrefix() + '-datadir'">Node data directory</label>
+        <div class="row path-row">
+          <input
+            [id]="idPrefix() + '-datadir'"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="~/.federationcoin"
+            formControlName="datadir"
+          />
+          <button type="button" [disabled]="!mining.inElectron()" (click)="browse()">Browse</button>
+        </div>
+        @if (cookieHint()) {
+          <p class="hint">
+            Cookie is <code>{{ cookieHint() }}</code>. Contents stay in the main process.
+          </p>
+        }
+      </fieldset>
+    }
+    @case ('userpass') {
+      <fieldset class="partition" formGroupName="userpass">
+        <legend>Username and password</legend>
+        <label [attr.for]="idPrefix() + '-rpcUser'">RPC username</label>
+        <input
+          [id]="idPrefix() + '-rpcUser'"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          formControlName="user"
+        />
+        <label [attr.for]="idPrefix() + '-rpcPassword'">RPC password</label>
+        <input
+          [id]="idPrefix() + '-rpcPassword'"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          formControlName="password"
+        />
+        <p class="hint">Sent as HTTP Basic auth. Not a cookie file.</p>
+      </fieldset>
+    }
+  }
+</div>

@@ -1,0 +1,51 @@
+:host {
+  display: block;
+}
+
+:host[hidden] {
+  display: none;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  min-width: 600px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tabs button {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  background: #1a1d24;
+  color: #c5c9d1;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: #3d6ea8;
+  border-color: #3d6ea8;
+  color: #fff;
+}
+
+.pane-col {
+  min-width: 0;
+  border: 1px solid #3a3f4b;
+  border-radius: 6px;
+  padding: 1rem 1.1rem 1.25rem;
+  background: #16181e;
+}
+
+.pane-col h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}

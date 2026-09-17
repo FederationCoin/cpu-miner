@@ -111,6 +111,45 @@ export function parseNotify(msg: unknown): StratumNotify | null {
   }
 }
 
+/** Why parseNotify returned null. Keep the 39-byte DATUM coinb1 check. */
+export function notifyIgnoreReason(msg: unknown): string {
+  if (!msg || typeof msg !== 'object') {
+    return 'bad mining.notify';
+  }
+  const rec = msg as { params?: unknown };
+  if (!Array.isArray(rec.params) || rec.params.length < 3) {
+    return 'bad mining.notify';
+  }
+  const coinb1 = rec.params[2];
+  if (typeof coinb1 !== 'string') {
+    return 'bad mining.notify';
+  }
+  try {
+    const n = parseHex(coinb1).length;
+    if (n !== 39) {
+      return `bad mining.notify (coinb1 ${n} bytes)`;
+    }
+  } catch {
+    return 'bad mining.notify (coinb1)';
+  }
+  return 'bad mining.notify';
+}
+
+export function parseSetDifficulty(msg: unknown): number | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { method?: unknown; params?: unknown };
+  if (rec.method !== 'mining.set_difficulty' || !Array.isArray(rec.params) || rec.params.length < 1) {
+    return null;
+  }
+  const d = Number(rec.params[0]);
+  if (!Number.isFinite(d) || d <= 0) {
+    return null;
+  }
+  return d;
+}
+
 export function isAuthorizeOk(msg: unknown): boolean {
   if (!msg || typeof msg !== 'object') {
     return false;
@@ -121,10 +160,12 @@ export function isAuthorizeOk(msg: unknown): boolean {
 
 export type StratumHandlers = {
   onNotify: (job: StratumNotify) => void;
+  onDifficulty: (diff: number) => void;
   onSubscribed: (sub: StratumSubscribe) => void;
   onAuthorized: () => void;
   onSubmitResult: (ok: boolean, error?: string) => void;
   onClose: (reason: string) => void;
+  onJobIgnored: (reason: string) => void;
 };
 
 export class StratumClient {
@@ -199,10 +240,16 @@ export class StratumClient {
       const job = parseNotify(msg);
       if (job) {
         this.handlers.onNotify(job);
+      } else {
+        this.handlers.onJobIgnored(notifyIgnoreReason(msg));
       }
       return;
     }
     if (rec.method === 'mining.set_difficulty') {
+      const diff = parseSetDifficulty(msg);
+      if (diff != null) {
+        this.handlers.onDifficulty(diff);
+      }
       return;
     }
     if (rec.id === 1) {
