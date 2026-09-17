@@ -114,6 +114,9 @@
         <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="host" />
         <label [attr.for]="id('stratumPort')">Port</label>
         <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="port" />
+        @if (isWebDemo()) {
+          <p class="hint">This page speaks WebSocket Stratum (port 443). TCP 23334 is the desktop app and firmware.</p>
+        }
         <label [attr.for]="id('stratumWorker')">Worker</label>
         <input
           [id]="id('stratumWorker')"

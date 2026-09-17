@@ -111,6 +111,30 @@ export function parseNotify(msg: unknown): StratumNotify | null {
   }
 }
 
+/** Why parseNotify returned null. Keep the 39-byte DATUM coinb1 check. */
+export function notifyIgnoreReason(msg: unknown): string {
+  if (!msg || typeof msg !== 'object') {
+    return 'bad mining.notify';
+  }
+  const rec = msg as { params?: unknown };
+  if (!Array.isArray(rec.params) || rec.params.length < 3) {
+    return 'bad mining.notify';
+  }
+  const coinb1 = rec.params[2];
+  if (typeof coinb1 !== 'string') {
+    return 'bad mining.notify';
+  }
+  try {
+    const n = parseHex(coinb1).length;
+    if (n !== 39) {
+      return `bad mining.notify (coinb1 ${n} bytes)`;
+    }
+  } catch {
+    return 'bad mining.notify (coinb1)';
+  }
+  return 'bad mining.notify';
+}
+
 export function parseSetDifficulty(msg: unknown): number | null {
   if (!msg || typeof msg !== 'object') {
     return null;
@@ -141,6 +165,7 @@ export type StratumHandlers = {
   onAuthorized: () => void;
   onSubmitResult: (ok: boolean, error?: string) => void;
   onClose: (reason: string) => void;
+  onJobIgnored: (reason: string) => void;
 };
 
 export class StratumClient {
@@ -215,6 +240,8 @@ export class StratumClient {
       const job = parseNotify(msg);
       if (job) {
         this.handlers.onNotify(job);
+      } else {
+        this.handlers.onJobIgnored(notifyIgnoreReason(msg));
       }
       return;
     }

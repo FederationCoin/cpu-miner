@@ -1,38 +1,26 @@
 import { InjectionToken } from '@angular/core';
+import { APP_DEFAULTS, WEB_DEFAULTS, type AppDefaults, type HostedEndpoints, type WebDefaults } from './defaults/defaults';
 
-export type HostedEndpoints = {
-  label: string;
-  stratumTcp: { host: string; port: number };
-  datumTcp: { host: string; port: number };
-  stratumWss: string;
-  datumWss: string;
-  statsUrl: string;
-};
+export type { AppDefaults, HostedEndpoints, WebDefaults } from './defaults/defaults';
+export { APP_DEFAULTS, WEB_DEFAULTS } from './defaults/defaults';
 
 export type MinerShell =
-  | { kind: 'desktop' }
-  | { kind: 'webDemo'; hosted: HostedEndpoints };
+  | { kind: 'desktop'; defaults: AppDefaults }
+  | { kind: 'webDemo'; defaults: WebDefaults };
 
 export const MINER_SHELL = new InjectionToken<MinerShell>('MINER_SHELL', {
   providedIn: 'root',
-  factory: () => ({ kind: 'desktop' }),
+  factory: () => desktopShell(),
 });
 
-export const DEFAULT_HOSTED_TESTNET: HostedEndpoints = {
-  label: 'FederationCoin testnet pool',
-  stratumTcp: { host: 'stratum.testnet.federationcoin.org', port: 23334 },
-  datumTcp: { host: 'datum.testnet.federationcoin.org', port: 28916 },
-  stratumWss: 'wss://pool.testnet.federationcoin.org/stratum',
-  datumWss: 'wss://pool.testnet.federationcoin.org/datum',
-  statsUrl: 'https://pool.testnet.federationcoin.org/api/stats',
-};
+export const DEFAULT_HOSTED_TESTNET: HostedEndpoints = WEB_DEFAULTS.hosted;
 
 export function desktopShell(): MinerShell {
-  return { kind: 'desktop' };
+  return { kind: 'desktop', defaults: APP_DEFAULTS };
 }
 
-export function webDemoShell(hosted: HostedEndpoints = DEFAULT_HOSTED_TESTNET): MinerShell {
-  return { kind: 'webDemo', hosted };
+export function webDemoShell(defaults: WebDefaults = WEB_DEFAULTS): MinerShell {
+  return { kind: 'webDemo', defaults };
 }
 
 export type WorkspaceTab = 'mine' | 'pool' | 'docs' | 'finder';

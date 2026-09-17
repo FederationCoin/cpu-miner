@@ -185,4 +185,26 @@ describe('web demo shell', () => {
     expect(has(f, '#testnet-gpu-webgpu-0')).toBe(true);
     expect(has(f, '#testnet-webgpuHelp')).toBe(false);
   });
+
+  it('defaults Stratum to the WebSocket host on 443', async () => {
+    const f = await render();
+    (f.nativeElement.querySelector('#testnet-mineToStratum') as HTMLInputElement).click();
+    f.detectChanges();
+    expect((f.nativeElement.querySelector('#testnet-stratumHost') as HTMLInputElement).value).toBe(
+      'pool.testnet.federationcoin.org',
+    );
+    expect((f.nativeElement.querySelector('#testnet-stratumPort') as HTMLInputElement).value).toBe('443');
+  });
+
+  it('replaces a saved TCP NLB Stratum default with the WebSocket port', async () => {
+    localStorage.setItem('fc.testnet.stratum.host', 'stratum.testnet.federationcoin.org');
+    localStorage.setItem('fc.testnet.stratum.port', '23334');
+    const f = await render();
+    (f.nativeElement.querySelector('#testnet-mineToStratum') as HTMLInputElement).click();
+    f.detectChanges();
+    expect((f.nativeElement.querySelector('#testnet-stratumHost') as HTMLInputElement).value).toBe(
+      'pool.testnet.federationcoin.org',
+    );
+    expect((f.nativeElement.querySelector('#testnet-stratumPort') as HTMLInputElement).value).toBe('443');
+  });
 });

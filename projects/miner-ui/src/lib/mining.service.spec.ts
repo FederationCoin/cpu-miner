@@ -95,6 +95,27 @@ describe('MiningService', () => {
     expect(miner.start).toHaveBeenLastCalledWith(expect.objectContaining({ chain: 'main' }));
   });
 
+  it('updates when the hasher mutates and re-emits the same stats object', () => {
+    const miner = stubMiner();
+    window.miner = miner;
+    const svc = TestBed.inject(MiningService);
+    const onStats = miner.onStats as ReturnType<typeof vi.fn>;
+    const cb = onStats.mock.calls[0]?.[0] as ((s: MinerStats) => void) | undefined;
+    expect(cb).toBeDefined();
+    const shared: MinerStats = {
+      ...IDLE_STATS,
+      running: true,
+      chain: 'testnet',
+      status: 'connecting wss://pool.testnet.federationcoin.org/stratum',
+    };
+    cb!(shared);
+    expect(svc.stats().status).toContain('connecting');
+    shared.status = 'authorized tgfcn1qqq.web';
+    cb!(shared);
+    expect(svc.stats().status).toBe('authorized tgfcn1qqq.web');
+    expect(svc.stats()).not.toBe(shared);
+  });
+
   it('records the WebGPU scan reason', async () => {
     const miner = stubMiner({
       gpus: vi.fn().mockResolvedValue({ devices: [], addon: false, reason: 'no-adapter' }),

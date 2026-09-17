@@ -479,6 +479,12 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
           status = `authorized ${opts.worker}`;
           emitStats();
         },
+        onJobIgnored: (reason) => {
+          lastError = reason;
+          status = reason;
+          emitLog('stratum', reason, true);
+          emitStats();
+        },
         onNotify: (job) => {
           delay = 0;
           lastError = '';

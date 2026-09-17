@@ -110,4 +110,72 @@ describe('WebHasherHost reconnect', () => {
       }
     }
   });
+
+  it('toasts when mining.notify coinb1 is not 39 bytes', async () => {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ running: true, chain: 'testnet', status: 'ok' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const sockets: FakeWebSocket[] = [];
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
+    try {
+      const toasts: string[] = [];
+      host.onToast((m) => toasts.push(m));
+      const r = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
+      });
+      expect(r.ok).toBe(true);
+      sockets[0]!.openNow();
+      sockets[0]!.pushLine({ id: 1, error: null, result: [[], 'aabbccdd', 8] });
+      sockets[0]!.pushLine({ id: 2, error: null, result: true });
+      sockets[0]!.pushLine({
+        method: 'mining.notify',
+        params: ['j', '11'.repeat(32), '22'.repeat(38), '', [], '20000000', '1e00ffff', '01020304', true],
+      });
+      expect(toasts).toContain('bad mining.notify (coinb1 38 bytes)');
+      await host.stop();
+    } finally {
+      globalThis.fetch = origFetch;
+      const timer = (host as unknown as { pollTimer: ReturnType<typeof setInterval> | null }).pollTimer;
+      if (timer) {
+        clearInterval(timer);
+      }
+    }
+  });
+
+  it('refuses TCP house Stratum instead of opening wss on 23334', async () => {
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET);
+    try {
+      const r = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: {
+          kind: 'stratum',
+          stratum: {
+            host: 'stratum.testnet.federationcoin.org',
+            port: 23334,
+            worker: 'tgfcn1abc.cpu',
+            password: 'x',
+          },
+        },
+      });
+      expect(r.ok).toBe(false);
+      expect(r.error).toMatch(/WebSocket port \(443\)/);
+    } finally {
+      const timer = (host as unknown as { pollTimer: ReturnType<typeof setInterval> | null }).pollTimer;
+      if (timer) {
+        clearInterval(timer);
+      }
+    }
+  });
 });

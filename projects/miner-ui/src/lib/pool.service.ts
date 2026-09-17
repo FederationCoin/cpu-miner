@@ -34,7 +34,9 @@ export class PoolService {
       return;
     }
     this.bound = true;
-    this.unsub.push(this.host.onPoolStats((s) => this.stats.set(s)));
+    this.unsub.push(
+      this.host.onPoolStats((s) => this.stats.set({ ...s, payouts: [...s.payouts] })),
+    );
   }
 
   async start(opts: PoolStartOpts): Promise<string | null> {

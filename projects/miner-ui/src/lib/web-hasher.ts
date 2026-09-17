@@ -17,7 +17,7 @@ import type {
   PoolStats,
 } from './miner-api';
 import type { HostedEndpoints } from './miner-shell';
-import { StratumWsClient, stratumWsUrl, type StratumNotify, type StratumWsTransport } from './stratum-ws';
+import { StratumWsClient, isTcpStratumEndpoint, stratumWsUrl, type StratumNotify, type StratumWsTransport } from './stratum-ws';
 import { diagnoseWebGpu, webgpuGrind } from './webgpu';
 
 export const IDLE_WEB_STATS: MinerStats = {
@@ -79,6 +79,12 @@ export class WebHasherHost implements HasherHost {
     if (opts.chain === 'main' && opts.mineTo.kind === 'hostedPoolStratum') {
       return { ok: false, error: 'Federation pool is not offered on main' };
     }
+    if (opts.mineTo.kind === 'stratum' && isTcpStratumEndpoint(opts.mineTo.stratum.host, opts.mineTo.stratum.port)) {
+      return {
+        ok: false,
+        error: 'TCP Stratum (port 23334) is for the desktop app and firmware. This page needs the WebSocket port (443).',
+      };
+    }
     await this.stop();
     const url = this.stratumUrl(opts);
     if (!url) {
@@ -132,6 +138,12 @@ export class WebHasherHost implements HasherHost {
           return;
         }
         this.beginGrind(client, job, extraNonce1, target, threads);
+      },
+      onJobIgnored: (reason) => {
+        this.statsState.lastError = reason;
+        this.statsState.status = reason;
+        this.emitStats();
+        this.toast(reason);
       },
       onSubmitResult: (ok, error) => {
         if (ok) {
@@ -409,8 +421,9 @@ export class WebHasherHost implements HasherHost {
   }
 
   private emitStats(): void {
+    const snap: MinerStats = { ...this.statsState };
     for (const cb of this.statsCbs) {
-      cb(this.statsState);
+      cb(snap);
     }
   }
 

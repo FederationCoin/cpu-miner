@@ -45,12 +45,15 @@ export class PoolPane implements OnInit {
   }
 
   ngOnInit(): void {
-    const cfg = CHAINS[this.chain()];
+    if (this.shell.kind !== 'desktop') {
+      return;
+    }
+    const d = this.shell.defaults.chains[this.chain()];
     const authKind = localStorage.getItem(this.key('authKind'));
     this.form.patchValue({
       rpc: {
-        host: localStorage.getItem(this.key('rpcHost'))?.trim() || '127.0.0.1',
-        port: this.loadNum('rpcPort', cfg.rpcPort),
+        host: localStorage.getItem(this.key('rpcHost'))?.trim() || d.rpc.host,
+        port: this.loadNum('rpcPort', d.rpc.port),
         authKind: authKind === 'userpass' ? 'userpass' : 'cookie',
         cookie: {
           datadir: localStorage.getItem(this.key('datadir'))?.trim() || this.mining.info()?.datadir || '',
@@ -61,11 +64,11 @@ export class PoolPane implements OnInit {
         },
       },
       operator: localStorage.getItem(this.key('operator')) ?? '',
-      feePercent: localStorage.getItem(this.key('feePercent')) ?? '2',
-      stratumHost: localStorage.getItem(this.key('stratumHost'))?.trim() || '127.0.0.1',
-      stratumPort: this.loadNum('stratumPort', cfg.stratumPort),
-      datumHost: localStorage.getItem(this.key('datumHost'))?.trim() || '127.0.0.1',
-      datumPort: this.loadNum('datumPort', cfg.datumPort),
+      feePercent: localStorage.getItem(this.key('feePercent')) ?? d.pool.feePercent,
+      stratumHost: localStorage.getItem(this.key('stratumHost'))?.trim() || d.pool.stratumHost,
+      stratumPort: this.loadNum('stratumPort', d.pool.stratumPort),
+      datumHost: localStorage.getItem(this.key('datumHost'))?.trim() || d.pool.datumHost,
+      datumPort: this.loadNum('datumPort', d.pool.datumPort),
     });
     this.form.valueChanges.subscribe(() => this.persist());
   }
@@ -115,14 +118,14 @@ export class PoolPane implements OnInit {
   }
 
   protected hostedLabel(): string {
-    return this.shell.kind === 'webDemo' ? this.shell.hosted.label : 'FederationCoin testnet pool';
+    return this.shell.kind === 'webDemo' ? this.shell.defaults.hosted.label : 'FederationCoin testnet pool';
   }
 
   protected hostedStratum(): string {
     if (this.shell.kind !== 'webDemo') {
       return '';
     }
-    const t = this.shell.hosted.stratumTcp;
+    const t = this.shell.defaults.hosted.stratumTcp;
     return `${t.host}:${t.port}`;
   }
 
@@ -130,16 +133,16 @@ export class PoolPane implements OnInit {
     if (this.shell.kind !== 'webDemo') {
       return '';
     }
-    const t = this.shell.hosted.datumTcp;
+    const t = this.shell.defaults.hosted.datumTcp;
     return `${t.host}:${t.port}`;
   }
 
   protected hostedWss(): string {
-    return this.shell.kind === 'webDemo' ? this.shell.hosted.stratumWss : '';
+    return this.shell.kind === 'webDemo' ? this.shell.defaults.hosted.stratumWss : '';
   }
 
   protected hostedDatumWss(): string {
-    return this.shell.kind === 'webDemo' ? this.shell.hosted.datumWss : '';
+    return this.shell.kind === 'webDemo' ? this.shell.defaults.hosted.datumWss : '';
   }
 
   protected async start(): Promise<void> {

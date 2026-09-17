@@ -5,6 +5,7 @@ import {
   parseNotify,
   parseSetDifficulty,
   parseSubscribeResult,
+  notifyIgnoreReason,
   subscribeLine,
   submitLine,
 } from './stratum.js';
@@ -74,6 +75,17 @@ describe('stratum wire', () => {
       params: ['j', prev, coinb1, '', [], '20000000', '1d00ffff', '00112233', true],
     };
     expect(parseNotify(msg)).toBeNull();
+  });
+
+  it('reports 38-byte coinb1 without accepting the job', () => {
+    const prev = '11'.repeat(32);
+    const coinb1 = '22'.repeat(38);
+    const msg = {
+      method: 'mining.notify',
+      params: ['j', prev, coinb1, '', [], '20000000', '1e00ffff', '01020304', true],
+    };
+    expect(parseNotify(msg)).toBeNull();
+    expect(notifyIgnoreReason(msg)).toBe('bad mining.notify (coinb1 38 bytes)');
   });
 
   it('authorize and submit JSON match fcminer', () => {

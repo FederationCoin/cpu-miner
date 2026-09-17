@@ -5,7 +5,9 @@ import {
   parseNotify,
   parseSetDifficulty,
   parseSubscribeResult,
+  notifyIgnoreReason,
   shareBodyKey,
+  isTcpStratumEndpoint,
   stratumWsUrl,
   submitLine,
   subscribeLine,
@@ -91,6 +93,7 @@ function silentHandlers(over: Partial<StratumWsHandlers> = {}): StratumWsHandler
     onAuthorized: () => undefined,
     onSubmitResult: () => undefined,
     onClose: () => undefined,
+    onJobIgnored: () => undefined,
     ...over,
   };
 }
@@ -148,12 +151,29 @@ describe('stratum-ws', () => {
     expect(job?.ntime8[0]).toBe(0x01);
   });
 
+  it('reports 38-byte coinb1 without accepting the job', () => {
+    const prev = '11'.repeat(32);
+    const coinb1 = '22'.repeat(38);
+    const msg = {
+      method: 'mining.notify',
+      params: ['j', prev, coinb1, '', [], '20000000', '1e00ffff', '01020304', true],
+    };
+    expect(parseNotify(msg)).toBeNull();
+    expect(notifyIgnoreReason(msg)).toBe('bad mining.notify (coinb1 38 bytes)');
+  });
+
   it('maps host/port to a websocket stratum URL', () => {
     expect(stratumWsUrl('127.0.0.1', 23334)).toBe('ws://127.0.0.1:23334/stratum');
     expect(stratumWsUrl('pool.testnet.federationcoin.org', 443)).toBe(
       'wss://pool.testnet.federationcoin.org/stratum',
     );
     expect(stratumWsUrl('wss://example.test/stratum', 1)).toBe('wss://example.test/stratum');
+  });
+
+  it('detects TCP NLB Stratum endpoints the browser cannot open', () => {
+    expect(isTcpStratumEndpoint('stratum.testnet.federationcoin.org', 23334)).toBe(true);
+    expect(isTcpStratumEndpoint('pool.testnet.federationcoin.org', 443)).toBe(false);
+    expect(isTcpStratumEndpoint('wss://stratum.testnet.federationcoin.org:23334/stratum', 1)).toBe(true);
   });
 
   it('keys a share by body, not JSON-RPC id', () => {
@@ -384,5 +404,34 @@ describe('StratumWsClient outbox', () => {
     expect(closed).toBe('stopped');
     const after = clock.timers.size;
     expect(after).toBe(0);
+  });
+
+  it('calls onJobIgnored for a 38-byte coinb1 notify', () => {
+    const sockets: FakeWebSocket[] = [];
+    const ignored: string[] = [];
+    const client = new StratumWsClient(
+      'ws://pool.test/stratum',
+      'tgfcn1abc.cpu',
+      'x',
+      silentHandlers({
+        onJobIgnored: (r) => ignored.push(r),
+      }),
+      {
+        open: (url) => {
+          const ws = new FakeWebSocket(url);
+          sockets.push(ws);
+          return ws as unknown as WebSocket;
+        },
+      },
+    );
+    client.connect();
+    sockets[0]!.openNow();
+    handshake(sockets[0]!);
+    sockets[0]!.pushLine({
+      method: 'mining.notify',
+      params: ['j', '11'.repeat(32), '22'.repeat(38), '', [], '20000000', '1e00ffff', '01020304', true],
+    });
+    expect(ignored).toEqual(['bad mining.notify (coinb1 38 bytes)']);
+    client.close();
   });
 });

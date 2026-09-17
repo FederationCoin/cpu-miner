@@ -7,6 +7,7 @@ import { MINER_SHELL } from './miner-shell';
 import { IDLE_STATS, MiningService } from './mining.service';
 import { PoolService } from './pool.service';
 import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
+import { isTcpStratumEndpoint } from './stratum-ws';
 import { DefaultsFold } from './defaults-fold';
 import { WebgpuHelp } from './webgpu-help';
 
@@ -81,37 +82,29 @@ export class MinerPane implements OnInit {
   }
 
   ngOnInit(): void {
-    const cfg = this.config();
-    this.form.controls.rpc.patchValue(this.loadRpc('rpc', cfg.rpcPort));
-    this.form.controls.stratum.patchValue({
-      host:
-        localStorage.getItem(this.key('stratum.host'))?.trim() ||
-        (this.shell.kind === 'webDemo'
-          ? this.chain() === 'testnet'
-            ? this.shell.hosted.stratumTcp.host
-            : ''
-          : '127.0.0.1'),
-      port: this.loadNum('stratum.port', cfg.stratumPort),
-      worker: localStorage.getItem(this.key('stratum.worker')) ?? '',
-      password: localStorage.getItem(this.key('stratum.password')) ?? 'x',
-    });
-    this.form.controls.datum.patchValue({
-      host: localStorage.getItem(this.key('datum.host'))?.trim() || '127.0.0.1',
-      port: this.loadNum('datum.port', cfg.datumPort),
-      worker: localStorage.getItem(this.key('datum.worker')) ?? '',
-      rpc: this.loadRpc('datum.rpc', cfg.rpcPort),
-    });
-    this.form.controls.appPoolStratum.patchValue({
-      worker: localStorage.getItem(this.key('appPoolStratum.worker')) ?? '',
-      password: localStorage.getItem(this.key('appPoolStratum.password')) ?? 'x',
-    });
-    this.form.controls.appPoolDatum.patchValue({
-      worker: localStorage.getItem(this.key('appPoolDatum.worker')) ?? '',
-      rpc: this.loadRpc('appPoolDatum.rpc', cfg.rpcPort),
-    });
+    const chainDefaults = this.shell.defaults.chains[this.chain()];
+    this.form.controls.stratum.patchValue(this.loadStratum(chainDefaults.stratum));
+    if (this.shell.kind === 'desktop') {
+      const d = this.shell.defaults.chains[this.chain()];
+      this.form.controls.rpc.patchValue(this.loadRpc('rpc', d.rpc));
+      this.form.controls.datum.patchValue({
+        host: localStorage.getItem(this.key('datum.host'))?.trim() || d.datum.host,
+        port: this.loadNum('datum.port', d.datum.port),
+        worker: localStorage.getItem(this.key('datum.worker')) ?? '',
+        rpc: this.loadRpc('datum.rpc', d.rpc),
+      });
+      this.form.controls.appPoolStratum.patchValue({
+        worker: localStorage.getItem(this.key('appPoolStratum.worker')) ?? '',
+        password: localStorage.getItem(this.key('appPoolStratum.password')) ?? d.stratum.password,
+      });
+      this.form.controls.appPoolDatum.patchValue({
+        worker: localStorage.getItem(this.key('appPoolDatum.worker')) ?? '',
+        rpc: this.loadRpc('appPoolDatum.rpc', d.rpc),
+      });
+    }
     this.form.controls.hostedPoolStratum.patchValue({
       worker: localStorage.getItem(this.key('hostedPoolStratum.worker')) ?? '',
-      password: localStorage.getItem(this.key('hostedPoolStratum.password')) ?? 'x',
+      password: localStorage.getItem(this.key('hostedPoolStratum.password')) ?? chainDefaults.stratum.password,
     });
     this.form.controls.payout.setValue(localStorage.getItem(this.key('payout')) ?? '');
     const savedThreads = localStorage.getItem(this.key('threads'));
@@ -122,10 +115,15 @@ export class MinerPane implements OnInit {
     }
     const savedKind = localStorage.getItem(this.key('kind')) as MineToKind | null;
     const allowed = this.allowedKinds();
-    const fallback: MineToKind = this.shell.kind === 'webDemo' ? (this.chain() === 'testnet' ? 'hostedPoolStratum' : 'stratum') : 'node';
+    const fallback = chainDefaults.mineToKind;
     this.form.controls.kind.setValue(savedKind && allowed.includes(savedKind) ? savedKind : fallback);
     this.gpuIds.set(this.loadGpuIds());
     this.form.valueChanges.subscribe(() => this.persist());
+    if (this.shell.kind === 'webDemo') {
+      const s = this.form.controls.stratum.getRawValue();
+      localStorage.setItem(this.key('stratum.host'), s.host);
+      localStorage.setItem(this.key('stratum.port'), String(s.port));
+    }
   }
 
   protected config(): ChainConfig {
@@ -178,14 +176,14 @@ export class MinerPane implements OnInit {
   }
 
   protected hostedLabel(): string {
-    return this.shell.kind === 'webDemo' ? this.shell.hosted.label : 'FederationCoin testnet pool';
+    return this.shell.kind === 'webDemo' ? this.shell.defaults.hosted.label : 'FederationCoin testnet pool';
   }
 
   protected frozenHostedStratum(): string {
     if (this.shell.kind !== 'webDemo') {
       return '';
     }
-    return this.shell.hosted.stratumWss;
+    return this.shell.defaults.hosted.stratumWss;
   }
 
   protected allowedKinds(): MineToKind[] {
@@ -318,11 +316,26 @@ export class MinerPane implements OnInit {
     return saved ? Number.parseInt(saved, 10) || fallback : fallback;
   }
 
-  private loadRpc(prefix: string, rpcPort: number) {
+  private loadStratum(fallback: { host: string; port: number; password: string }) {
+    const savedHost = localStorage.getItem(this.key('stratum.host'))?.trim() ?? '';
+    const savedPortRaw = localStorage.getItem(this.key('stratum.port'));
+    const savedPort = savedPortRaw ? Number.parseInt(savedPortRaw, 10) : 0;
+    const staleTcp = this.shell.kind === 'webDemo' && isTcpStratumEndpoint(savedHost, savedPort);
+    const hostPort =
+      !savedHost || !savedPort || staleTcp ? { host: fallback.host, port: fallback.port } : { host: savedHost, port: savedPort };
+    return {
+      host: hostPort.host,
+      port: hostPort.port,
+      worker: localStorage.getItem(this.key('stratum.worker')) ?? '',
+      password: localStorage.getItem(this.key('stratum.password')) ?? fallback.password,
+    };
+  }
+
+  private loadRpc(prefix: string, fallback: { host: string; port: number }) {
     const authKind = localStorage.getItem(this.key(`${prefix}.authKind`));
     return {
-      host: localStorage.getItem(this.key(`${prefix}.host`))?.trim() || '127.0.0.1',
-      port: this.loadNum(`${prefix}.port`, rpcPort),
+      host: localStorage.getItem(this.key(`${prefix}.host`))?.trim() || fallback.host,
+      port: this.loadNum(`${prefix}.port`, fallback.port),
       authKind: authKind === 'userpass' ? ('userpass' as const) : ('cookie' as const),
       cookie: {
         datadir: localStorage.getItem(this.key(`${prefix}.datadir`))?.trim() || this.mining.info()?.datadir || '',

@@ -135,6 +135,30 @@ export function parseNotify(msg: unknown): StratumNotify | null {
   }
 }
 
+/** Why parseNotify returned null. Keep the 39-byte DATUM coinb1 check. */
+export function notifyIgnoreReason(msg: unknown): string {
+  if (!msg || typeof msg !== 'object') {
+    return 'bad mining.notify';
+  }
+  const rec = msg as { params?: unknown };
+  if (!Array.isArray(rec.params) || rec.params.length < 3) {
+    return 'bad mining.notify';
+  }
+  const coinb1 = rec.params[2];
+  if (typeof coinb1 !== 'string') {
+    return 'bad mining.notify';
+  }
+  try {
+    const n = parseHex(coinb1).length;
+    if (n !== 39) {
+      return `bad mining.notify (coinb1 ${n} bytes)`;
+    }
+  } catch {
+    return 'bad mining.notify (coinb1)';
+  }
+  return 'bad mining.notify';
+}
+
 export function parseSetDifficulty(msg: unknown): number | null {
   if (!msg || typeof msg !== 'object') {
     return null;
@@ -157,6 +181,7 @@ export type StratumWsHandlers = {
   onAuthorized: () => void;
   onSubmitResult: (ok: boolean, error?: string) => void;
   onClose: (reason: string) => void;
+  onJobIgnored: (reason: string) => void;
   onDisconnected?: (reason: string) => void;
 };
 
@@ -187,6 +212,34 @@ export function stratumWsUrl(host: string, port: number): string {
     return `${proto}://${h}/stratum`;
   }
   return `${proto}://${h}:${port}/stratum`;
+}
+
+const STRATUM_TCP_PORT = 23334;
+const DATUM_TCP_PORT = 28916;
+
+function tcpStratumPort(port: number): boolean {
+  return port === STRATUM_TCP_PORT || port === DATUM_TCP_PORT;
+}
+
+function tcpStratumHost(host: string): boolean {
+  const h = host.trim().toLowerCase();
+  return h === 'stratum.testnet.federationcoin.org' || h === 'datum.testnet.federationcoin.org';
+}
+
+/** TCP NLB / firmware ports. The browser cannot speak those; it needs wss:// on 443. */
+export function isTcpStratumEndpoint(host: string, port: number): boolean {
+  const raw = host.trim();
+  const lower = raw.toLowerCase();
+  if (lower.startsWith('ws://') || lower.startsWith('wss://')) {
+    try {
+      const u = new URL(raw);
+      const p = u.port ? Number.parseInt(u.port, 10) : u.protocol === 'wss:' ? 443 : 80;
+      return tcpStratumHost(u.hostname) || tcpStratumPort(p);
+    } catch {
+      return false;
+    }
+  }
+  return tcpStratumHost(lower) || tcpStratumPort(port);
 }
 
 type OutboxItem = {
@@ -428,6 +481,8 @@ export class StratumWsClient {
       if (job) {
         this.noteJob(job.jobId);
         this.handlers.onNotify(job);
+      } else {
+        this.handlers.onJobIgnored(notifyIgnoreReason(msg));
       }
       return;
     }

@@ -1,18 +1,16 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import {
-  DEFAULT_HOSTED_TESTNET,
   HASHER_HOST,
   MINER_SHELL,
+  WEB_DEFAULTS,
   WebHasherHost,
   webDemoShell,
 } from '@federationcoin/miner-ui';
 
-const hosted = DEFAULT_HOSTED_TESTNET;
-
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
-    { provide: MINER_SHELL, useValue: webDemoShell(hosted) },
-    { provide: HASHER_HOST, useFactory: () => new WebHasherHost(hosted) },
+    { provide: MINER_SHELL, useValue: webDemoShell() },
+    { provide: HASHER_HOST, useFactory: () => new WebHasherHost(WEB_DEFAULTS.hosted) },
   ],
 };

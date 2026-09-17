@@ -47,7 +47,7 @@ export class MiningService {
     void this.host.info().then((i) => this.info.set(i));
     this.unsub.push(
       this.host.onStats((s) => {
-        this.stats.set(s);
+        this.stats.set({ ...s });
         if (!s.running) {
           this.sessionKind.set(null);
         }
