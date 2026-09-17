@@ -111,6 +111,21 @@ export function parseNotify(msg: unknown): StratumNotify | null {
   }
 }
 
+export function parseSetDifficulty(msg: unknown): number | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { method?: unknown; params?: unknown };
+  if (rec.method !== 'mining.set_difficulty' || !Array.isArray(rec.params) || rec.params.length < 1) {
+    return null;
+  }
+  const d = Number(rec.params[0]);
+  if (!Number.isFinite(d) || d <= 0) {
+    return null;
+  }
+  return d;
+}
+
 export function isAuthorizeOk(msg: unknown): boolean {
   if (!msg || typeof msg !== 'object') {
     return false;
@@ -121,6 +136,7 @@ export function isAuthorizeOk(msg: unknown): boolean {
 
 export type StratumHandlers = {
   onNotify: (job: StratumNotify) => void;
+  onDifficulty: (diff: number) => void;
   onSubscribed: (sub: StratumSubscribe) => void;
   onAuthorized: () => void;
   onSubmitResult: (ok: boolean, error?: string) => void;
@@ -203,6 +219,10 @@ export class StratumClient {
       return;
     }
     if (rec.method === 'mining.set_difficulty') {
+      const diff = parseSetDifficulty(msg);
+      if (diff != null) {
+        this.handlers.onDifficulty(diff);
+      }
       return;
     }
     if (rec.id === 1) {

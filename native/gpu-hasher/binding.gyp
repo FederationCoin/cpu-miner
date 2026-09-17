@@ -8,6 +8,7 @@
         "src/sha256.cpp",
         "src/pow_cpu.cpp",
         "src/opencl_runtime.cpp",
+        "src/cuda_runtime.cpp",
         "src/grind.cpp"
       ],
       "include_dirs": ["include", "../../node_modules/node-addon-api"],

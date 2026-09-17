@@ -3,6 +3,7 @@ import {
   authorizeLine,
   isAuthorizeOk,
   parseNotify,
+  parseSetDifficulty,
   parseSubscribeResult,
   subscribeLine,
   submitLine,
@@ -93,5 +94,11 @@ describe('stratum wire', () => {
     expect(rec.params[2]).toHaveLength(16);
     expect(isAuthorizeOk({ id: 2, result: true, error: null })).toBe(true);
     expect(isAuthorizeOk({ id: 2, result: false })).toBe(false);
+  });
+
+  it('parses mining.set_difficulty', () => {
+    expect(parseSetDifficulty({ method: 'mining.set_difficulty', params: [1] })).toBe(1);
+    expect(parseSetDifficulty({ method: 'mining.set_difficulty', params: [0] })).toBeNull();
+    expect(parseSetDifficulty({ method: 'mining.notify', params: [1] })).toBeNull();
   });
 });

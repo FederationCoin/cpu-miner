@@ -10,8 +10,11 @@ export const IDLE_POOL_STATS: PoolStats = {
   rejected: 0,
   lastError: '',
   status: 'idle',
+  stratumHost: '',
   stratumPort: 0,
+  datumHost: '',
   datumPort: 0,
+  payouts: [],
 };
 
 @Injectable({ providedIn: 'root' })

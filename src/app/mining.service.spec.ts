@@ -37,6 +37,7 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
     onToast: vi.fn().mockReturnValue(() => undefined),
     poolStart: vi.fn().mockResolvedValue({ ok: true }),
     poolStop: vi.fn().mockResolvedValue(undefined),
+    poolRefresh: vi.fn().mockResolvedValue({ ok: true }),
     onPoolStats: vi.fn().mockReturnValue(() => undefined),
     ...overrides,
   };
@@ -69,22 +70,21 @@ describe('MiningService', () => {
     const svc = TestBed.inject(MiningService);
     await svc.start({
       chain: 'testnet',
-      mode: 'stratum',
       threads: 4,
-      host: '127.0.0.1',
-      port: 23334,
-      worker: 'tgfcn1abc.cpu',
-      password: 'x',
+      mineTo: {
+        kind: 'stratum',
+        stratum: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' },
+      },
     });
     expect(miner.stop).not.toHaveBeenCalled();
     await svc.start({
       chain: 'main',
-      mode: 'rpc',
       threads: 4,
-      host: '127.0.0.1',
-      port: 4094,
-      payout: 'gfcn1qqq',
-      datadir: '/tmp/x',
+      mineTo: {
+        kind: 'node',
+        rpc: { host: '127.0.0.1', port: 4094, auth: { kind: 'cookie', datadir: '/tmp/x' } },
+        payout: 'gfcn1qqq',
+      },
     });
     expect(miner.stop).toHaveBeenCalledTimes(1);
     expect(miner.start).toHaveBeenCalledTimes(2);

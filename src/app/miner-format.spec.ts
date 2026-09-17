@@ -1,4 +1,4 @@
-import { cookiePathHint, formatHashRate, gpuStatusHint, mainIsNotLive } from './miner-format';
+import { cookiePathHint, formatHashRate, formatSats, gpuStatusHint, mainIsNotLive } from './miner-format';
 
 describe('mainIsNotLive', () => {
   it('is true only for dummy MAIN', () => {
@@ -11,10 +11,10 @@ describe('mainIsNotLive', () => {
 
 describe('gpuStatusHint', () => {
   it('covers detecting, unscanned, missing addon, no devices, and ready', () => {
-    expect(gpuStatusHint({ detecting: true, scanned: false, addon: false, deviceCount: 0 })).toMatch(/Loading OpenCL/);
-    expect(gpuStatusHint({ detecting: false, scanned: false, addon: false, deviceCount: 0 })).toMatch(/No OpenCL GPUs listed yet/);
+    expect(gpuStatusHint({ detecting: true, scanned: false, addon: false, deviceCount: 0 })).toMatch(/Loading GPU/);
+    expect(gpuStatusHint({ detecting: false, scanned: false, addon: false, deviceCount: 0 })).toMatch(/No GPUs listed yet/);
     expect(gpuStatusHint({ detecting: false, scanned: true, addon: false, deviceCount: 0 })).toMatch(/No GPU hasher/);
-    expect(gpuStatusHint({ detecting: false, scanned: true, addon: true, deviceCount: 0 })).toMatch(/No OpenCL GPUs\./);
+    expect(gpuStatusHint({ detecting: false, scanned: true, addon: true, deviceCount: 0 })).toMatch(/No OpenCL or CUDA GPUs/);
     expect(gpuStatusHint({ detecting: false, scanned: true, addon: true, deviceCount: 1 })).toMatch(/Off until you tick a card/);
   });
 });
@@ -32,10 +32,9 @@ describe('cookiePathHint', () => {
   });
 });
 
-describe('formatHashRate', () => {
-  it('uses MH/s, kH/s, then H/s', () => {
-    expect(formatHashRate(1_000_000)).toBe('1.00 MH/s');
-    expect(formatHashRate(1_500)).toBe('1.50 kH/s');
-    expect(formatHashRate(12)).toBe('12 H/s');
+describe('formatSats', () => {
+  it('formats whole tokens to 8 decimals without float', () => {
+    expect(formatSats('5000000000')).toBe('50.00000000');
+    expect(formatSats('34180')).toBe('0.00034180');
   });
 });

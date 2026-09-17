@@ -11,16 +11,16 @@ export function gpuStatusHint(state: {
   deviceCount: number;
 }): string {
   if (state.detecting) {
-    return 'Loading OpenCL. A bad driver can take down this app.';
+    return 'Loading GPU drivers. A bad ICD can take down this app.';
   }
   if (!state.scanned) {
-    return 'No OpenCL GPUs listed yet. Detect loads the GPU driver in-process (a bad ICD can take down this app; skip this on WSL). CPU threads still mine.';
+    return 'No GPUs listed yet. Detect loads OpenCL or CUDA in-process (a bad ICD can take down this app). CPU threads still mine.';
   }
   if (!state.addon) {
     return 'No GPU hasher in this build. CPU threads still mine.';
   }
   if (state.deviceCount === 0) {
-    return 'No OpenCL GPUs. Install NVIDIA, AMD, or Intel GPU drivers (not the CUDA Toolkit). CPU threads still mine.';
+    return 'No OpenCL or CUDA GPUs. On WSL, CUDA lists NVIDIA cards when OpenCL is empty. CPU threads still mine.';
   }
   return 'Off until you tick a card. CPU workers stay on. Combined hashrate below. ccminer “blake2b” is the wrong PoW.';
 }
@@ -47,4 +47,18 @@ export function formatHashRate(n: number): string {
     return `${(n / 1e3).toFixed(2)} kH/s`;
   }
   return `${n.toFixed(0)} H/s`;
+}
+
+export function formatSats(sats: string): string {
+  let n: bigint;
+  try {
+    n = BigInt(sats);
+  } catch {
+    return sats;
+  }
+  const neg = n < 0n;
+  const v = neg ? -n : n;
+  const whole = v / 100000000n;
+  const frac = (v % 100000000n).toString().padStart(8, '0');
+  return `${neg ? '-' : ''}${whole}.${frac}`;
 }

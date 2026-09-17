@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import type { GpuDevice, GpuScan, MinerChain, MinerInfo, MinerStartOpts, MinerStats } from '../miner-api';
+import type { GpuDevice, GpuScan, MinerChain, MinerInfo, MinerStartOpts, MinerStats, MineToKind } from '../miner-api';
 
 export const IDLE_STATS: MinerStats = {
   running: false,
@@ -24,6 +24,7 @@ export class MiningService {
   readonly gpuAddon = signal(false);
   readonly gpuScanned = signal(false);
   readonly toast = signal('');
+  readonly sessionKind = signal<MineToKind | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private unsub: (() => void)[] = [];
   private bound = false;
@@ -44,7 +45,14 @@ export class MiningService {
     }
     this.bound = true;
     void api.info().then((i) => this.info.set(i));
-    this.unsub.push(api.onStats((s) => this.stats.set(s)));
+    this.unsub.push(
+      api.onStats((s) => {
+        this.stats.set(s);
+        if (!s.running) {
+          this.sessionKind.set(null);
+        }
+      }),
+    );
     this.unsub.push(
       api.onToast((message) => {
         this.toast.set(message);
@@ -73,11 +81,21 @@ export class MiningService {
     if (!r.ok) {
       return r.error ?? 'start failed';
     }
+    this.sessionKind.set(opts.mineTo.kind);
     return null;
   }
 
   async stop(): Promise<void> {
     await window.miner?.stop();
+    this.sessionKind.set(null);
+  }
+
+  warn(message: string): void {
+    this.toast.set(message);
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = setTimeout(() => this.toast.set(''), 5000);
   }
 
   async refreshGpus(): Promise<GpuScan> {

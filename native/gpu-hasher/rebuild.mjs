@@ -46,6 +46,17 @@ const dist = join(here, 'dist');
 mkdirSync(dist, { recursive: true });
 copyFileSync(join(here, 'kernel', 'asic_pow.cl'), join(dist, 'asic_pow.cl'));
 
+const nvcc = spawnSync(
+  'nvcc',
+  ['-ptx', '-O2', '-arch=compute_75', join(here, 'kernel', 'asic_pow.cu'), '-o', join(dist, 'asic_pow.ptx')],
+  { cwd: here, stdio: 'inherit', env: process.env },
+);
+if (nvcc.status === 0) {
+  console.log(`asic_pow.ptx -> ${dist}`);
+} else {
+  console.error('nvcc PTX skipped (CUDA grind needs asic_pow.ptx; OpenCL still works)');
+}
+
 if (gyp.error) {
   console.error(gyp.error);
 }

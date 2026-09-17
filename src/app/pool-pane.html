@@ -1,4 +1,4 @@
-<div class="pane">
+<div class="pane" [formGroup]="form" [attr.data-tides]="tidesJson()">
   <p class="hint">
     Starts a local DATUM Prime + TIDES + Stratum v1 process against
     <code>federationcoind</code>. Not the pool of record. Cookie stays in the
@@ -11,129 +11,46 @@
     </p>
   }
 
-  <fieldset class="mode">
-    <legend>Chain</legend>
-    <label class="check" for="pool-chainTestnet">
-      <input
-        id="pool-chainTestnet"
-        type="radio"
-        name="pool-chain"
-        [checked]="chain() === 'testnet'"
-        [disabled]="pool.stats().running"
-        (change)="setChain('testnet')"
-      />
-      Testnet
-    </label>
-    <label class="check" for="pool-chainMain">
-      <input
-        id="pool-chainMain"
-        type="radio"
-        name="pool-chain"
-        [checked]="chain() === 'main'"
-        [disabled]="pool.stats().running"
-        (change)="setChain('main')"
-      />
-      Main
-    </label>
+  <fieldset class="partition">
+    <legend>Node RPC</legend>
+    <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain() + '-pool'" [chain]="chain()" />
   </fieldset>
 
-  <label for="pool-rpcHost">RPC host</label>
+  <label [attr.for]="id('operator')">Operator payout ({{ config().hrp }}1)</label>
   <input
-    id="pool-rpcHost"
-    type="text"
-    autocomplete="off"
-    spellcheck="false"
-    [value]="rpcHost()"
-    (input)="setRpcHost($any($event.target).value)"
-  />
-  <label for="pool-rpcPort">RPC port</label>
-  <input
-    id="pool-rpcPort"
-    type="number"
-    min="1"
-    max="65535"
-    [value]="rpcPort()"
-    (input)="setRpcPort($any($event.target).value)"
-  />
-  <label for="pool-datadir">Node data directory</label>
-  <div class="row path-row">
-    <input
-      id="pool-datadir"
-      type="text"
-      autocomplete="off"
-      spellcheck="false"
-      [value]="datadir()"
-      (input)="setDatadir($any($event.target).value)"
-    />
-    <button type="button" [disabled]="!mining.inElectron()" (click)="browseDatadir()">Browse</button>
-  </div>
-  <p class="hint">
-    Cookie is <code>{{ cookieHint() || '…/testnet3/.cookie' }}</code>. Contents stay in the main process.
-  </p>
-
-  <label for="pool-operator">Operator payout ({{ config().hrp }}1)</label>
-  <input
-    id="pool-operator"
+    [id]="id('operator')"
     type="text"
     autocomplete="off"
     spellcheck="false"
     [placeholder]="config().hrp + '1…'"
-    [value]="operator()"
-    (input)="setOperator($any($event.target).value)"
+    formControlName="operator"
   />
-  <label for="pool-fee">Fee percent</label>
-  <input
-    id="pool-fee"
-    type="text"
-    inputmode="decimal"
-    [value]="feePercent()"
-    (input)="setFeePercent($any($event.target).value)"
-  />
+  <label [attr.for]="id('fee')">Fee percent</label>
+  <input [id]="id('fee')" type="text" inputmode="decimal" formControlName="feePercent" />
 
-  <label for="pool-stratumHost">Stratum bind</label>
-  <input
-    id="pool-stratumHost"
-    type="text"
-    autocomplete="off"
-    spellcheck="false"
-    [value]="stratumHost()"
-    (input)="setStratumHost($any($event.target).value)"
-  />
-  <label for="pool-stratumPort">Stratum port</label>
-  <input
-    id="pool-stratumPort"
-    type="number"
-    min="1"
-    max="65535"
-    [value]="stratumPort()"
-    (input)="setStratumPort($any($event.target).value)"
-  />
-  <label for="pool-datumHost">DATUM Prime bind</label>
-  <input
-    id="pool-datumHost"
-    type="text"
-    autocomplete="off"
-    spellcheck="false"
-    [value]="datumHost()"
-    (input)="setDatumHost($any($event.target).value)"
-  />
-  <label for="pool-datumPort">DATUM Prime port</label>
-  <input
-    id="pool-datumPort"
-    type="number"
-    min="1"
-    max="65535"
-    [value]="datumPort()"
-    (input)="setDatumPort($any($event.target).value)"
-  />
+  <fieldset class="partition">
+    <legend>Stratum bind</legend>
+    <label [attr.for]="id('stratumHost')">Host</label>
+    <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="stratumHost" />
+    <label [attr.for]="id('stratumPort')">Port</label>
+    <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="stratumPort" />
+  </fieldset>
+
+  <fieldset class="partition">
+    <legend>DATUM Prime bind</legend>
+    <label [attr.for]="id('datumHost')">Host</label>
+    <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="datumHost" />
+    <label [attr.for]="id('datumPort')">Port</label>
+    <input [id]="id('datumPort')" type="number" min="1" max="65535" formControlName="datumPort" />
+  </fieldset>
 
   @if (formError()) {
     <p class="err">{{ formError() }}</p>
   }
 
   <div class="row">
-    <button type="button" id="pool-start" [disabled]="startDisabled()" (click)="start()">Start</button>
-    <button type="button" id="pool-stop" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+    <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
+    <button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
   </div>
 
   <dl>
@@ -150,4 +67,17 @@
     <dt>Last error</dt>
     <dd class="mono">{{ paneStats().lastError || '—' }}</dd>
   </dl>
+
+  @if (paneStats().payouts.length > 0) {
+    <fieldset class="partition" [attr.id]="id('tides')">
+      <legend>TIDES coinbase</legend>
+      <p class="hint">Paid in the next block’s coinbase. Share log is kept if this pool process restarts.</p>
+      <dl>
+        @for (p of paneStats().payouts; track p.miner) {
+          <dt class="mono">{{ p.miner }}</dt>
+          <dd>{{ formatPayout(p.sats) }}</dd>
+        }
+      </dl>
+    </fieldset>
+  }
 </div>

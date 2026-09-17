@@ -21,7 +21,8 @@ const CDP = process.env.ELECTRON_CDP ?? 'http://127.0.0.1:9222';
 const BLOCK_MS = Number.parseInt(process.env.LIVE_BLOCK_GRIND_MS ?? '7200000', 10) || 7200000;
 
 function addr(fill) {
-  const a = encodeAddress('tgfcn', 1, new Uint8Array(32).fill(fill));
+  // Taproot is NEVER_ACTIVE. Payouts are witness v0 P2WPKH (tgfcn1…, 20-byte program).
+  const a = encodeAddress('tgfcn', 0, new Uint8Array(20).fill(fill));
   if (!a) {
     throw new Error('encodeAddress failed');
   }
@@ -153,6 +154,21 @@ async function waitFor(cdp, expression, timeoutMs, label) {
     await sleep(400);
   }
   throw new Error(`${label}: timed out (${JSON.stringify(last)})`);
+}
+
+async function selectCookieAuth(cdp, prefix) {
+  const id = `${prefix}-authCookie`;
+  await cdp.eval(`(() => {
+    const el = document.getElementById(${JSON.stringify(id)});
+    if (!el) throw new Error('missing ' + ${JSON.stringify(id)});
+    el.click();
+  })()`);
+  await waitFor(
+    cdp,
+    `document.getElementById(${JSON.stringify(id)})?.checked === true`,
+    8000,
+    `${prefix} cookie auth`,
+  );
 }
 
 async function paste(cdp, id, text) {
@@ -319,6 +335,7 @@ async function main() {
   if (net !== 'testnet') {
     throw new Error(`network is ${net}, expected testnet`);
   }
+  await selectCookieAuth(cdp, 'testnet-pool');
   const rpcForm = await readRpcForm(cdp);
   const { auth, rpcOpts } = nodeAuth(rpcForm);
   const startCount = await rpcCall(auth, 'getblockcount', [], rpcOpts);
@@ -373,6 +390,7 @@ async function main() {
   );
 
   await cdp.eval(`document.getElementById('testnet-mineToAppPoolDatum').click()`);
+  await selectCookieAuth(cdp, 'testnet-appPoolDatum');
   out.pasteAppDatumRpc = await paste(cdp, 'testnet-appPoolDatum-rpcHost', '127.0.0.1');
   out.pasteAppDatum = await paste(cdp, 'testnet-appPoolDatumWorker', `${walletB}.datum`);
   await cdp.eval(`document.getElementById('testnet-start').click()`);

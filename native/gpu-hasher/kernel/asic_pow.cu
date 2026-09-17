@@ -1,13 +1,13 @@
-// DATUM profile-0 hot path: blake2b-256 of 80-byte work, XOR mask, byte-reverse.
-// Not SHA256d. Not Sia-blob blake2b. Host supplies the 32-byte XOR mask.
+// DATUM profile-0 hot path (CUDA). Same math as asic_pow.cl.
+// WSL NVIDIA exposes CUDA, not OpenCL.
 
 #define rotr64(x, r) (((x) >> (r)) | ((x) << (64 - (r))))
 
-__constant ulong blake2b_IV[8] = {
-    0x6a09e667f3bcc908UL, 0xbb67ae8584caa73bUL, 0x3c6ef372fe94f82bUL, 0xa54ff53a5f1d36f1UL,
-    0x510e527fade682d1UL, 0x9b05688c2b3e6c1fUL, 0x1f83d9abfb41bd6bUL, 0x5be0cd19137e2179UL};
+__constant__ unsigned long long blake2b_IV[8] = {
+    0x6a09e667f3bcc908ULL, 0xbb67ae8584caa73bULL, 0x3c6ef372fe94f82bULL, 0xa54ff53a5f1d36f1ULL,
+    0x510e527fade682d1ULL, 0x9b05688c2b3e6c1fULL, 0x1f83d9abfb41bd6bULL, 0x5be0cd19137e2179ULL};
 
-__constant uchar blake2b_sigma[12][16] = {
+__constant__ unsigned char blake2b_sigma[12][16] = {
     {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
     {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3},
     {11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4},
@@ -22,28 +22,30 @@ __constant uchar blake2b_sigma[12][16] = {
     {14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3},
 };
 
-ulong load64_priv(const uchar* p)
+__device__ unsigned long long load64_priv(const unsigned char* p)
 {
-    return (ulong)p[0] | ((ulong)p[1] << 8) | ((ulong)p[2] << 16) | ((ulong)p[3] << 24)
-        | ((ulong)p[4] << 32) | ((ulong)p[5] << 40) | ((ulong)p[6] << 48) | ((ulong)p[7] << 56);
+    return (unsigned long long)p[0] | ((unsigned long long)p[1] << 8) | ((unsigned long long)p[2] << 16)
+        | ((unsigned long long)p[3] << 24) | ((unsigned long long)p[4] << 32) | ((unsigned long long)p[5] << 40)
+        | ((unsigned long long)p[6] << 48) | ((unsigned long long)p[7] << 56);
 }
 
-void store64_priv(uchar* p, ulong x)
+__device__ void store64_priv(unsigned char* p, unsigned long long x)
 {
-    p[0] = (uchar)x;
-    p[1] = (uchar)(x >> 8);
-    p[2] = (uchar)(x >> 16);
-    p[3] = (uchar)(x >> 24);
-    p[4] = (uchar)(x >> 32);
-    p[5] = (uchar)(x >> 40);
-    p[6] = (uchar)(x >> 48);
-    p[7] = (uchar)(x >> 56);
+    p[0] = (unsigned char)x;
+    p[1] = (unsigned char)(x >> 8);
+    p[2] = (unsigned char)(x >> 16);
+    p[3] = (unsigned char)(x >> 24);
+    p[4] = (unsigned char)(x >> 32);
+    p[5] = (unsigned char)(x >> 40);
+    p[6] = (unsigned char)(x >> 48);
+    p[7] = (unsigned char)(x >> 56);
 }
 
-void blake2b_compress_priv(ulong h[8], const uchar block[128], ulong t0, ulong t1, ulong f0, ulong f1)
+__device__ void blake2b_compress_priv(unsigned long long h[8], const unsigned char block[128],
+    unsigned long long t0, unsigned long long t1, unsigned long long f0, unsigned long long f1)
 {
-    ulong m[16];
-    ulong v[16];
+    unsigned long long m[16];
+    unsigned long long v[16];
     for (int i = 0; i < 16; ++i) {
         m[i] = load64_priv(block + i * 8);
     }
@@ -104,13 +106,13 @@ void blake2b_compress_priv(ulong h[8], const uchar block[128], ulong t0, ulong t
     }
 }
 
-void blake2b32_80(const uchar work[80], uchar out[32])
+__device__ void blake2b32_80(const unsigned char work[80], unsigned char out[32])
 {
-    ulong h[8];
+    unsigned long long h[8];
     for (int i = 0; i < 8; ++i) {
         h[i] = blake2b_IV[i];
     }
-    uchar P[64];
+    unsigned char P[64];
     for (int i = 0; i < 64; ++i) {
         P[i] = 0;
     }
@@ -120,15 +122,15 @@ void blake2b32_80(const uchar work[80], uchar out[32])
     for (int i = 0; i < 8; ++i) {
         h[i] ^= load64_priv(P + i * 8);
     }
-    uchar block[128];
+    unsigned char block[128];
     for (int i = 0; i < 128; ++i) {
         block[i] = 0;
     }
     for (int i = 0; i < 80; ++i) {
         block[i] = work[i];
     }
-    blake2b_compress_priv(h, block, 80, 0, (ulong)(-1), 0);
-    uchar buf[64];
+    blake2b_compress_priv(h, block, 80, 0, (unsigned long long)(-1), 0);
+    unsigned char buf[64];
     for (int i = 0; i < 8; ++i) {
         store64_priv(buf + i * 8, h[i]);
     }
@@ -137,16 +139,16 @@ void blake2b32_80(const uchar work[80], uchar out[32])
     }
 }
 
-void asic_final(const uchar work[80], const uchar mask[32], uchar out[32])
+__device__ void asic_final(const unsigned char work[80], const unsigned char mask[32], unsigned char out[32])
 {
-    uchar hash[32];
+    unsigned char hash[32];
     blake2b32_80(work, hash);
     for (int i = 0; i < 32; ++i) {
-        out[31 - i] = (uchar)(hash[i] ^ mask[i]);
+        out[31 - i] = (unsigned char)(hash[i] ^ mask[i]);
     }
 }
 
-int meets_target(const uchar hash[32], const uchar target[32])
+__device__ int meets_target(const unsigned char hash[32], const unsigned char target[32])
 {
     for (int i = 31; i >= 0; --i) {
         if (hash[i] < target[i]) {
@@ -159,33 +161,17 @@ int meets_target(const uchar hash[32], const uchar target[32])
     return 1;
 }
 
-__kernel void asic_pow_hash_one(__global const uchar* work80, __global const uchar* mask32, __global uchar* out32)
+extern "C" __global__ void asic_pow_grind(const unsigned char* work80, const unsigned char* mask32,
+    const unsigned char* target32, unsigned int nonce_lo, unsigned int nonce_hi, unsigned int iter,
+    unsigned int* found)
 {
-    uchar work[80];
-    uchar mask[32];
-    uchar out[32];
-    for (int i = 0; i < 80; ++i) {
-        work[i] = work80[i];
-    }
-    for (int i = 0; i < 32; ++i) {
-        mask[i] = mask32[i];
-    }
-    asic_final(work, mask, out);
-    for (int i = 0; i < 32; ++i) {
-        out32[i] = out[i];
-    }
-}
+    unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long start = (unsigned long long)nonce_lo + (unsigned long long)gid * (unsigned long long)iter;
 
-__kernel void asic_pow_grind(__global const uchar* work80, __global const uchar* mask32, __global const uchar* target32,
-    uint nonce_lo, uint nonce_hi, uint iter, __global uint* found)
-{
-    uint gid = get_global_id(0);
-    ulong start = (ulong)nonce_lo + (ulong)gid * (ulong)iter;
-
-    uchar work[80];
-    uchar mask[32];
-    uchar target[32];
-    uchar out[32];
+    unsigned char work[80];
+    unsigned char mask[32];
+    unsigned char target[32];
+    unsigned char out[32];
     for (int i = 0; i < 80; ++i) {
         work[i] = work80[i];
     }
@@ -193,24 +179,24 @@ __kernel void asic_pow_grind(__global const uchar* work80, __global const uchar*
         mask[i] = mask32[i];
         target[i] = target32[i];
     }
-    for (uint k = 0; k < iter; ++k) {
-        if ((k & 63u) == 0u && atomic_or(found, 0u) != 0u) {
+    for (unsigned int k = 0; k < iter; ++k) {
+        if ((k & 63u) == 0u && atomicOr(found, 0u) != 0u) {
             return;
         }
-        ulong full = start + k;
-        uint n = (uint)full;
-        uint n2 = nonce_hi + (uint)(full >> 32);
-        work[32] = (uchar)n;
-        work[33] = (uchar)(n >> 8);
-        work[34] = (uchar)(n >> 16);
-        work[35] = (uchar)(n >> 24);
-        work[36] = (uchar)n2;
-        work[37] = (uchar)(n2 >> 8);
-        work[38] = (uchar)(n2 >> 16);
-        work[39] = (uchar)(n2 >> 24);
+        unsigned long long full = start + k;
+        unsigned int n = (unsigned int)full;
+        unsigned int n2 = nonce_hi + (unsigned int)(full >> 32);
+        work[32] = (unsigned char)n;
+        work[33] = (unsigned char)(n >> 8);
+        work[34] = (unsigned char)(n >> 16);
+        work[35] = (unsigned char)(n >> 24);
+        work[36] = (unsigned char)n2;
+        work[37] = (unsigned char)(n2 >> 8);
+        work[38] = (unsigned char)(n2 >> 16);
+        work[39] = (unsigned char)(n2 >> 24);
         asic_final(work, mask, out);
         if (meets_target(out, target)) {
-            if (atomic_cmpxchg(found, 0, 1) == 0) {
+            if (atomicCAS(found, 0u, 1u) == 0u) {
                 found[1] = n;
                 found[2] = n2;
             }

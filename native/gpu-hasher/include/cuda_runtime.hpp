@@ -4,22 +4,22 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace gpu {
 
-void set_opencl_kernel_source(std::string src);
-bool load_opencl_kernel_file(const char* path, std::string* err);
+void set_cuda_ptx_source(std::string src);
+std::vector<GpuDeviceInfo> list_cuda_devices();
 
-class OpenClEngine {
+class CudaEngine {
 public:
-    OpenClEngine();
-    ~OpenClEngine();
-    OpenClEngine(const OpenClEngine&) = delete;
-    OpenClEngine& operator=(const OpenClEngine&) = delete;
+    CudaEngine();
+    ~CudaEngine();
+    CudaEngine(const CudaEngine&) = delete;
+    CudaEngine& operator=(const CudaEngine&) = delete;
 
     bool init(const GpuDeviceInfo& info, std::string* err);
     bool load_job(const uint8_t work[80], const uint8_t mask[32], const uint8_t target[32], std::string* err);
-    bool hash_one(const uint8_t work[80], const uint8_t mask[32], uint8_t out[32], std::string* err);
     bool grind_batch(uint32_t nonce_lo, uint32_t nonce_hi, uint32_t batch, OpenClFound* out, std::string* err);
 
 private:

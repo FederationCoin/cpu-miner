@@ -1,13 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { LogLine } from './log.js';
+import type { MinerStartOpts } from './mine-to.js';
 
-export type MinerChain = 'main' | 'testnet';
-
-export type MinerMode = 'rpc' | 'stratum';
+export type { MinerChain } from './chain.js';
+export type { MineTo, MineToKind, MinerStartOpts, RpcConnect, RpcAuthConnect, RpcAuthKind, StratumConnect, DatumConnect } from './mine-to.js';
 
 export type MinerStats = {
   running: boolean;
-  chain: MinerChain | null;
+  chain: import('./chain.js').MinerChain | null;
   hashrate: number;
   height: number;
   hashes: number;
@@ -31,7 +31,7 @@ export type GpuDevice = {
   name: string;
   vendor: string;
   memoryMiB: number;
-  backend: 'opencl';
+  backend: 'opencl' | 'cuda';
   kind: 'discrete' | 'integrated';
 };
 
@@ -40,24 +40,9 @@ export type GpuScan = {
   addon: boolean;
 };
 
-export type MinerStartOpts = {
-  chain: MinerChain;
-  mode: MinerMode;
-  threads: number;
-  gpuIds?: string[];
-  host?: string;
-  port?: number;
-  payout?: string;
-  datadir?: string;
-  worker?: string;
-  password?: string;
-};
-
 export type PoolStartOpts = {
-  chain: MinerChain;
-  rpcHost: string;
-  rpcPort: number;
-  datadir: string;
+  chain: import('./chain.js').MinerChain;
+  rpc: import('./mine-to.js').RpcConnect;
   operator: string;
   feeBps: number;
   stratumHost: string;
@@ -66,17 +51,22 @@ export type PoolStartOpts = {
   datumPort: number;
 };
 
+export type TidesPayout = { miner: string; sats: string };
+
 export type PoolStats = {
   running: boolean;
-  chain: MinerChain | null;
+  chain: import('./chain.js').MinerChain | null;
   height: number;
   workers: number;
   accepted: number;
   rejected: number;
   lastError: string;
   status: string;
+  stratumHost: string;
   stratumPort: number;
+  datumHost: string;
   datumPort: number;
+  payouts: TidesPayout[];
 };
 
 export type { LogLine };
@@ -99,5 +89,6 @@ contextBridge.exposeInMainWorld('miner', {
   onToast: (cb: (message: string) => void) => listen('miner:toast', cb),
   poolStart: (opts: PoolStartOpts) => ipcRenderer.invoke('pool:start', opts),
   poolStop: () => ipcRenderer.invoke('pool:stop'),
+  poolRefresh: () => ipcRenderer.invoke('pool:refresh'),
   onPoolStats: (cb: (s: PoolStats) => void) => listen('pool:stats', cb),
 });

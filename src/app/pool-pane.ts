@@ -1,30 +1,33 @@
-import { Component, OnInit, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import type { PoolStartOpts } from '../miner-api';
 import { CHAINS, type MinerChain } from './chain';
-import { cookiePathHint, mainIsNotLive } from './miner-format';
+import { formatSats, mainIsNotLive } from './miner-format';
 import { MiningService } from './mining.service';
 import { IDLE_POOL_STATS, PoolService } from './pool.service';
-import type { PoolStartOpts } from '../miner-api';
+import { RpcConnect, rpcConnectGroup, rpcConnectValue } from './rpc-connect';
 
 @Component({
   selector: 'app-pool-pane',
+  imports: [ReactiveFormsModule, RpcConnect],
   styleUrl: './miner-pane.css',
   templateUrl: './pool-pane.html',
 })
 export class PoolPane implements OnInit {
+  readonly chain = input.required<MinerChain>();
   protected readonly mining = inject(MiningService);
   protected readonly pool = inject(PoolService);
-
-  protected readonly chain = signal<MinerChain>('testnet');
-  protected readonly rpcHost = signal('127.0.0.1');
-  protected readonly rpcPort = signal(35332);
-  protected readonly datadir = signal('');
-  protected readonly operator = signal('');
-  protected readonly feePercent = signal('2');
-  protected readonly stratumHost = signal('127.0.0.1');
-  protected readonly stratumPort = signal(23334);
-  protected readonly datumHost = signal('127.0.0.1');
-  protected readonly datumPort = signal(28916);
   protected readonly formError = signal('');
+
+  protected readonly form = new FormGroup({
+    rpc: rpcConnectGroup(35332),
+    operator: new FormControl('', { nonNullable: true }),
+    feePercent: new FormControl('2', { nonNullable: true }),
+    stratumHost: new FormControl('127.0.0.1', { nonNullable: true }),
+    stratumPort: new FormControl(23334, { nonNullable: true }),
+    datumHost: new FormControl('127.0.0.1', { nonNullable: true }),
+    datumPort: new FormControl(28916, { nonNullable: true }),
+  });
 
   constructor() {
     effect(() => {
@@ -32,24 +35,40 @@ export class PoolPane implements OnInit {
       if (!inf) {
         return;
       }
-      if (!this.datadir() && !localStorage.getItem('fc.pool.datadir')?.trim()) {
-        this.datadir.set(inf.datadir);
+      if (!this.form.controls.rpc.controls.cookie.controls.datadir.value && !localStorage.getItem(this.key('datadir'))?.trim()) {
+        this.form.controls.rpc.controls.cookie.patchValue({ datadir: inf.datadir }, { emitEvent: false });
       }
     });
   }
 
   ngOnInit(): void {
-    const savedChain = localStorage.getItem('fc.pool.chain');
-    this.chain.set(savedChain === 'main' ? 'main' : 'testnet');
-    this.rpcHost.set(localStorage.getItem('fc.pool.rpcHost')?.trim() || '127.0.0.1');
-    this.datadir.set(localStorage.getItem('fc.pool.datadir')?.trim() || this.mining.info()?.datadir || '');
-    this.operator.set(localStorage.getItem('fc.pool.operator') ?? '');
-    this.feePercent.set(localStorage.getItem('fc.pool.feePercent') ?? '2');
-    this.stratumHost.set(localStorage.getItem('fc.pool.stratumHost')?.trim() || '127.0.0.1');
-    this.datumHost.set(localStorage.getItem('fc.pool.datumHost')?.trim() || '127.0.0.1');
-    this.rpcPort.set(this.loadNum('fc.pool.rpcPort', this.config().rpcPort));
-    this.stratumPort.set(this.loadNum('fc.pool.stratumPort', 23334));
-    this.datumPort.set(this.loadNum('fc.pool.datumPort', 28916));
+    const cfg = CHAINS[this.chain()];
+    const authKind = localStorage.getItem(this.key('authKind'));
+    this.form.patchValue({
+      rpc: {
+        host: localStorage.getItem(this.key('rpcHost'))?.trim() || '127.0.0.1',
+        port: this.loadNum('rpcPort', cfg.rpcPort),
+        authKind: authKind === 'userpass' ? 'userpass' : 'cookie',
+        cookie: {
+          datadir: localStorage.getItem(this.key('datadir'))?.trim() || this.mining.info()?.datadir || '',
+        },
+        userpass: {
+          user: localStorage.getItem(this.key('rpcUser')) ?? '',
+          password: localStorage.getItem(this.key('rpcPassword')) ?? '',
+        },
+      },
+      operator: localStorage.getItem(this.key('operator')) ?? '',
+      feePercent: localStorage.getItem(this.key('feePercent')) ?? '2',
+      stratumHost: localStorage.getItem(this.key('stratumHost'))?.trim() || '127.0.0.1',
+      stratumPort: this.loadNum('stratumPort', cfg.stratumPort),
+      datumHost: localStorage.getItem(this.key('datumHost'))?.trim() || '127.0.0.1',
+      datumPort: this.loadNum('datumPort', cfg.datumPort),
+    });
+    this.form.valueChanges.subscribe(() => this.persist());
+  }
+
+  protected id(suffix: string): string {
+    return `${this.chain()}-pool-${suffix}`;
   }
 
   protected config() {
@@ -61,7 +80,16 @@ export class PoolPane implements OnInit {
   }
 
   protected paneStats() {
-    return this.pool.stats().running ? this.pool.stats() : IDLE_POOL_STATS;
+    const s = this.pool.stats();
+    return s.running && s.chain === this.chain() ? s : IDLE_POOL_STATS;
+  }
+
+  protected tidesJson(): string {
+    return JSON.stringify(this.paneStats().payouts ?? []);
+  }
+
+  protected formatPayout(sats: string): string {
+    return formatSats(sats);
   }
 
   protected startDisabled(): boolean {
@@ -69,75 +97,7 @@ export class PoolPane implements OnInit {
   }
 
   protected stopDisabled(): boolean {
-    return !this.mining.inElectron() || !this.pool.stats().running;
-  }
-
-  protected cookieHint(): string {
-    return cookiePathHint(this.datadir(), this.chain());
-  }
-
-  protected setChain(id: MinerChain): void {
-    this.chain.set(id);
-    localStorage.setItem('fc.pool.chain', id);
-    const saved = localStorage.getItem('fc.pool.rpcPort');
-    if (!saved) {
-      this.rpcPort.set(CHAINS[id].rpcPort);
-    }
-  }
-
-  protected setRpcHost(value: string): void {
-    this.rpcHost.set(value);
-    localStorage.setItem('fc.pool.rpcHost', value);
-  }
-
-  protected setRpcPort(value: string): void {
-    const n = Number.parseInt(value, 10) || this.config().rpcPort;
-    this.rpcPort.set(n);
-    localStorage.setItem('fc.pool.rpcPort', String(n));
-  }
-
-  protected setDatadir(value: string): void {
-    this.datadir.set(value);
-    localStorage.setItem('fc.pool.datadir', value);
-  }
-
-  protected setOperator(value: string): void {
-    this.operator.set(value);
-    localStorage.setItem('fc.pool.operator', value);
-  }
-
-  protected setFeePercent(value: string): void {
-    this.feePercent.set(value);
-    localStorage.setItem('fc.pool.feePercent', value);
-  }
-
-  protected setStratumHost(value: string): void {
-    this.stratumHost.set(value);
-    localStorage.setItem('fc.pool.stratumHost', value);
-  }
-
-  protected setStratumPort(value: string): void {
-    const n = Number.parseInt(value, 10) || 23334;
-    this.stratumPort.set(n);
-    localStorage.setItem('fc.pool.stratumPort', String(n));
-  }
-
-  protected setDatumHost(value: string): void {
-    this.datumHost.set(value);
-    localStorage.setItem('fc.pool.datumHost', value);
-  }
-
-  protected setDatumPort(value: string): void {
-    const n = Number.parseInt(value, 10) || 28916;
-    this.datumPort.set(n);
-    localStorage.setItem('fc.pool.datumPort', String(n));
-  }
-
-  protected async browseDatadir(): Promise<void> {
-    const p = await this.mining.pickDatadir();
-    if (p) {
-      this.setDatadir(p);
-    }
+    return !this.mining.inElectron() || !this.pool.stats().running || this.pool.stats().chain !== this.chain();
   }
 
   protected async start(): Promise<void> {
@@ -152,25 +112,44 @@ export class PoolPane implements OnInit {
     await this.pool.stop();
   }
 
-  private loadNum(key: string, fallback: number): number {
-    const saved = localStorage.getItem(key);
+  private key(suffix: string): string {
+    return `fc.${this.chain()}.pool.${suffix}`;
+  }
+
+  private loadNum(suffix: string, fallback: number): number {
+    const saved = localStorage.getItem(this.key(suffix));
     return saved ? Number.parseInt(saved, 10) || fallback : fallback;
   }
 
+  private persist(): void {
+    const v = this.form.getRawValue();
+    localStorage.setItem(this.key('rpcHost'), v.rpc.host);
+    localStorage.setItem(this.key('rpcPort'), String(v.rpc.port));
+    localStorage.setItem(this.key('authKind'), v.rpc.authKind);
+    localStorage.setItem(this.key('datadir'), v.rpc.cookie.datadir);
+    localStorage.setItem(this.key('rpcUser'), v.rpc.userpass.user);
+    localStorage.setItem(this.key('rpcPassword'), v.rpc.userpass.password);
+    localStorage.setItem(this.key('operator'), v.operator);
+    localStorage.setItem(this.key('feePercent'), v.feePercent);
+    localStorage.setItem(this.key('stratumHost'), v.stratumHost);
+    localStorage.setItem(this.key('stratumPort'), String(v.stratumPort));
+    localStorage.setItem(this.key('datumHost'), v.datumHost);
+    localStorage.setItem(this.key('datumPort'), String(v.datumPort));
+  }
+
   private startOpts(): PoolStartOpts {
-    const pct = Number.parseFloat(this.feePercent());
+    const v = this.form.getRawValue();
+    const pct = Number.parseFloat(v.feePercent);
     const feeBps = Number.isFinite(pct) ? Math.round(pct * 100) : 200;
     return {
       chain: this.chain(),
-      rpcHost: this.rpcHost(),
-      rpcPort: this.rpcPort(),
-      datadir: this.datadir(),
-      operator: this.operator(),
+      rpc: rpcConnectValue(this.form.controls.rpc),
+      operator: v.operator,
       feeBps,
-      stratumHost: this.stratumHost(),
-      stratumPort: this.stratumPort(),
-      datumHost: this.datumHost(),
-      datumPort: this.datumPort(),
+      stratumHost: v.stratumHost,
+      stratumPort: v.stratumPort,
+      datumHost: v.datumHost,
+      datumPort: v.datumPort,
     };
   }
 }

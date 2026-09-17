@@ -15,13 +15,14 @@ export type GpuDevice = {
   name: string;
   vendor: string;
   memoryMiB: number;
-  backend: 'opencl';
+  backend: 'opencl' | 'cuda';
   kind: 'discrete' | 'integrated';
 };
 
 type Native = {
   listDevices: () => GpuDevice[];
   setKernelSource: (src: string) => void;
+  setPtxSource?: (src: string) => void;
   asicPowHash: (work: Uint8Array, xorKey: Uint8Array, xorClear: number) => Buffer;
   startGrind: (
     job: {
@@ -72,6 +73,21 @@ function kernelPath(addonFile: string): string | null {
   return null;
 }
 
+function ptxPath(addonFile: string): string | null {
+  const resources = typeof process.resourcesPath === 'string' ? process.resourcesPath : '';
+  const candidates = [
+    join(dirname(addonFile), 'asic_pow.ptx'),
+    resources ? join(resources, 'gpu-hasher', 'asic_pow.ptx') : '',
+    join(here, '../native/gpu-hasher/dist/asic_pow.ptx'),
+  ];
+  for (const p of candidates) {
+    if (p && existsSync(p)) {
+      return p;
+    }
+  }
+  return null;
+}
+
 let native: Native | null | undefined;
 
 function loadNative(): Native | null {
@@ -88,6 +104,10 @@ function loadNative(): Native | null {
     const k = kernelPath(file);
     if (k) {
       native.setKernelSource(readFileSync(k, 'utf8'));
+    }
+    const ptx = ptxPath(file);
+    if (ptx && native.setPtxSource) {
+      native.setPtxSource(readFileSync(ptx, 'utf8'));
     }
     return native;
   } catch {
@@ -160,21 +180,26 @@ export function startGpuGrindNative(
   if (!n) {
     return false;
   }
-  n.startGrind(
-    {
-      deviceId: opts.deviceId,
-      work: Buffer.from(opts.work),
-      target: Buffer.from(opts.target),
-      xorKey: Buffer.from(opts.xorKey),
-      xorClear: opts.xorClear,
-      extraNonce2: Buffer.from(opts.extraNonce2),
-      gen: opts.gen,
-    },
-    opts.onProgress,
-    (msg) => {
-      opts.onFound({ nonce: msg.nonce, nonce2: msg.nonce2, hashes: msg.hashes });
-    },
-    opts.onLog,
-  );
-  return true;
+  try {
+    n.startGrind(
+      {
+        deviceId: opts.deviceId,
+        work: Buffer.from(opts.work),
+        target: Buffer.from(opts.target),
+        xorKey: Buffer.from(opts.xorKey),
+        xorClear: opts.xorClear,
+        extraNonce2: Buffer.from(opts.extraNonce2),
+        gen: opts.gen,
+      },
+      opts.onProgress,
+      (msg) => {
+        opts.onFound({ nonce: msg.nonce, nonce2: msg.nonce2, hashes: msg.hashes });
+      },
+      opts.onLog,
+    );
+    return true;
+  } catch (e) {
+    opts.onLog(e instanceof Error ? `gpu: ${e.message}` : 'gpu: start failed');
+    return false;
+  }
 }

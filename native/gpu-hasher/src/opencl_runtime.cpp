@@ -1,5 +1,6 @@
 #include "opencl_engine.hpp"
 #include "gpu_pow.hpp"
+#include "grind_launch.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -90,7 +91,6 @@ constexpr cl_uint kMaxPlatforms = 16;
 constexpr cl_uint kMaxDevices = 64;
 constexpr size_t kMaxInfoBytes = 4096;
 constexpr size_t kMaxBuildLog = 64 * 1024;
-constexpr uint32_t kMaxBatch = 1u << 20;
 constexpr size_t kMaxKernelSource = 2 * 1024 * 1024;
 
 struct ClMem {
@@ -333,6 +333,11 @@ struct OpenClEngine::Impl {
     cl_kernel grind = nullptr;
     cl_kernel one = nullptr;
     cl_device_id dev = nullptr;
+    cl_mem work = nullptr;
+    cl_mem mask = nullptr;
+    cl_mem target = nullptr;
+    cl_mem found = nullptr;
+    bool job_loaded = false;
 };
 
 OpenClEngine::OpenClEngine() : impl_(std::make_unique<Impl>()) {}
@@ -349,6 +354,22 @@ OpenClEngine::~OpenClEngine()
     if (impl_->one && g_api.ReleaseKernel) {
         g_api.ReleaseKernel(impl_->one);
         impl_->one = nullptr;
+    }
+    if (impl_->found && g_api.ReleaseMemObject) {
+        g_api.ReleaseMemObject(impl_->found);
+        impl_->found = nullptr;
+    }
+    if (impl_->target && g_api.ReleaseMemObject) {
+        g_api.ReleaseMemObject(impl_->target);
+        impl_->target = nullptr;
+    }
+    if (impl_->mask && g_api.ReleaseMemObject) {
+        g_api.ReleaseMemObject(impl_->mask);
+        impl_->mask = nullptr;
+    }
+    if (impl_->work && g_api.ReleaseMemObject) {
+        g_api.ReleaseMemObject(impl_->work);
+        impl_->work = nullptr;
     }
     if (impl_->prog && g_api.ReleaseProgram) {
         g_api.ReleaseProgram(impl_->prog);
@@ -442,6 +463,46 @@ bool OpenClEngine::init(const GpuDeviceInfo& info, std::string* err)
         }
         return false;
     }
+    impl_->work = g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_ONLY, 80, nullptr, &e);
+    impl_->mask = g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_ONLY, 32, nullptr, &e);
+    impl_->target = g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_ONLY, 32, nullptr, &e);
+    impl_->found = g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_WRITE, 12, nullptr, &e);
+    if (!impl_->work || !impl_->mask || !impl_->target || !impl_->found || e != CL_SUCCESS) {
+        if (err) {
+            *err = "clCreateBuffer grind buffers failed";
+        }
+        return false;
+    }
+    if (g_api.SetKernelArg(impl_->grind, 0, sizeof(cl_mem), &impl_->work) != CL_SUCCESS
+        || g_api.SetKernelArg(impl_->grind, 1, sizeof(cl_mem), &impl_->mask) != CL_SUCCESS
+        || g_api.SetKernelArg(impl_->grind, 2, sizeof(cl_mem), &impl_->target) != CL_SUCCESS
+        || g_api.SetKernelArg(impl_->grind, 6, sizeof(cl_mem), &impl_->found) != CL_SUCCESS) {
+        if (err) {
+            *err = "clSetKernelArg grind buffers failed";
+        }
+        return false;
+    }
+    return true;
+}
+
+bool OpenClEngine::load_job(const uint8_t work[80], const uint8_t mask[32], const uint8_t target[32], std::string* err)
+{
+    if (!impl_->q || !impl_->work || !impl_->mask || !impl_->target) {
+        if (err) {
+            *err = "OpenCL engine not initialized";
+        }
+        return false;
+    }
+    if (g_api.EnqueueWriteBuffer(impl_->q, impl_->work, CL_TRUE, 0, 80, work, 0, nullptr, nullptr) != CL_SUCCESS
+        || g_api.EnqueueWriteBuffer(impl_->q, impl_->mask, CL_TRUE, 0, 32, mask, 0, nullptr, nullptr) != CL_SUCCESS
+        || g_api.EnqueueWriteBuffer(impl_->q, impl_->target, CL_TRUE, 0, 32, target, 0, nullptr, nullptr)
+            != CL_SUCCESS) {
+        if (err) {
+            *err = "clEnqueueWriteBuffer job failed";
+        }
+        return false;
+    }
+    impl_->job_loaded = true;
     return true;
 }
 
@@ -500,66 +561,41 @@ bool OpenClEngine::hash_one(const uint8_t work[80], const uint8_t mask[32], uint
     return true;
 }
 
-bool OpenClEngine::grind_batch(const uint8_t work[80], const uint8_t mask[32], const uint8_t target[32], uint32_t nonce_lo,
-    uint32_t nonce_hi, uint32_t batch, OpenClFound* out, std::string* err)
+bool OpenClEngine::grind_batch(uint32_t nonce_lo, uint32_t nonce_hi, uint32_t batch, OpenClFound* out, std::string* err)
 {
-    if (!out || batch == 0 || batch > kMaxBatch || !impl_->ctx || !impl_->q || !impl_->grind || !g_api.CreateBuffer) {
+    const uint32_t stride = kBlockThreads * kHashesPerThread;
+    if (!out || batch == 0 || batch % stride != 0 || !impl_->q || !impl_->grind || !impl_->found || !impl_->job_loaded) {
         if (err) {
             *err = "invalid grind_batch args";
         }
         return false;
     }
-    cl_int e = 0;
-    uint8_t work_copy[80];
-    uint8_t mask_copy[32];
-    uint8_t target_copy[32];
-    std::memcpy(work_copy, work, 80);
-    std::memcpy(mask_copy, mask, 32);
-    std::memcpy(target_copy, target, 32);
     uint32_t found[3] = {0, 0, 0};
-    ClMem wbuf(g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 80, work_copy, &e));
-    if (!wbuf.p || e != CL_SUCCESS) {
+    if (g_api.EnqueueWriteBuffer(impl_->q, impl_->found, CL_TRUE, 0, sizeof(found), found, 0, nullptr, nullptr)
+        != CL_SUCCESS) {
         if (err) {
-            *err = "grind_batch clCreateBuffer failed";
+            *err = "grind_batch clear found failed";
         }
         return false;
     }
-    ClMem mbuf(g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 32, mask_copy, &e));
-    if (!mbuf.p || e != CL_SUCCESS) {
+    unsigned int iter = kHashesPerThread;
+    if (g_api.SetKernelArg(impl_->grind, 3, sizeof(uint32_t), &nonce_lo) != CL_SUCCESS
+        || g_api.SetKernelArg(impl_->grind, 4, sizeof(uint32_t), &nonce_hi) != CL_SUCCESS
+        || g_api.SetKernelArg(impl_->grind, 5, sizeof(uint32_t), &iter) != CL_SUCCESS) {
         if (err) {
-            *err = "grind_batch clCreateBuffer failed";
+            *err = "grind_batch set args failed";
         }
         return false;
     }
-    ClMem tbuf(g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 32, target_copy, &e));
-    if (!tbuf.p || e != CL_SUCCESS) {
-        if (err) {
-            *err = "grind_batch clCreateBuffer failed";
-        }
-        return false;
-    }
-    ClMem fbuf(g_api.CreateBuffer(impl_->ctx, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(found), found, &e));
-    if (!fbuf.p || e != CL_SUCCESS) {
-        if (err) {
-            *err = "grind_batch clCreateBuffer failed";
-        }
-        return false;
-    }
-    g_api.SetKernelArg(impl_->grind, 0, sizeof(cl_mem), &wbuf.p);
-    g_api.SetKernelArg(impl_->grind, 1, sizeof(cl_mem), &mbuf.p);
-    g_api.SetKernelArg(impl_->grind, 2, sizeof(cl_mem), &tbuf.p);
-    g_api.SetKernelArg(impl_->grind, 3, sizeof(uint32_t), &nonce_lo);
-    g_api.SetKernelArg(impl_->grind, 4, sizeof(uint32_t), &nonce_hi);
-    g_api.SetKernelArg(impl_->grind, 5, sizeof(cl_mem), &fbuf.p);
-    size_t gsz = batch;
-    e = g_api.EnqueueNDRangeKernel(impl_->q, impl_->grind, 1, nullptr, &gsz, nullptr, 0, nullptr, nullptr);
+    size_t gsz = batch / kHashesPerThread;
+    cl_int e = g_api.EnqueueNDRangeKernel(impl_->q, impl_->grind, 1, nullptr, &gsz, nullptr, 0, nullptr, nullptr);
     if (e != CL_SUCCESS) {
         if (err) {
             *err = "grind_batch enqueue failed";
         }
         return false;
     }
-    e = g_api.EnqueueReadBuffer(impl_->q, fbuf.p, CL_TRUE, 0, sizeof(found), found, 0, nullptr, nullptr);
+    e = g_api.EnqueueReadBuffer(impl_->q, impl_->found, CL_TRUE, 0, sizeof(found), found, 0, nullptr, nullptr);
     if (e != CL_SUCCESS) {
         if (err) {
             *err = "grind_batch read failed";
@@ -581,7 +617,10 @@ bool opencl_hash_batch(const GpuDeviceInfo& dev, const uint8_t work[80], const u
     }
     uint8_t mask[32];
     xor_key_mask_bytes(xor_key, xor_clear, mask);
-    return eng.grind_batch(work, mask, target, nonce_lo, nonce_hi, batch, out, err);
+    if (!eng.load_job(work, mask, target, err)) {
+        return false;
+    }
+    return eng.grind_batch(nonce_lo, nonce_hi, batch, out, err);
 }
 
 bool opencl_hash_one(const GpuDeviceInfo& dev, const uint8_t work[80], const uint8_t xor_key[16], uint8_t xor_clear,

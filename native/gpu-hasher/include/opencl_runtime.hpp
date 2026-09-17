@@ -13,6 +13,7 @@ struct GpuDeviceInfo {
     std::string vendor;
     uint64_t memory_mib = 0;
     std::string kind; // "discrete" | "integrated"
+    std::string backend = "opencl";
     int platform_index = -1;
     int device_index = -1;
 };

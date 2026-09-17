@@ -1,11 +1,25 @@
 <main>
-  <h1>FederationCoin CPU miner</h1>
-  <p class="lead">
-    Two chains, one hasher, plus a Host a pool tab. Node RPC talks JSON-RPC with
-    the datadir cookie (never shown here). Stratum is an ASIC-style TCP client.
-    Host a pool starts a local DATUM Prime + TIDES process. Unsigned; no
-    Developer account.
-  </p>
+  <header class="header">
+    <div>
+      <h1>FederationCoin CPU miner</h1>
+      <p class="lead">
+        Network is the tenant. Mining and pool sit side by side. Mine to a node,
+        Stratum, DATUM Prime, or the app-hosted pool when it is running.
+        Unsigned; no Developer account.
+      </p>
+    </div>
+    <label class="network-toggle" for="network-toggle">
+      Network
+      <select
+        id="network-toggle"
+        [value]="network.chain()"
+        (change)="selectNetwork($any($event.target).value)"
+      >
+        <option value="testnet">Testnet</option>
+        <option value="main">Main</option>
+      </select>
+    </label>
+  </header>
 
   @if (!mining.inElectron()) {
     <p class="warn">
@@ -15,52 +29,8 @@
     </p>
   }
 
-  <div class="tabs" role="tablist" aria-label="Miner">
-    <button
-      type="button"
-      role="tab"
-      id="tab-main"
-      [attr.aria-selected]="tab() === 'main'"
-      [attr.aria-controls]="'panel-main'"
-      (click)="selectTab('main')"
-    >
-      Main
-    </button>
-    <button
-      type="button"
-      role="tab"
-      id="tab-testnet"
-      [attr.aria-selected]="tab() === 'testnet'"
-      [attr.aria-controls]="'panel-testnet'"
-      (click)="selectTab('testnet')"
-    >
-      Testnet
-    </button>
-    <button
-      type="button"
-      role="tab"
-      id="tab-pool"
-      [attr.aria-selected]="tab() === 'pool'"
-      [attr.aria-controls]="'panel-pool'"
-      (click)="selectTab('pool')"
-    >
-      Host a pool
-    </button>
-  </div>
-
-  <app-miner-pane
-    id="panel-main"
-    role="tabpanel"
-    chain="main"
-    [hidden]="tab() !== 'main'"
-  />
-  <app-miner-pane
-    id="panel-testnet"
-    role="tabpanel"
-    chain="testnet"
-    [hidden]="tab() !== 'testnet'"
-  />
-  <app-pool-pane id="panel-pool" role="tabpanel" [hidden]="tab() !== 'pool'" />
+  <app-network-workspace chain="testnet" [hidden]="network.chain() !== 'testnet'" />
+  <app-network-workspace chain="main" [hidden]="network.chain() !== 'main'" />
 
   @if (mining.toast()) {
     <div class="toast" role="status">{{ mining.toast() }}</div>

@@ -1,13 +1,12 @@
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { MAIN_IS_LIVE, parseChain, type MinerChain } from './chain.js';
+import { parseRpcConnect, type RpcConnect } from './mine-to.js';
 import { parseHost, parsePort } from './rpc.js';
 
 export type PoolStartOpts = {
   chain: MinerChain;
-  rpcHost: string;
-  rpcPort: number;
-  datadir: string;
+  rpc: RpcConnect;
   operator: string;
   feeBps: number;
   stratumHost: string;
@@ -15,6 +14,8 @@ export type PoolStartOpts = {
   datumHost: string;
   datumPort: number;
 };
+
+export type TidesPayout = { miner: string; sats: string };
 
 export type PoolStats = {
   running: boolean;
@@ -25,8 +26,11 @@ export type PoolStats = {
   rejected: number;
   lastError: string;
   status: string;
+  stratumHost: string;
   stratumPort: number;
+  datumHost: string;
   datumPort: number;
+  payouts: TidesPayout[];
 };
 
 export const IDLE_POOL_STATS: PoolStats = {
@@ -38,8 +42,11 @@ export const IDLE_POOL_STATS: PoolStats = {
   rejected: 0,
   lastError: '',
   status: 'idle',
+  stratumHost: '',
   stratumPort: 0,
+  datumHost: '',
   datumPort: 0,
+  payouts: [],
 };
 
 export function resolvePoolCli(env: NodeJS.ProcessEnv, here: string, resourcesPath: string): string | null {
@@ -67,8 +74,7 @@ export function poolArgv(opts: PoolStartOpts): string[] {
   if (chain === 'main' && !MAIN_IS_LIVE) {
     throw new Error('MAIN is not live; host a pool on testnet');
   }
-  parseHost(opts.rpcHost);
-  parsePort(opts.rpcPort);
+  const rpc = parseRpcConnect(opts.rpc, chain);
   parseHost(opts.stratumHost);
   parsePort(opts.stratumPort);
   parseHost(opts.datumHost);
@@ -80,15 +86,13 @@ export function poolArgv(opts: PoolStartOpts): string[] {
   if (fee < 0 || fee > 10000) {
     throw new Error('fee bps must be 0..10000');
   }
-  return [
+  const args = [
     '--chain',
     chain,
     '--rpc-host',
-    opts.rpcHost.trim(),
+    rpc.host,
     '--rpc-port',
-    String(opts.rpcPort),
-    '--datadir',
-    opts.datadir.trim(),
+    String(rpc.port),
     '--operator',
     opts.operator.trim(),
     '--fee-bps',
@@ -102,6 +106,12 @@ export function poolArgv(opts: PoolStartOpts): string[] {
     '--datum-port',
     String(opts.datumPort),
   ];
+  if (rpc.auth.kind === 'cookie') {
+    args.push('--datadir', rpc.auth.datadir);
+  } else {
+    args.push('--rpc-user', rpc.auth.user, '--rpc-password', rpc.auth.password);
+  }
+  return args;
 }
 
 export function parsePoolStatsLine(line: string): PoolStats | null {
@@ -114,10 +124,33 @@ export function parsePoolStatsLine(line: string): PoolStats | null {
     if (typeof rec.running !== 'boolean') {
       return null;
     }
-    return rec;
+    return { ...rec, payouts: normalizePayouts(rec.payouts) };
   } catch {
     return null;
   }
+}
+
+function normalizePayouts(raw: unknown): TidesPayout[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: TidesPayout[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+    const miner = (item as { miner?: unknown }).miner;
+    const sats = (item as { sats?: unknown }).sats;
+    if (typeof miner !== 'string' || !miner) {
+      continue;
+    }
+    if (typeof sats === 'string' && sats.length > 0) {
+      out.push({ miner, sats });
+    } else if (typeof sats === 'number' && Number.isFinite(sats)) {
+      out.push({ miner, sats: String(Math.trunc(sats)) });
+    }
+  }
+  return out;
 }
 
 export function poolCliDir(cliPath: string): string {

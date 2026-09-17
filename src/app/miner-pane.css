@@ -18,13 +18,16 @@ label {
   font-size: 0.9rem;
 }
 
-input {
+input:not([type='checkbox']):not([type='radio']) {
+  box-sizing: border-box;
+  width: 100%;
   padding: 0.45rem 0.55rem;
   border: 1px solid #3a3f4b;
   border-radius: 4px;
   background: #1a1d24;
   color: #e8eaed;
   font: inherit;
+  user-select: text;
 }
 
 .row {
@@ -124,10 +127,22 @@ fieldset.mode {
 }
 
 fieldset.mode legend,
-fieldset.gpus legend {
+fieldset.gpus legend,
+fieldset.partition legend {
   padding: 0 0.35rem;
   color: #9aa0aa;
   font-size: 0.82rem;
+}
+
+fieldset.partition {
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  margin: 0.85rem 0;
+  padding: 0.55rem 0.85rem 0.75rem;
+}
+
+.frozen {
+  margin: 0.35rem 0 0.85rem;
 }
 
 fieldset.gpus {

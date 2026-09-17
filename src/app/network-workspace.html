@@ -1,0 +1,10 @@
+<div class="workspace">
+  <section class="pane-col" [attr.id]="chain() + '-mining'">
+    <h2>Mining</h2>
+    <app-miner-pane [chain]="chain()" />
+  </section>
+  <section class="pane-col" [attr.id]="chain() + '-pool'">
+    <h2>Pool</h2>
+    <app-pool-pane [chain]="chain()" />
+  </section>
+</div>

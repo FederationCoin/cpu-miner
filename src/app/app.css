@@ -1,10 +1,20 @@
 :host {
   display: block;
-  max-width: 40rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 90rem;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1.5rem 1.75rem 2rem;
   font-family: system-ui, sans-serif;
   color: #e8eaed;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 h1 {
@@ -13,8 +23,29 @@ h1 {
 }
 
 .lead {
+  margin: 0;
+  max-width: 46rem;
   color: #b8bcc4;
-  line-height: 1.4;
+  line-height: 1.45;
+}
+
+.network-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: #9aa0aa;
+}
+
+.network-toggle select {
+  min-width: 10rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+  background: #1a1d24;
+  color: #e8eaed;
+  font: inherit;
 }
 
 .warn {
@@ -27,30 +58,6 @@ h1 {
 code {
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
-}
-
-.tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin: 1rem 0 0;
-  border-bottom: 1px solid #3a3f4b;
-}
-
-.tabs button {
-  padding: 0.45rem 0.9rem;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: 4px 4px 0 0;
-  background: transparent;
-  color: #9aa0aa;
-  font: inherit;
-  cursor: pointer;
-}
-
-.tabs button[aria-selected='true'] {
-  color: #e8eaed;
-  background: #1a1d24;
-  border-color: #3a3f4b;
 }
 
 .toast {

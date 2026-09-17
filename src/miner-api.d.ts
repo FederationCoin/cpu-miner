@@ -1,7 +1,5 @@
 export type MinerChain = 'main' | 'testnet';
 
-export type MinerMode = 'rpc' | 'stratum';
-
 export type LogLine = {
   t: number;
   mode: string;
@@ -34,7 +32,7 @@ export type GpuDevice = {
   name: string;
   vendor: string;
   memoryMiB: number;
-  backend: 'opencl';
+  backend: 'opencl' | 'cuda';
   kind: 'discrete' | 'integrated';
 };
 
@@ -43,24 +41,51 @@ export type GpuScan = {
   addon: boolean;
 };
 
+export type RpcAuthKind = 'cookie' | 'userpass';
+
+export type RpcAuthConnect =
+  | { kind: 'cookie'; datadir: string }
+  | { kind: 'userpass'; user: string; password: string };
+
+export type RpcConnect = {
+  host: string;
+  port: number;
+  auth: RpcAuthConnect;
+};
+
+export type StratumConnect = {
+  host: string;
+  port: number;
+  worker: string;
+  password: string;
+};
+
+export type DatumConnect = {
+  host: string;
+  port: number;
+  worker: string;
+  rpc: RpcConnect;
+};
+
+export type MineTo =
+  | { kind: 'node'; rpc: RpcConnect; payout: string }
+  | { kind: 'stratum'; stratum: StratumConnect }
+  | { kind: 'datum'; datum: DatumConnect }
+  | { kind: 'appPoolStratum'; worker: string; password: string }
+  | { kind: 'appPoolDatum'; worker: string; rpc: RpcConnect };
+
+export type MineToKind = MineTo['kind'];
+
 export type MinerStartOpts = {
   chain: MinerChain;
-  mode: MinerMode;
   threads: number;
   gpuIds?: string[];
-  host?: string;
-  port?: number;
-  payout?: string;
-  datadir?: string;
-  worker?: string;
-  password?: string;
+  mineTo: MineTo;
 };
 
 export type PoolStartOpts = {
   chain: MinerChain;
-  rpcHost: string;
-  rpcPort: number;
-  datadir: string;
+  rpc: RpcConnect;
   operator: string;
   feeBps: number;
   stratumHost: string;
@@ -68,6 +93,8 @@ export type PoolStartOpts = {
   datumHost: string;
   datumPort: number;
 };
+
+export type TidesPayout = { miner: string; sats: string };
 
 export type PoolStats = {
   running: boolean;
@@ -78,8 +105,11 @@ export type PoolStats = {
   rejected: number;
   lastError: string;
   status: string;
+  stratumHost: string;
   stratumPort: number;
+  datumHost: string;
   datumPort: number;
+  payouts: TidesPayout[];
 };
 
 export type MinerApi = {
@@ -94,6 +124,7 @@ export type MinerApi = {
   onToast: (cb: (message: string) => void) => () => void;
   poolStart: (opts: PoolStartOpts) => Promise<{ ok: boolean; error?: string }>;
   poolStop: () => Promise<void>;
+  poolRefresh: () => Promise<{ ok: boolean; error?: string }>;
   onPoolStats: (cb: (s: PoolStats) => void) => () => void;
 };
 
