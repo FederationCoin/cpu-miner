@@ -29,10 +29,24 @@
         The desktop app talks to loopback (or your LAN node) instead.
       </p>
     }
-    <label class="check" [attr.for]="id('mineToStratum')">
-      <input [id]="id('mineToStratum')" type="radio" formControlName="kind" value="stratum" [attr.disabled]="kindLocked() ? true : null" />
-      Stratum
-    </label>
+    @if (!isWebDemo()) {
+      <label class="check" [attr.for]="id('mineToStratum')">
+        <input [id]="id('mineToStratum')" type="radio" formControlName="kind" value="stratum" [attr.disabled]="kindLocked() ? true : null" />
+        Stratum
+      </label>
+    }
+    @if (isWebDemo()) {
+      <label class="check" [attr.for]="id('mineToStratumWebsocket')">
+        <input
+          [id]="id('mineToStratumWebsocket')"
+          type="radio"
+          formControlName="kind"
+          value="stratumWebsocket"
+          [attr.disabled]="kindLocked() ? true : null"
+        />
+        Stratum Websocket
+      </label>
+    }
     <label class="check" [attr.for]="id('mineToDatum')">
       <input
         [id]="id('mineToDatum')"
@@ -49,6 +63,21 @@
         desktop app with your own node (TCP DATUM to the advertised pool host).
       </p>
     }
+    <label class="check" [attr.for]="id('mineToDatumWebsocket')">
+      <input
+        [id]="id('mineToDatumWebsocket')"
+        type="radio"
+        formControlName="kind"
+        value="datumWebsocket"
+        [attr.disabled]="kindLocked() || datumWebsocketDisabled() ? true : null"
+      />
+      DATUM Prime (Websocket)
+    </label>
+    @if (datumWebsocketDisabled()) {
+      <p class="hint" [attr.id]="id('datumWebsocketDisabledHint')">
+        DATUM Websocket needs a websocket proxy to your node. We do not offer that.
+      </p>
+    }
     @if (hostedPoolReady()) {
       <label class="check" [attr.for]="id('mineToHostedPoolStratum')">
         <input
@@ -58,7 +87,7 @@
           value="hostedPoolStratum"
           [attr.disabled]="kindLocked() ? true : null"
         />
-        {{ hostedLabel() }} (Stratum)
+        {{ hostedLabel() }} (Stratum Websocket)
       </label>
     }
     @if (appPoolReady()) {
@@ -114,9 +143,6 @@
         <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="host" />
         <label [attr.for]="id('stratumPort')">Port</label>
         <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="port" />
-        @if (isWebDemo()) {
-          <p class="hint">This page speaks WebSocket Stratum (port 443). TCP 23334 is the desktop app and firmware.</p>
-        }
         <label [attr.for]="id('stratumWorker')">Worker</label>
         <input
           [id]="id('stratumWorker')"
@@ -130,6 +156,33 @@
         <label [attr.for]="id('stratumPassword')">Password</label>
         <input
           [id]="id('stratumPassword')"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          formControlName="password"
+        />
+      </fieldset>
+    }
+    @case ('stratumWebsocket') {
+      <fieldset class="partition" formGroupName="stratumWebsocket">
+        <legend>Stratum Websocket</legend>
+        <label [attr.for]="id('stratumWebsocketHost')">Host</label>
+        <input [id]="id('stratumWebsocketHost')" type="text" autocomplete="off" spellcheck="false" formControlName="host" />
+        <label [attr.for]="id('stratumWebsocketPort')">Port</label>
+        <input [id]="id('stratumWebsocketPort')" type="number" min="1" max="65535" formControlName="port" />
+        <label [attr.for]="id('stratumWebsocketWorker')">Worker</label>
+        <input
+          [id]="id('stratumWebsocketWorker')"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          [placeholder]="config().hrp + '1….cpu'"
+          formControlName="worker"
+        />
+        <p class="hint">Username as on firmware. A <code>.worker</code> suffix is allowed.</p>
+        <label [attr.for]="id('stratumWebsocketPassword')">Password</label>
+        <input
+          [id]="id('stratumWebsocketPassword')"
           type="password"
           autocomplete="off"
           spellcheck="false"
@@ -231,9 +284,17 @@
         />
       </fieldset>
     }
+    @case ('datumWebsocket') {
+      <fieldset class="partition" formGroupName="datumWebsocket">
+        <legend>DATUM Prime (Websocket)</legend>
+        <p class="hint">Needs a websocket proxy to your node. We do not offer that.</p>
+        <label [attr.for]="id('datumWebsocketUrl')">URL</label>
+        <input [id]="id('datumWebsocketUrl')" type="text" autocomplete="off" spellcheck="false" formControlName="url" />
+      </fieldset>
+    }
     @case ('hostedPoolStratum') {
       <fieldset class="partition" formGroupName="hostedPoolStratum">
-        <legend>{{ hostedLabel() }} (Stratum)</legend>
+        <legend>{{ hostedLabel() }} (Stratum Websocket)</legend>
         <p class="hint">This pool is already running. Host and path come from the server.</p>
         <p class="mono frozen">{{ frozenHostedStratum() }}</p>
         <label [attr.for]="id('hostedPoolStratumWorker')">Worker</label>

@@ -20,7 +20,6 @@ import type { HostedEndpoints } from './miner-shell';
 import {
   PoolStatsClient,
   StratumWsClient,
-  isTcpStratumEndpoint,
   stratumWsUrl,
   type StratumNotify,
   type StratumWsTransport,
@@ -92,12 +91,6 @@ export class WebHasherHost implements HasherHost {
     if (opts.chain === 'main' && opts.mineTo.kind === 'hostedPoolStratum') {
       return { ok: false, error: 'Federation pool is not offered on main' };
     }
-    if (opts.mineTo.kind === 'stratum' && isTcpStratumEndpoint(opts.mineTo.stratum.host, opts.mineTo.stratum.port)) {
-      return {
-        ok: false,
-        error: 'TCP Stratum (port 23334) is for the desktop app and firmware. This page needs the WebSocket port (443).',
-      };
-    }
     this.stopMining();
     this.stopStatsWatch();
     const url = this.stratumUrl(opts);
@@ -108,14 +101,14 @@ export class WebHasherHost implements HasherHost {
     const worker =
       opts.mineTo.kind === 'hostedPoolStratum'
         ? opts.mineTo.worker
-        : opts.mineTo.kind === 'stratum'
-          ? opts.mineTo.stratum.worker
+        : opts.mineTo.kind === 'stratumWebsocket'
+          ? opts.mineTo.stratumWebsocket.worker
           : '';
     const password =
       opts.mineTo.kind === 'hostedPoolStratum'
         ? opts.mineTo.password
-        : opts.mineTo.kind === 'stratum'
-          ? opts.mineTo.stratum.password
+        : opts.mineTo.kind === 'stratumWebsocket'
+          ? opts.mineTo.stratumWebsocket.password
           : 'x';
     if (!worker.trim()) {
       this.startStatsWatch();
@@ -283,18 +276,27 @@ export class WebHasherHost implements HasherHost {
     if (opts.mineTo.kind === 'hostedPoolStratum') {
       return this.hosted.stratumWss;
     }
-    if (opts.mineTo.kind === 'stratum') {
-      return stratumWsUrl(opts.mineTo.stratum.host, opts.mineTo.stratum.port);
+    if (opts.mineTo.kind === 'stratumWebsocket') {
+      return stratumWsUrl(opts.mineTo.stratumWebsocket.host, opts.mineTo.stratumWebsocket.port);
     }
     return null;
   }
 
   private startError(opts: MinerStartOpts): string {
-    if (opts.mineTo.kind === 'node' || opts.mineTo.kind === 'datum' || opts.mineTo.kind === 'appPoolDatum') {
+    if (opts.mineTo.kind === 'stratum') {
+      return 'TCP Stratum is for the desktop app and firmware. This page uses Stratum Websocket.';
+    }
+    if (opts.mineTo.kind === 'datum') {
+      return 'DATUM Prime is TCP to your node. Use the desktop app.';
+    }
+    if (opts.mineTo.kind === 'datumWebsocket') {
+      return 'DATUM Prime (Websocket) needs a websocket proxy to your node. We do not offer that.';
+    }
+    if (opts.mineTo.kind === 'node' || opts.mineTo.kind === 'appPoolDatum') {
       return 'DATUM is bring your own node. Use the desktop app with your own node.';
     }
     if (opts.mineTo.kind === 'appPoolStratum') {
-      return 'App pool is desktop-only. Mine the hosted testnet pool or a Stratum URL.';
+      return 'App pool is desktop-only. Mine the hosted testnet pool or a Stratum Websocket URL.';
     }
     return 'This web demo mines over WebSocket Stratum only.';
   }

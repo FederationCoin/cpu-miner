@@ -10,18 +10,24 @@
   "chains": {
     "testnet": {
       "mineToKind": "hostedPoolStratum",
-      "stratum": {
+      "stratumWebsocket": {
         "host": "pool.testnet.federationcoin.org",
         "port": 443,
         "password": "x"
+      },
+      "datumWebsocket": {
+        "url": "wss://pool.testnet.federationcoin.org/datum"
       }
     },
     "main": {
-      "mineToKind": "stratum",
-      "stratum": {
+      "mineToKind": "stratumWebsocket",
+      "stratumWebsocket": {
         "host": "",
         "port": 443,
         "password": "x"
+      },
+      "datumWebsocket": {
+        "url": "wss://pool.testnet.federationcoin.org/datum"
       }
     }
   }

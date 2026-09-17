@@ -74,10 +74,16 @@ export type DatumConnect = {
   rpc: RpcConnect;
 };
 
+export type DatumWebsocketConnect = {
+  url: string;
+};
+
 export type MineTo =
   | { kind: 'node'; rpc: RpcConnect; payout: string }
   | { kind: 'stratum'; stratum: StratumConnect }
+  | { kind: 'stratumWebsocket'; stratumWebsocket: StratumConnect }
   | { kind: 'datum'; datum: DatumConnect }
+  | { kind: 'datumWebsocket'; datumWebsocket: DatumWebsocketConnect }
   | { kind: 'appPoolStratum'; worker: string; password: string }
   | { kind: 'appPoolDatum'; worker: string; rpc: RpcConnect }
   | { kind: 'hostedPoolStratum'; worker: string; password: string };

@@ -383,6 +383,7 @@ describe('App', () => {
     it('Start in Testnet Stratum sends a stratum mineTo', async () => {
       const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ start }));
+      expect(has(f, '#testnet-mineToStratumWebsocket')).toBe(false);
       selectKind(f, 'testnet', 'Stratum');
       setInput(f, '#testnet-stratumWorker', 'tgfcn1abc.cpu');
       queryDe(f, '#testnet-start').triggerEventHandler('click');
@@ -396,6 +397,14 @@ describe('App', () => {
           stratum: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' },
         },
       });
+    });
+
+    it('DATUM Prime (Websocket) is present and disabled', async () => {
+      const f = await render(stubMiner());
+      const ws = queryEl<HTMLInputElement>(f, '#testnet-mineToDatumWebsocket');
+      expect(ws.disabled).toBe(true);
+      expect(has(f, '#testnet-mineToStratum')).toBe(true);
+      expect(has(f, '#testnet-mineToStratumWebsocket')).toBe(false);
     });
 
     it('shows a GPUs fieldset on Testnet', async () => {

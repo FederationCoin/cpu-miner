@@ -39,11 +39,20 @@ export class MinerPane implements OnInit {
       worker: new FormControl('', { nonNullable: true }),
       password: new FormControl('x', { nonNullable: true }),
     }),
+    stratumWebsocket: new FormGroup({
+      host: new FormControl('', { nonNullable: true }),
+      port: new FormControl(443, { nonNullable: true }),
+      worker: new FormControl('', { nonNullable: true }),
+      password: new FormControl('x', { nonNullable: true }),
+    }),
     datum: new FormGroup({
       host: new FormControl('127.0.0.1', { nonNullable: true }),
       port: new FormControl(28916, { nonNullable: true }),
       worker: new FormControl('', { nonNullable: true }),
       rpc: rpcConnectGroup(35332),
+    }),
+    datumWebsocket: new FormGroup({
+      url: new FormControl('', { nonNullable: true }),
     }),
     appPoolStratum: new FormGroup({
       worker: new FormControl('', { nonNullable: true }),
@@ -76,22 +85,34 @@ export class MinerPane implements OnInit {
     effect(() => {
       const kind = this.form.controls.kind.value;
       if ((kind === 'appPoolStratum' || kind === 'appPoolDatum') && !this.appPoolReady()) {
-        this.form.controls.kind.setValue('stratum');
+        this.form.controls.kind.setValue(this.isWebDemo() ? this.webKindFallback() : 'stratum');
       }
     });
   }
 
   ngOnInit(): void {
-    const chainDefaults = this.shell.defaults.chains[this.chain()];
-    this.form.controls.stratum.patchValue(this.loadStratum(chainDefaults.stratum));
-    if (this.shell.kind === 'desktop') {
+    if (this.shell.kind === 'webDemo') {
       const d = this.shell.defaults.chains[this.chain()];
+      this.form.controls.stratumWebsocket.patchValue(this.loadStratumWebsocket(d.stratumWebsocket));
+      this.form.controls.datumWebsocket.patchValue({
+        url: localStorage.getItem(this.key('datumWebsocket.url'))?.trim() || d.datumWebsocket.url,
+      });
+      this.form.controls.hostedPoolStratum.patchValue({
+        worker: localStorage.getItem(this.key('hostedPoolStratum.worker')) ?? '',
+        password: localStorage.getItem(this.key('hostedPoolStratum.password')) ?? d.stratumWebsocket.password,
+      });
+    } else {
+      const d = this.shell.defaults.chains[this.chain()];
+      this.form.controls.stratum.patchValue(this.loadStratum(d.stratum));
       this.form.controls.rpc.patchValue(this.loadRpc('rpc', d.rpc));
       this.form.controls.datum.patchValue({
         host: localStorage.getItem(this.key('datum.host'))?.trim() || d.datum.host,
         port: this.loadNum('datum.port', d.datum.port),
         worker: localStorage.getItem(this.key('datum.worker')) ?? '',
         rpc: this.loadRpc('datum.rpc', d.rpc),
+      });
+      this.form.controls.datumWebsocket.patchValue({
+        url: localStorage.getItem(this.key('datumWebsocket.url'))?.trim() || d.datumWebsocket.url,
       });
       this.form.controls.appPoolStratum.patchValue({
         worker: localStorage.getItem(this.key('appPoolStratum.worker')) ?? '',
@@ -101,11 +122,11 @@ export class MinerPane implements OnInit {
         worker: localStorage.getItem(this.key('appPoolDatum.worker')) ?? '',
         rpc: this.loadRpc('appPoolDatum.rpc', d.rpc),
       });
+      this.form.controls.hostedPoolStratum.patchValue({
+        worker: localStorage.getItem(this.key('hostedPoolStratum.worker')) ?? '',
+        password: localStorage.getItem(this.key('hostedPoolStratum.password')) ?? d.stratum.password,
+      });
     }
-    this.form.controls.hostedPoolStratum.patchValue({
-      worker: localStorage.getItem(this.key('hostedPoolStratum.worker')) ?? '',
-      password: localStorage.getItem(this.key('hostedPoolStratum.password')) ?? chainDefaults.stratum.password,
-    });
     this.form.controls.payout.setValue(localStorage.getItem(this.key('payout')) ?? '');
     const savedThreads = localStorage.getItem(this.key('threads'));
     if (savedThreads) {
@@ -113,17 +134,13 @@ export class MinerPane implements OnInit {
     } else if ((this.mining.info()?.defaultThreads ?? 0) > 0) {
       this.form.controls.threads.setValue(this.mining.info()!.defaultThreads);
     }
-    const savedKind = localStorage.getItem(this.key('kind')) as MineToKind | null;
+    const savedKind = this.loadKind();
     const allowed = this.allowedKinds();
-    const fallback = chainDefaults.mineToKind;
+    const fallback = this.shell.defaults.chains[this.chain()].mineToKind;
     this.form.controls.kind.setValue(savedKind && allowed.includes(savedKind) ? savedKind : fallback);
     this.gpuIds.set(this.loadGpuIds());
     this.form.valueChanges.subscribe(() => this.persist());
-    if (this.shell.kind === 'webDemo') {
-      const s = this.form.controls.stratum.getRawValue();
-      localStorage.setItem(this.key('stratum.host'), s.host);
-      localStorage.setItem(this.key('stratum.port'), String(s.port));
-    }
+    this.persist();
   }
 
   protected config(): ChainConfig {
@@ -182,6 +199,14 @@ export class MinerPane implements OnInit {
     return this.isWebDemo();
   }
 
+  protected datumWebsocketDisabled(): boolean {
+    return true;
+  }
+
+  private webKindFallback(): MineToKind {
+    return this.hostedPoolReady() ? 'hostedPoolStratum' : 'stratumWebsocket';
+  }
+
   protected hostedPoolReady(): boolean {
     return this.shell.kind === 'webDemo' && this.chain() === 'testnet';
   }
@@ -199,7 +224,7 @@ export class MinerPane implements OnInit {
 
   protected allowedKinds(): MineToKind[] {
     if (this.shell.kind === 'webDemo') {
-      const kinds: MineToKind[] = ['stratum'];
+      const kinds: MineToKind[] = ['stratumWebsocket'];
       if (this.chain() === 'testnet') {
         kinds.unshift('hostedPoolStratum');
       }
@@ -268,6 +293,9 @@ export class MinerPane implements OnInit {
     if (kind === 'stratum') {
       return { kind: 'stratum', stratum: this.form.controls.stratum.getRawValue() };
     }
+    if (kind === 'stratumWebsocket') {
+      return { kind: 'stratumWebsocket', stratumWebsocket: this.form.controls.stratumWebsocket.getRawValue() };
+    }
     if (kind === 'datum') {
       const d = this.form.controls.datum.getRawValue();
       return {
@@ -288,6 +316,9 @@ export class MinerPane implements OnInit {
       const v = this.form.controls.hostedPoolStratum.getRawValue();
       return { kind: 'hostedPoolStratum', worker: v.worker, password: v.password };
     }
+    if (kind === 'datumWebsocket') {
+      return { kind: 'datumWebsocket', datumWebsocket: this.form.controls.datumWebsocket.getRawValue() };
+    }
     const v = this.form.controls.appPoolDatum.getRawValue();
     return {
       kind: 'appPoolDatum',
@@ -300,6 +331,17 @@ export class MinerPane implements OnInit {
     const v = this.form.getRawValue();
     localStorage.setItem(this.key('kind'), v.kind);
     localStorage.setItem(this.key('payout'), v.payout);
+    localStorage.setItem(this.key('threads'), String(v.threads));
+    localStorage.setItem(this.key('hostedPoolStratum.worker'), v.hostedPoolStratum.worker);
+    localStorage.setItem(this.key('hostedPoolStratum.password'), v.hostedPoolStratum.password);
+    localStorage.setItem(this.key('datumWebsocket.url'), v.datumWebsocket.url);
+    if (this.shell.kind === 'webDemo') {
+      localStorage.setItem(this.key('stratumWebsocket.host'), v.stratumWebsocket.host);
+      localStorage.setItem(this.key('stratumWebsocket.port'), String(v.stratumWebsocket.port));
+      localStorage.setItem(this.key('stratumWebsocket.worker'), v.stratumWebsocket.worker);
+      localStorage.setItem(this.key('stratumWebsocket.password'), v.stratumWebsocket.password);
+      return;
+    }
     this.persistRpc('rpc', v.rpc);
     localStorage.setItem(this.key('stratum.host'), v.stratum.host);
     localStorage.setItem(this.key('stratum.port'), String(v.stratum.port));
@@ -312,10 +354,7 @@ export class MinerPane implements OnInit {
     localStorage.setItem(this.key('appPoolStratum.worker'), v.appPoolStratum.worker);
     localStorage.setItem(this.key('appPoolStratum.password'), v.appPoolStratum.password);
     localStorage.setItem(this.key('appPoolDatum.worker'), v.appPoolDatum.worker);
-    localStorage.setItem(this.key('hostedPoolStratum.worker'), v.hostedPoolStratum.worker);
-    localStorage.setItem(this.key('hostedPoolStratum.password'), v.hostedPoolStratum.password);
     this.persistRpc('appPoolDatum.rpc', v.appPoolDatum.rpc);
-    localStorage.setItem(this.key('threads'), String(v.threads));
   }
 
   private key(suffix: string): string {
@@ -327,18 +366,57 @@ export class MinerPane implements OnInit {
     return saved ? Number.parseInt(saved, 10) || fallback : fallback;
   }
 
+  private loadKind(): MineToKind | null {
+    const saved = localStorage.getItem(this.key('kind')) as MineToKind | null;
+    if (this.shell.kind === 'webDemo' && saved === 'stratum') {
+      return 'stratumWebsocket';
+    }
+    return saved;
+  }
+
   private loadStratum(fallback: { host: string; port: number; password: string }) {
     const savedHost = localStorage.getItem(this.key('stratum.host'))?.trim() ?? '';
     const savedPortRaw = localStorage.getItem(this.key('stratum.port'));
     const savedPort = savedPortRaw ? Number.parseInt(savedPortRaw, 10) : 0;
-    const staleTcp = this.shell.kind === 'webDemo' && isTcpStratumEndpoint(savedHost, savedPort);
-    const hostPort =
-      !savedHost || !savedPort || staleTcp ? { host: fallback.host, port: fallback.port } : { host: savedHost, port: savedPort };
+    const hostPort = !savedHost || !savedPort ? { host: fallback.host, port: fallback.port } : { host: savedHost, port: savedPort };
     return {
       host: hostPort.host,
       port: hostPort.port,
       worker: localStorage.getItem(this.key('stratum.worker')) ?? '',
       password: localStorage.getItem(this.key('stratum.password')) ?? fallback.password,
+    };
+  }
+
+  private loadStratumWebsocket(fallback: { host: string; port: number; password: string }) {
+    const wsHost = localStorage.getItem(this.key('stratumWebsocket.host'))?.trim() ?? '';
+    const wsPortRaw = localStorage.getItem(this.key('stratumWebsocket.port'));
+    const wsPort = wsPortRaw ? Number.parseInt(wsPortRaw, 10) : 0;
+    const oldHost = localStorage.getItem(this.key('stratum.host'))?.trim() ?? '';
+    const oldPortRaw = localStorage.getItem(this.key('stratum.port'));
+    const oldPort = oldPortRaw ? Number.parseInt(oldPortRaw, 10) : 0;
+    let host = fallback.host;
+    let port = fallback.port;
+    if (wsHost && wsPort) {
+      host = wsHost;
+      port = wsPort;
+    } else if (oldHost && oldPort) {
+      if (isTcpStratumEndpoint(oldHost, oldPort)) {
+        host = fallback.host;
+        port = fallback.port;
+      } else {
+        host = oldHost;
+        port = oldPort;
+      }
+    }
+    return {
+      host,
+      port,
+      worker:
+        localStorage.getItem(this.key('stratumWebsocket.worker')) ?? localStorage.getItem(this.key('stratum.worker')) ?? '',
+      password:
+        localStorage.getItem(this.key('stratumWebsocket.password')) ??
+        localStorage.getItem(this.key('stratum.password')) ??
+        fallback.password,
     };
   }
 
@@ -464,9 +542,16 @@ export class MinerPane implements OnInit {
       const s = this.form.controls.stratum.getRawValue();
       return `${s.host}:${s.port} (stratum)`;
     }
+    if (kind === 'stratumWebsocket') {
+      const s = this.form.controls.stratumWebsocket.getRawValue();
+      return `${s.host}:${s.port} (stratum websocket)`;
+    }
     if (kind === 'datum') {
       const d = this.form.controls.datum.getRawValue();
       return `${d.host}:${d.port} (datum) · ${d.rpc.host}:${d.rpc.port} (node)`;
+    }
+    if (kind === 'datumWebsocket') {
+      return `${this.form.controls.datumWebsocket.getRawValue().url} (datum websocket)`;
     }
     if (kind === 'appPoolStratum') {
       return `${this.frozenStratum()} (app pool stratum)`;

@@ -194,25 +194,44 @@ describe('web demo shell', () => {
     expect(pill.textContent).toContain('Stratum idle');
   });
 
-  it('defaults Stratum to the WebSocket host on 443', async () => {
+  it('defaults Stratum Websocket to the WSS host on 443', async () => {
     const f = await render();
-    (f.nativeElement.querySelector('#testnet-mineToStratum') as HTMLInputElement).click();
+    expect(has(f, '#testnet-mineToStratum')).toBe(false);
+    (f.nativeElement.querySelector('#testnet-mineToStratumWebsocket') as HTMLInputElement).click();
     f.detectChanges();
-    expect((f.nativeElement.querySelector('#testnet-stratumHost') as HTMLInputElement).value).toBe(
+    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketHost') as HTMLInputElement).value).toBe(
       'pool.testnet.federationcoin.org',
     );
-    expect((f.nativeElement.querySelector('#testnet-stratumPort') as HTMLInputElement).value).toBe('443');
+    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketPort') as HTMLInputElement).value).toBe('443');
   });
 
-  it('replaces a saved TCP NLB Stratum default with the WebSocket port', async () => {
+  it('relabels the hosted pool as Stratum Websocket', async () => {
+    const f = await render();
+    const label = f.nativeElement.querySelector('label[for="testnet-mineToHostedPoolStratum"]') as HTMLLabelElement;
+    expect(label.textContent).toMatch(/Stratum Websocket/);
+  });
+
+  it('shows DATUM Prime (Websocket) disabled', async () => {
+    const f = await render();
+    const el = f.nativeElement.querySelector('#testnet-mineToDatumWebsocket') as HTMLInputElement;
+    expect(el).toBeTruthy();
+    expect(el.disabled).toBe(true);
+    expect(f.nativeElement.querySelector('#testnet-datumWebsocketDisabledHint')).toBeTruthy();
+  });
+
+  it('migrates a saved Stratum kind to Stratum Websocket and rewrites TCP NLB', async () => {
+    localStorage.setItem('fc.testnet.kind', 'stratum');
     localStorage.setItem('fc.testnet.stratum.host', 'stratum.testnet.federationcoin.org');
     localStorage.setItem('fc.testnet.stratum.port', '23334');
     const f = await render();
-    (f.nativeElement.querySelector('#testnet-mineToStratum') as HTMLInputElement).click();
-    f.detectChanges();
-    expect((f.nativeElement.querySelector('#testnet-stratumHost') as HTMLInputElement).value).toBe(
+    expect(has(f, '#testnet-mineToStratum')).toBe(false);
+    expect((f.nativeElement.querySelector('#testnet-mineToStratumWebsocket') as HTMLInputElement).checked).toBe(true);
+    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketHost') as HTMLInputElement).value).toBe(
       'pool.testnet.federationcoin.org',
     );
-    expect((f.nativeElement.querySelector('#testnet-stratumPort') as HTMLInputElement).value).toBe('443');
+    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketPort') as HTMLInputElement).value).toBe('443');
+    expect(localStorage.getItem('fc.testnet.kind')).toBe('stratumWebsocket');
+    expect(localStorage.getItem('fc.testnet.stratumWebsocket.host')).toBe('pool.testnet.federationcoin.org');
+    expect(localStorage.getItem('fc.testnet.stratum.host')).toBe('stratum.testnet.federationcoin.org');
   });
 });

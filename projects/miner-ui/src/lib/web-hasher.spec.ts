@@ -176,10 +176,41 @@ describe('WebHasherHost reconnect', () => {
     }
   });
 
-  it('refuses TCP house Stratum instead of opening wss on 23334', async () => {
-    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET);
+  it('starts stratumWebsocket at wss://host/stratum', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
     try {
       const r = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: {
+          kind: 'stratumWebsocket',
+          stratumWebsocket: {
+            host: 'pool.testnet.federationcoin.org',
+            port: 443,
+            worker: 'tgfcn1abc.cpu',
+            password: 'x',
+          },
+        },
+      });
+      expect(r.ok).toBe(true);
+      expect(sockets[0]!.url).toBe('wss://pool.testnet.federationcoin.org/stratum');
+      await host.stop();
+    } finally {
+      host.stopWatch();
+    }
+  });
+
+  it('refuses TCP Stratum and DATUM Websocket kinds', async () => {
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET);
+    try {
+      const tcp = await host.start({
         chain: 'testnet',
         threads: 1,
         mineTo: {
@@ -192,8 +223,18 @@ describe('WebHasherHost reconnect', () => {
           },
         },
       });
-      expect(r.ok).toBe(false);
-      expect(r.error).toMatch(/WebSocket port \(443\)/);
+      expect(tcp.ok).toBe(false);
+      expect(tcp.error).toMatch(/TCP Stratum/);
+      const datumWs = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: {
+          kind: 'datumWebsocket',
+          datumWebsocket: { url: 'wss://pool.testnet.federationcoin.org/datum' },
+        },
+      });
+      expect(datumWs.ok).toBe(false);
+      expect(datumWs.error).toMatch(/websocket proxy/);
       expect((host as unknown as { pollTimer?: unknown }).pollTimer).toBeUndefined();
     } finally {
       host.stopWatch();
