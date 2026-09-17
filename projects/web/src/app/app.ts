@@ -1,9 +1,9 @@
 import { Component, effect, inject } from '@angular/core';
-import { CHAINS, MiningService, NetworkContext, NetworkWorkspace, PoolService, type MinerChain } from '@federationcoin/miner-ui';
+import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, type MinerChain } from '@federationcoin/miner-ui';
 
 @Component({
   selector: 'app-root',
-  imports: [NetworkWorkspace],
+  imports: [NetworkWorkspace, MinerFooter],
   styleUrl: './app.css',
   templateUrl: './app.html',
 })

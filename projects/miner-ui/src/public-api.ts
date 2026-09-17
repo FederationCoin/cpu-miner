@@ -11,6 +11,7 @@ export * from './lib/pool.service';
 export * from './lib/network-context';
 export { rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './lib/rpc-connect';
 export { DefaultsFold } from './lib/defaults-fold';
+export { MinerFooter } from './lib/miner-footer';
 export * from './lib/miner-pane';
 export * from './lib/pool-pane';
 export * from './lib/docs-pane';

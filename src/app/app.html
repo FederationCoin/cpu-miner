@@ -32,6 +32,8 @@
   <app-network-workspace chain="testnet" [hidden]="network.chain() !== 'testnet'" />
   <app-network-workspace chain="main" [hidden]="network.chain() !== 'main'" />
 
+  <app-miner-footer />
+
   @if (mining.toast()) {
     <div class="toast" role="status">{{ mining.toast() }}</div>
   }

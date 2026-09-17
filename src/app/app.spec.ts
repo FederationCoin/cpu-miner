@@ -213,6 +213,17 @@ describe('App', () => {
       expect(queryEl(f, 'h1').textContent).toContain('FederationCoin CPU miner');
     });
 
+    it('links GitHub and X below the fold', async () => {
+      const f = await render();
+      const github = queryEl<HTMLAnchorElement>(f, '#miner-footer-github');
+      const x = queryEl<HTMLAnchorElement>(f, '#miner-footer-x');
+      expect(github.href).toBe('https://github.com/FederationCoin/cpu-miner');
+      expect(github.target).toBe('_blank');
+      expect(x.href).toBe('https://x.com/GFCNOrg');
+      expect(x.target).toBe('_blank');
+      expect(x.textContent).toContain('@GFCNOrg');
+    });
+
     it('defaults to Testnet with both mining and pool panes', async () => {
       const f = await render();
       expect(queryEl<HTMLSelectElement>(f, '#network-toggle').value).toBe('testnet');
