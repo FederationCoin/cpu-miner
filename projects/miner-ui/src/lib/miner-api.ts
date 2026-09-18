@@ -1,3 +1,5 @@
+import type { GpuPick, NativeGpuDevice } from './gpu-catalog';
+
 export type MinerChain = 'main' | 'testnet';
 
 export type LogLine = {
@@ -31,21 +33,35 @@ export type MinerInfo = {
   defaultThreads: number;
 };
 
-export type GpuDevice = {
-  id: string;
-  name: string;
-  vendor: string;
-  memoryMiB: number;
-  backend: 'opencl' | 'cuda' | 'webgpu';
-  kind: 'discrete' | 'integrated';
-};
+export type { GpuAdapter, GpuPick, GpuStrategy, NativeGpuDevice, WebGpuDevice } from './gpu-catalog';
 
 export type GpuScanReason = 'ok' | 'no-api' | 'no-adapter' | 'error';
 
 export type GpuScan = {
-  devices: GpuDevice[];
+  devices: NativeGpuDevice[];
   addon: boolean;
-  reason?: GpuScanReason;
+};
+
+export type WebGpuIpcJob = {
+  gen: number;
+  label: string;
+  work: number[];
+  target: number[];
+  mask: number[];
+  extraNonce2: number[];
+};
+
+export type WebGpuIpcFound = {
+  gen: number;
+  nonce: number;
+  nonce2: number;
+  hashes: number;
+  extraNonce2: number[];
+};
+
+export type WebGpuIpcProgress = {
+  gen: number;
+  hashes: number;
 };
 
 export type RpcAuthKind = 'cookie' | 'userpass';
@@ -93,13 +109,13 @@ export type MineToKind = MineTo['kind'];
 export type MinerStartOpts = {
   chain: MinerChain;
   threads: number;
-  gpuIds?: string[];
+  gpus?: GpuPick[];
   mineTo: MineTo;
 };
 
 export type PoolStartOpts = {
   chain: MinerChain;
-  rpc: RpcConnect;
+  rpc: RpcConnect[];
   operator: string;
   feeBps: number;
   stratumHost: string;
@@ -140,6 +156,11 @@ export type MinerApi = {
   poolStop: () => Promise<void>;
   poolRefresh: () => Promise<{ ok: boolean; error?: string }>;
   onPoolStats: (cb: (s: PoolStats) => void) => () => void;
+  onWebGpuJob?: (cb: (job: WebGpuIpcJob) => void) => () => void;
+  onWebGpuStop?: (cb: (msg: { gen: number }) => void) => () => void;
+  webGpuFound?: (msg: WebGpuIpcFound) => Promise<void>;
+  webGpuProgress?: (msg: WebGpuIpcProgress) => Promise<void>;
+  webGpuLog?: (message: string) => Promise<void>;
 };
 
 declare global {

@@ -166,7 +166,28 @@ export type StratumHandlers = {
   onSubmitResult: (ok: boolean, error?: string) => void;
   onClose: (reason: string) => void;
   onJobIgnored: (reason: string) => void;
+  onPoolStats?: (stats: { height: number; workers: number; status: string }) => void;
 };
+
+export function parseClientPoolStats(msg: unknown): { height: number; workers: number; status: string } | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { method?: unknown; params?: unknown };
+  if (rec.method !== 'client.pool_stats' || !Array.isArray(rec.params) || rec.params.length < 1) {
+    return null;
+  }
+  const raw = rec.params[0];
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const o = raw as { height?: unknown; workers?: unknown; status?: unknown };
+  return {
+    height: Number(o.height) || 0,
+    workers: Number(o.workers) || 0,
+    status: typeof o.status === 'string' ? o.status : '',
+  };
+}
 
 export class StratumClient {
   private sock: Socket | null = null;
@@ -236,6 +257,13 @@ export class StratumClient {
       return;
     }
     const rec = msg as { method?: unknown; id?: unknown; result?: unknown; error?: unknown };
+    if (rec.method === 'client.pool_stats') {
+      const stats = parseClientPoolStats(msg);
+      if (stats) {
+        this.handlers.onPoolStats?.(stats);
+      }
+      return;
+    }
     if (rec.method === 'mining.notify') {
       const job = parseNotify(msg);
       if (job) {

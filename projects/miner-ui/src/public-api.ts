@@ -1,4 +1,5 @@
 export * from './lib/miner-api';
+export { catalogHasWebGpu, groupGpuAdapters, migrateGpuIds, parseGpuPicks } from './lib/gpu-catalog';
 export { CHAINS, type ChainConfig } from './lib/chain';
 export * from './lib/miner-format';
 export * from './lib/miner-shell';

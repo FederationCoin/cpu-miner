@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readLe32 } from './bytes.js';
-import { GPU_EXTRANONCE2_BASE, gpuExtraNonce2, listGpus, startGpuGrindNative } from './gpu.js';
+import { GPU_EXTRANONCE2_BASE, gpuExtraNonce2, listGpus, nativeIdForStrategy, startGpuGrindNative } from './gpu.js';
 
 describe('GPU extraNonce2', () => {
   it('starts at 64 so it cannot collide with 64 CPU workers', () => {
@@ -55,5 +55,34 @@ describe('GPU extraNonce2', () => {
       ),
     ).toBe(false);
     expect(logs.some((m) => /unknown GPU id/.test(m))).toBe(true);
+  });
+});
+
+describe('nativeIdForStrategy', () => {
+  it('matches CUDA index and OpenCL platform/device', () => {
+    const devices = [
+      {
+        kind: 'cuda' as const,
+        index: 0,
+        id: 'cuda:0:card',
+        name: 'card',
+        vendor: 'NVIDIA',
+        memoryMiB: 8,
+        deviceKind: 'discrete' as const,
+      },
+      {
+        kind: 'opencl' as const,
+        platform: 0,
+        device: 0,
+        id: 'opencl:0:0:card',
+        name: 'card',
+        vendor: 'NVIDIA',
+        memoryMiB: 8,
+        deviceKind: 'discrete' as const,
+      },
+    ];
+    expect(nativeIdForStrategy(devices, { kind: 'cuda', index: 0 })).toBe('cuda:0:card');
+    expect(nativeIdForStrategy(devices, { kind: 'opencl', platform: 0, device: 0 })).toBe('opencl:0:0:card');
+    expect(nativeIdForStrategy(devices, { kind: 'cuda', index: 1 })).toBeNull();
   });
 });

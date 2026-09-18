@@ -1,5 +1,5 @@
 import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import type { PoolStartOpts } from './miner-api';
 import { CHAINS, type MinerChain } from './chain';
 import { formatSats, mainIsNotLive } from './miner-format';
@@ -23,7 +23,7 @@ export class PoolPane implements OnInit {
   protected readonly formError = signal('');
 
   protected readonly form = new FormGroup({
-    rpc: rpcConnectGroup(35332),
+    rpc: new FormArray<RpcConnectForm>([rpcConnectGroup(35332)]),
     operator: new FormControl('', { nonNullable: true }),
     feePercent: new FormControl('2', { nonNullable: true }),
     stratumHost: new FormControl('127.0.0.1', { nonNullable: true }),
@@ -38,8 +38,10 @@ export class PoolPane implements OnInit {
       if (!inf) {
         return;
       }
-      if (!this.form.controls.rpc.controls.cookie.controls.datadir.value && !localStorage.getItem(this.key('datadir'))?.trim()) {
-        this.form.controls.rpc.controls.cookie.patchValue({ datadir: inf.datadir }, { emitEvent: false });
+      for (const g of this.form.controls.rpc.controls) {
+        if (!g.controls.cookie.controls.datadir.value && !localStorage.getItem(this.key('datadir'))?.trim()) {
+          g.controls.cookie.patchValue({ datadir: inf.datadir }, { emitEvent: false });
+        }
       }
     });
   }
@@ -49,20 +51,8 @@ export class PoolPane implements OnInit {
       return;
     }
     const d = this.shell.defaults.chains[this.chain()];
-    const authKind = localStorage.getItem(this.key('authKind'));
+    this.replaceRpcRows(this.savedRpcRows(d.rpc.host, d.rpc.port));
     this.form.patchValue({
-      rpc: {
-        host: localStorage.getItem(this.key('rpcHost'))?.trim() || d.rpc.host,
-        port: this.loadNum('rpcPort', d.rpc.port),
-        authKind: authKind === 'userpass' ? 'userpass' : 'cookie',
-        cookie: {
-          datadir: localStorage.getItem(this.key('datadir'))?.trim() || this.mining.info()?.datadir || '',
-        },
-        userpass: {
-          user: localStorage.getItem(this.key('rpcUser')) ?? '',
-          password: localStorage.getItem(this.key('rpcPassword')) ?? '',
-        },
-      },
       operator: localStorage.getItem(this.key('operator')) ?? '',
       feePercent: localStorage.getItem(this.key('feePercent')) ?? d.pool.feePercent,
       stratumHost: localStorage.getItem(this.key('stratumHost'))?.trim() || d.pool.stratumHost,
@@ -75,6 +65,28 @@ export class PoolPane implements OnInit {
 
   protected id(suffix: string): string {
     return `${this.chain()}-pool-${suffix}`;
+  }
+
+  protected rpcIdPrefix(index: number): string {
+    return index === 0 ? `${this.chain()}-pool` : `${this.chain()}-pool-${index}`;
+  }
+
+  protected addRpc(): void {
+    const last = this.form.controls.rpc.at(this.form.controls.rpc.length - 1);
+    const next = rpcConnectGroup(last.controls.port.value);
+    next.patchValue(last.getRawValue());
+    this.form.controls.rpc.push(next);
+  }
+
+  protected removeRpc(index: number): void {
+    if (this.form.controls.rpc.length < 2) {
+      return;
+    }
+    this.form.controls.rpc.removeAt(index);
+  }
+
+  protected foldSingleRpc(): boolean {
+    return this.form.controls.rpc.length === 1 && this.rpcCookie(this.form.controls.rpc.at(0));
   }
 
   protected config() {
@@ -168,12 +180,7 @@ export class PoolPane implements OnInit {
 
   private persist(): void {
     const v = this.form.getRawValue();
-    localStorage.setItem(this.key('rpcHost'), v.rpc.host);
-    localStorage.setItem(this.key('rpcPort'), String(v.rpc.port));
-    localStorage.setItem(this.key('authKind'), v.rpc.authKind);
-    localStorage.setItem(this.key('datadir'), v.rpc.cookie.datadir);
-    localStorage.setItem(this.key('rpcUser'), v.rpc.userpass.user);
-    localStorage.setItem(this.key('rpcPassword'), v.rpc.userpass.password);
+    localStorage.setItem(this.key('rpcList'), JSON.stringify(v.rpc));
     localStorage.setItem(this.key('operator'), v.operator);
     localStorage.setItem(this.key('feePercent'), v.feePercent);
     localStorage.setItem(this.key('stratumHost'), v.stratumHost);
@@ -188,7 +195,7 @@ export class PoolPane implements OnInit {
     const feeBps = Number.isFinite(pct) ? Math.round(pct * 100) : 200;
     return {
       chain: this.chain(),
-      rpc: rpcConnectValue(this.form.controls.rpc),
+      rpc: this.form.controls.rpc.controls.map((g) => rpcConnectValue(g)),
       operator: v.operator,
       feeBps,
       stratumHost: v.stratumHost,
@@ -209,5 +216,44 @@ export class PoolPane implements OnInit {
 
   protected bindSummary(host: string, port: number): string {
     return `${host}:${port}`;
+  }
+
+  private savedRpcRows(defaultHost: string, defaultPort: number): Record<string, unknown>[] {
+    const raw = localStorage.getItem(this.key('rpcList'));
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed as Record<string, unknown>[];
+        }
+      } catch {
+        /* migrate from the single-node keys below */
+      }
+    }
+    const authKind = localStorage.getItem(this.key('authKind'));
+    return [
+      {
+        host: localStorage.getItem(this.key('rpcHost'))?.trim() || defaultHost,
+        port: this.loadNum('rpcPort', defaultPort),
+        authKind: authKind === 'userpass' ? 'userpass' : 'cookie',
+        cookie: {
+          datadir: localStorage.getItem(this.key('datadir'))?.trim() || this.mining.info()?.datadir || '',
+        },
+        userpass: {
+          user: localStorage.getItem(this.key('rpcUser')) ?? '',
+          password: localStorage.getItem(this.key('rpcPassword')) ?? '',
+        },
+      },
+    ];
+  }
+
+  private replaceRpcRows(rows: Record<string, unknown>[]): void {
+    const arr = this.form.controls.rpc;
+    arr.clear();
+    for (const row of rows) {
+      const g = rpcConnectGroup(35332);
+      g.patchValue(row);
+      arr.push(g);
+    }
   }
 }

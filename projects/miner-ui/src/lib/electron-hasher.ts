@@ -1,7 +1,14 @@
 import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from './miner-api';
 import type { HasherHost } from './hasher-host';
+import { bindDesktopWebGpu } from './webgpu-desktop';
 
 export class ElectronHasherHost implements HasherHost {
+  constructor() {
+    if (window.miner) {
+      bindDesktopWebGpu(window.miner);
+    }
+  }
+
   get canMine(): boolean {
     return !!window.miner;
   }

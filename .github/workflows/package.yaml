@@ -66,18 +66,23 @@ jobs:
           - os: ubuntu-22.04
             eb: linux
             artifact: linux-x64
+            cuda: true
           - os: ubuntu-22.04-arm
             eb: linux
             artifact: linux-arm64
+            cuda: false
           - os: windows-2022
             eb: win
             artifact: win-x64
+            cuda: true
           - os: macos-14
             eb: mac
             artifact: macos-arm64
+            cuda: false
           - os: macos-15-intel
             eb: mac
             artifact: macos-x64
+            cuda: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -97,6 +102,14 @@ jobs:
           python --version
           # npm 11 rejects `npm config set msvs_version`; node-gyp still honors this.
           echo "GYP_MSVS_VERSION=2022" >> $env:GITHUB_ENV
+      # nvcc -ptx does not need a GPU. Do not stitch Linux PTX into the Windows PE.
+      - name: CUDA Toolkit (nvcc)
+        if: matrix.cuda
+        uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d # v0.2.36
+        with:
+          cuda: '12.6.3'
+          method: network
+          sub-packages: '["nvcc"]'
       - run: npm ci
       - name: Native GPU hasher (Electron ABI)
         env:
@@ -105,6 +118,10 @@ jobs:
       - name: Require gpu-hasher.node
         shell: bash
         run: test -s native/gpu-hasher/dist/gpu-hasher.node
+      - name: Require asic_pow.ptx
+        if: matrix.cuda
+        shell: bash
+        run: test -s native/gpu-hasher/dist/asic_pow.ptx
       # Do not give this job GH_TOKEN (Sparrow does not either). electron-builder
       # v26 still implicit-publishes on GITHUB_ACTIONS and would upload a Release
       # if a token were present. --publish never: pack only. Draft is the gh job.

@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
-import type { GpuDevice, GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStats } from './miner-api';
+import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStats } from './miner-api';
 import { MINER_SHELL, webDemoShell } from './miner-shell';
 import { IDLE_STATS } from './mining.service';
 import { NetworkWorkspace } from './network-workspace';
@@ -58,7 +58,7 @@ function fakeWebHost(overrides: Partial<HasherHost> = {}): HasherHost {
       statsCb?.({ ...IDLE_STATS });
     },
     info: async () => info,
-    gpus: async () => ({ devices: [], addon: false, reason: 'no-adapter' }),
+    gpus: async () => ({ devices: [], addon: false }),
     pickDatadir: async () => null,
     onStats: (cb) => {
       statsCb = cb;
@@ -153,7 +153,6 @@ describe('web demo shell', () => {
     const gpus = vi.fn<(this: void) => Promise<GpuScan>>().mockResolvedValue({
       devices: [],
       addon: false,
-      reason: 'no-adapter',
     });
     const f = await render(fakeWebHost({ gpus }));
     const dlg = () => f.nativeElement.querySelector('#testnet-webgpuHelpDialog') as HTMLDialogElement;
@@ -166,24 +165,30 @@ describe('web demo shell', () => {
   });
 
   it('hides WebGPU Help after an adapter is listed', async () => {
-    const device: GpuDevice = {
-      id: 'webgpu:0',
-      name: 'WebGPU adapter',
-      vendor: 'webgpu',
-      memoryMiB: 0,
-      backend: 'webgpu',
-      kind: 'discrete',
-    };
-    const f = await render(
-      fakeWebHost({
-        gpus: async () => ({ devices: [device], addon: true, reason: 'ok' }),
-      }),
-    );
-    (f.nativeElement.querySelector('#testnet-detectGpus') as HTMLButtonElement).click();
-    await f.whenStable();
-    f.detectChanges();
-    expect(has(f, '#testnet-gpu-webgpu-0')).toBe(true);
-    expect(has(f, '#testnet-webgpuHelp')).toBe(false);
+    const previous = Object.getOwnPropertyDescriptor(globalThis.navigator, 'gpu');
+    Object.defineProperty(globalThis.navigator, 'gpu', {
+      configurable: true,
+      value: {
+        requestAdapter: async () => ({ info: { device: 'WebGPU adapter', vendor: 'webgpu' } }),
+      },
+    });
+    try {
+      const f = await render();
+      (f.nativeElement.querySelector('#testnet-detectGpus') as HTMLButtonElement).click();
+      await f.whenStable();
+      f.detectChanges();
+      expect(has(f, '#testnet-gpu-webgpu-adapter-off')).toBe(true);
+      expect(has(f, '#testnet-gpu-webgpu-adapter-webgpu')).toBe(true);
+      expect(has(f, '#testnet-gpu-webgpu-adapter-cuda')).toBe(false);
+      expect(has(f, '#testnet-gpu-webgpu-adapter-opencl')).toBe(false);
+      expect(has(f, '#testnet-webgpuHelp')).toBe(false);
+    } finally {
+      if (previous) {
+        Object.defineProperty(globalThis.navigator, 'gpu', previous);
+      } else {
+        delete (globalThis.navigator as { gpu?: unknown }).gpu;
+      }
+    }
   });
 
   it('shows an idle Stratum link pill', async () => {

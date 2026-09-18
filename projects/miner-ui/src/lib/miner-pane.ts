@@ -1,8 +1,16 @@
 import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import type { MineTo, MineToKind, MinerStartOpts, MinerStats } from './miner-api';
+import type { GpuAdapter, GpuPick, GpuStrategy, MineTo, MineToKind, MinerStartOpts, MinerStats } from './miner-api';
 import { CHAINS, type ChainConfig, type MinerChain } from './chain';
 import { formatHashRate, gpuStatusHint, gpuStatusHintWeb, mainIsNotLive } from './miner-format';
+import {
+  liveGpuPicks,
+  migrateGpuIds,
+  parseGpuPicks,
+  pickForAdapter,
+  setAdapterPick,
+  strategyKindLabel,
+} from './gpu-catalog';
 import { MINER_SHELL } from './miner-shell';
 import { IDLE_STATS, MiningService } from './mining.service';
 import { PoolService } from './pool.service';
@@ -24,7 +32,7 @@ export class MinerPane implements OnInit {
   protected readonly pool = inject(PoolService);
   protected readonly shell = inject(MINER_SHELL);
 
-  protected readonly gpuIds = signal<string[]>([]);
+  protected readonly gpuPicks = signal<GpuPick[]>([]);
   protected readonly gpuDetecting = signal(false);
   protected readonly webgpuHelpAutoOpen = signal(false);
   protected readonly formError = signal('');
@@ -138,7 +146,7 @@ export class MinerPane implements OnInit {
     const allowed = this.allowedKinds();
     const fallback = this.shell.defaults.chains[this.chain()].mineToKind;
     this.form.controls.kind.setValue(savedKind && allowed.includes(savedKind) ? savedKind : fallback);
-    this.gpuIds.set(this.loadGpuIds());
+    this.gpuPicks.set(this.loadGpuPicks());
     this.form.valueChanges.subscribe(() => this.persist());
     this.persist();
   }
@@ -280,9 +288,9 @@ export class MinerPane implements OnInit {
   private startOpts(): MinerStartOpts {
     const chain = this.chain();
     const threads = this.form.controls.threads.value;
-    const gpuIds = this.gpuIds();
+    const gpus = this.gpuPicks();
     const mineTo = this.mineTo();
-    return { chain, threads, gpuIds, mineTo };
+    return { chain, threads, gpus, mineTo };
   }
 
   private mineTo(): MineTo {
@@ -480,7 +488,10 @@ export class MinerPane implements OnInit {
   }
 
   protected webGpuHelpVisible(): boolean {
-    return this.isWebDemo() && this.gpuList().length === 0;
+    if (this.mining.hasWebGpuStrategy()) {
+      return false;
+    }
+    return this.mining.gpuScanned() || this.isWebDemo();
   }
 
   protected async detectGpus(): Promise<void> {
@@ -490,6 +501,8 @@ export class MinerPane implements OnInit {
     this.gpuDetecting.set(true);
     try {
       await this.mining.refreshGpus();
+      this.gpuPicks.set(this.reconcilePicks());
+      this.persistGpuPicks();
       if (this.webGpuHelpVisible()) {
         this.webgpuHelpAutoOpen.set(true);
       }
@@ -498,38 +511,82 @@ export class MinerPane implements OnInit {
     }
   }
 
-  protected gpuSelected(id: string): boolean {
-    return this.gpuIds().includes(id);
+  protected gpuPickKind(adapterKey: string): GpuStrategy['kind'] | 'off' {
+    return pickForAdapter(this.gpuPicks(), adapterKey)?.strategy.kind ?? 'off';
+  }
+
+  protected strategyKindLabel(kind: GpuStrategy['kind']): string {
+    return strategyKindLabel(kind);
+  }
+
+  protected gpuAdapterHint(dev: GpuAdapter): string {
+    const mem = dev.memoryMiB > 0 ? `${dev.memoryMiB} MiB · ` : '';
+    return `${mem}${dev.deviceKind}`;
   }
 
   protected gpuDomId(id: string): string {
     return id.replace(/[^a-zA-Z0-9]+/g, '-');
   }
 
-  protected toggleGpu(id: string, checked: boolean): void {
-    const next = this.gpuIds().filter((x) => x !== id);
-    if (checked) {
-      next.push(id);
-    }
-    this.gpuIds.set(next);
-    localStorage.setItem(this.key('gpuIds'), JSON.stringify(next));
+  protected setGpuStrategy(adapterKey: string, strategy: GpuStrategy | null): void {
+    const next = setAdapterPick(this.gpuPicks(), adapterKey, strategy);
+    this.gpuPicks.set(next);
+    this.persistGpuPicks();
   }
 
-  private loadGpuIds(): string[] {
-    const raw = localStorage.getItem(this.key('gpuIds'));
+  private persistGpuPicks(): void {
+    localStorage.setItem(this.key('gpuPicks'), JSON.stringify(this.gpuPicks()));
+  }
+
+  private loadGpuPicks(): GpuPick[] {
+    const raw = localStorage.getItem(this.key('gpuPicks'));
     if (!raw) {
       return [];
     }
     try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-      const known = new Set(this.mining.gpuDevices().map((d) => d.id));
-      return parsed.filter((id): id is string => typeof id === 'string' && (!known.size || known.has(id)));
+      return liveGpuPicks(parseGpuPicks(JSON.parse(raw)), this.mining.gpuDevices());
     } catch {
       return [];
     }
+  }
+
+  private reconcilePicks(): GpuPick[] {
+    const adapters = this.mining.gpuDevices();
+    const live = liveGpuPicks(this.gpuPicks(), adapters);
+    if (live.length > 0 || adapters.length === 0) {
+      return live;
+    }
+    const raw = localStorage.getItem(this.key('gpuIds'));
+    if (!raw) {
+      return live;
+    }
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) {
+        return live;
+      }
+      const ids = parsed.filter((id): id is string => typeof id === 'string');
+      return migrateGpuIds(ids, adapters);
+    } catch {
+      return live;
+    }
+  }
+
+  protected gpuSummary(): string {
+    const adapters = this.gpuList();
+    const selected = this.gpuPicks()
+      .map((p) => {
+        const adapter = adapters.find((a) => a.key === p.adapter);
+        if (!adapter) {
+          return '';
+        }
+        return `${adapter.label} (${strategyKindLabel(p.strategy.kind)})`;
+      })
+      .filter(Boolean);
+    if (selected.length === 0) {
+      return 'none';
+    }
+    return selected.join(', ');
   }
 
   protected endpointHint(): string {
@@ -574,13 +631,5 @@ export class MinerPane implements OnInit {
   protected rpcSummary(form: RpcConnectForm): string {
     const v = form.getRawValue();
     return `${v.host}:${v.port}`;
-  }
-
-  protected gpuSummary(): string {
-    const selected = this.gpuList().filter((d) => this.gpuSelected(d.id));
-    if (selected.length === 0) {
-      return 'none';
-    }
-    return selected.map((d) => d.name).join(', ');
   }
 }

@@ -29,23 +29,24 @@ export type MinerInfo = {
   defaultThreads: number;
 };
 
-export type GpuDevice = {
-  id: string;
-  name: string;
-  vendor: string;
-  memoryMiB: number;
-  backend: 'opencl' | 'cuda';
-  kind: 'discrete' | 'integrated';
-};
-
 export type GpuScan = {
-  devices: GpuDevice[];
+  devices: Array<{
+    kind: 'cuda' | 'opencl';
+    id: string;
+    name: string;
+    vendor: string;
+    memoryMiB: number;
+    deviceKind: 'discrete' | 'integrated';
+    index?: number;
+    platform?: number;
+    device?: number;
+  }>;
   addon: boolean;
 };
 
 export type PoolStartOpts = {
   chain: import('./chain.js').MinerChain;
-  rpc: import('./mine-to.js').RpcConnect;
+  rpc: import('./mine-to.js').RpcConnect[];
   operator: string;
   feeBps: number;
   stratumHost: string;
@@ -90,6 +91,11 @@ contextBridge.exposeInMainWorld('miner', {
   onStats: (cb: (s: MinerStats) => void) => listen('miner:stats', cb),
   onLog: (cb: (line: LogLine) => void) => listen('miner:log', cb),
   onToast: (cb: (message: string) => void) => listen('miner:toast', cb),
+  onWebGpuJob: (cb: (job: unknown) => void) => listen('miner:webgpu-job', cb),
+  onWebGpuStop: (cb: (msg: { gen: number }) => void) => listen('miner:webgpu-stop', cb),
+  webGpuFound: (msg: unknown) => ipcRenderer.invoke('miner:webgpu-found', msg),
+  webGpuProgress: (msg: unknown) => ipcRenderer.invoke('miner:webgpu-progress', msg),
+  webGpuLog: (message: string) => ipcRenderer.invoke('miner:webgpu-log', message),
   poolStart: (opts: PoolStartOpts) => ipcRenderer.invoke('pool:start', opts),
   poolStop: () => ipcRenderer.invoke('pool:stop'),
   poolRefresh: () => ipcRenderer.invoke('pool:refresh'),

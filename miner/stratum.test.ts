@@ -5,6 +5,7 @@ import {
   parseNotify,
   parseSetDifficulty,
   parseSubscribeResult,
+  parseClientPoolStats,
   notifyIgnoreReason,
   subscribeLine,
   submitLine,
@@ -112,5 +113,16 @@ describe('stratum wire', () => {
     expect(parseSetDifficulty({ method: 'mining.set_difficulty', params: [1] })).toBe(1);
     expect(parseSetDifficulty({ method: 'mining.set_difficulty', params: [0] })).toBeNull();
     expect(parseSetDifficulty({ method: 'mining.notify', params: [1] })).toBeNull();
+  });
+
+  it('parses client.pool_stats height', () => {
+    const stats = parseClientPoolStats({
+      id: null,
+      method: 'client.pool_stats',
+      params: [{ running: true, height: 9, workers: 2, status: 'ok' }],
+    });
+    expect(stats?.height).toBe(9);
+    expect(stats?.workers).toBe(2);
+    expect(parseClientPoolStats({ method: 'mining.notify', params: [] })).toBeNull();
   });
 });
