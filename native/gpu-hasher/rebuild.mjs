@@ -112,9 +112,10 @@ const nvcc = spawnSync(
   ['-ptx', '-O2', '-arch=compute_75', join(here, 'kernel', 'asic_pow.cu'), '-o', join(dist, 'asic_pow.ptx')],
   { cwd: here, stdio: 'inherit', env: nvccEnv },
 );
+const nvccMissing = Boolean(nvcc.error && nvcc.error.code === 'ENOENT');
 if (nvcc.status === 0) {
   console.log(`asic_pow.ptx -> ${dist}`);
-} else if (required) {
+} else if (required && !nvccMissing) {
   fail(
     `nvcc PTX failed (status=${nvcc.status} signal=${nvcc.signal}${nvcc.error ? `; ${nvcc.error.message}` : ''}); CUDA grind needs asic_pow.ptx`,
   );
