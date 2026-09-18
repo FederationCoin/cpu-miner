@@ -41,16 +41,26 @@
       </p>
     }
 
-    @if (rpcCookie(form.controls.rpc)) {
-      <app-defaults-fold [foldId]="id('rpc-fold')" title="Node RPC" [summary]="rpcSummary(form.controls.rpc)">
-        <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain() + '-pool'" [chain]="chain()" />
-      </app-defaults-fold>
-    } @else {
-      <fieldset class="partition">
-        <legend>Node RPC</legend>
-        <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain() + '-pool'" [chain]="chain()" />
-      </fieldset>
+    <p class="hint">
+      Ordered node RPC list. The pool prefers the first and fails over on RPC error. Each row is a
+      full connect. Auth must match on every node.
+    </p>
+    @for (rpc of form.controls.rpc.controls; track $index) {
+      @if (foldSingleRpc() && $index === 0) {
+        <app-defaults-fold [foldId]="id('rpc-fold')" title="Node RPC" [summary]="rpcSummary(rpc)">
+          <app-rpc-connect [form]="rpc" [idPrefix]="rpcIdPrefix($index)" [chain]="chain()" />
+        </app-defaults-fold>
+      } @else {
+        <fieldset class="partition">
+          <legend>Node RPC {{ $index + 1 }}</legend>
+          <app-rpc-connect [form]="rpc" [idPrefix]="rpcIdPrefix($index)" [chain]="chain()" />
+          @if (form.controls.rpc.length > 1) {
+            <button type="button" [id]="id('remove-rpc-' + $index)" (click)="removeRpc($index)">Remove</button>
+          }
+        </fieldset>
+      }
     }
+    <button type="button" [id]="id('add-rpc')" (click)="addRpc()">Add node</button>
 
     <label [attr.for]="id('operator')">Operator payout ({{ config().hrp }}1)</label>
     <input

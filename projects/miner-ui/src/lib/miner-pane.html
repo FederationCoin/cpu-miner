@@ -342,18 +342,35 @@
         }
       </div>
       @if (gpuList().length > 0) {
-        @for (dev of gpuList(); track dev.id) {
-          <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.id))">
-            <input
-              [id]="id('gpu-' + gpuDomId(dev.id))"
-              type="checkbox"
-              [checked]="gpuSelected(dev.id)"
-              [attr.disabled]="kindLocked() ? true : null"
-              (change)="toggleGpu(dev.id, $any($event.target).checked)"
-            />
-            {{ dev.name }}
-            <span class="hint-inline">{{ dev.vendor }} · {{ dev.memoryMiB }} MiB · {{ dev.kind }}</span>
-          </label>
+        @for (dev of gpuList(); track dev.key) {
+          <fieldset class="gpu-adapter" [attr.id]="id('gpu-adapter-' + gpuDomId(dev.key))">
+            <legend>{{ dev.label }}</legend>
+            <span class="hint-inline">{{ gpuAdapterHint(dev) }}</span>
+            <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.key) + '-off')">
+              <input
+                [id]="id('gpu-' + gpuDomId(dev.key) + '-off')"
+                type="radio"
+                [name]="id('gpu-' + gpuDomId(dev.key))"
+                [checked]="gpuPickKind(dev.key) === 'off'"
+                [attr.disabled]="kindLocked() ? true : null"
+                (change)="setGpuStrategy(dev.key, null)"
+              />
+              Off
+            </label>
+            @for (strat of dev.strategies; track strat.kind) {
+              <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.key) + '-' + strat.kind)">
+                <input
+                  [id]="id('gpu-' + gpuDomId(dev.key) + '-' + strat.kind)"
+                  type="radio"
+                  [name]="id('gpu-' + gpuDomId(dev.key))"
+                  [checked]="gpuPickKind(dev.key) === strat.kind"
+                  [attr.disabled]="kindLocked() ? true : null"
+                  (change)="setGpuStrategy(dev.key, strat)"
+                />
+                {{ strategyKindLabel(strat.kind) }}
+              </label>
+            }
+          </fieldset>
         }
       }
       <p class="hint">{{ gpuHint() }}</p>

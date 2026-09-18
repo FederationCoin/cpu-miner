@@ -1,5 +1,6 @@
 import { MAIN_IS_LIVE, defaultRpcPort, parseChain, STRATUM_PORT_DEFAULT, type MinerChain } from './chain.js';
 import { parseHost, parsePort } from './rpc.js';
+import type { GpuPick } from './gpu-pick.js';
 
 export type RpcAuthKind = 'cookie' | 'userpass';
 
@@ -39,7 +40,7 @@ export type MineToKind = MineTo['kind'];
 export type MinerStartOpts = {
   chain: MinerChain;
   threads: number;
-  gpuIds?: string[];
+  gpus?: GpuPick[];
   mineTo: MineTo;
 };
 

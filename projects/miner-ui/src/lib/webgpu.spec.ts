@@ -59,12 +59,10 @@ describe('diagnoseWebGpu', () => {
     expect(scan.reason).toBe('ok');
     expect(scan.devices).toEqual([
       {
-        id: 'webgpu:0',
+        kind: 'webgpu',
+        adapter: 0,
         name: 'Test GPU',
         vendor: 'test',
-        memoryMiB: 0,
-        backend: 'webgpu',
-        kind: 'discrete',
       },
     ]);
   });

@@ -101,6 +101,10 @@ cpSync(join(root, 'dist/renderer'), join(app, 'dist/renderer'), { recursive: tru
 cpSync(join(root, 'node_modules/@noble'), join(app, 'node_modules/@noble'), { recursive: true });
 copyFileSync(join(root, 'build/icon.png'), join(app, 'icon.png'));
 copyFileSync(join(root, 'native/gpu-hasher/kernel/asic_pow.cl'), join(stage, 'resources/gpu-hasher/asic_pow.cl'));
+const ptx = join(root, 'native/gpu-hasher/dist/asic_pow.ptx');
+if (existsSync(ptx)) {
+  copyFileSync(ptx, join(stage, 'resources/gpu-hasher/asic_pow.ptx'));
+}
 
 let zipDir = stage;
 try {

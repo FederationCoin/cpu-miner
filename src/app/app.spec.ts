@@ -295,7 +295,7 @@ describe('App', () => {
       expect(start).toHaveBeenCalledWith({
         chain: 'testnet',
         threads: 4,
-        gpuIds: [],
+        gpus: [],
         mineTo: {
           kind: 'node',
           rpc: { host: '127.0.0.1', port: 35332, auth: { kind: 'userpass', user: 'rpcuser', password: 'rpcpass' } },
@@ -341,7 +341,7 @@ describe('App', () => {
       expect(start).toHaveBeenCalledWith({
         chain: 'testnet',
         threads: 4,
-        gpuIds: [],
+        gpus: [],
         mineTo: {
           kind: 'datum',
           datum: {
@@ -391,7 +391,7 @@ describe('App', () => {
       expect(start).toHaveBeenCalledWith({
         chain: 'testnet',
         threads: 4,
-        gpuIds: [],
+        gpus: [],
         mineTo: {
           kind: 'stratum',
           stratum: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' },
@@ -492,20 +492,30 @@ describe('App', () => {
       f.detectChanges();
       expect(gpus).toHaveBeenCalled();
       expect(queryEl(f, '#testnet-gpus').textContent).toMatch(/No GPU hasher/);
-      expect(has(f, '#testnet-webgpuHelp')).toBe(false);
+      expect(has(f, '#testnet-webgpuHelp')).toBe(true);
     });
 
-    it('GPU checkboxes use safe ids and Start sends the real CUDA id', async () => {
-      const deviceId = 'cuda:0:NVIDIA GeForce RTX 3090 Ti';
+    it('GPU radios group CUDA and OpenCL under one adapter', async () => {
       const gpus = vi.fn().mockResolvedValue({
         devices: [
           {
-            id: deviceId,
+            kind: 'cuda',
+            index: 0,
+            id: 'cuda:0:NVIDIA GeForce RTX 3090 Ti',
             name: 'NVIDIA GeForce RTX 3090 Ti',
             vendor: 'NVIDIA',
             memoryMiB: 24563,
-            backend: 'cuda',
-            kind: 'discrete',
+            deviceKind: 'discrete',
+          },
+          {
+            kind: 'opencl',
+            platform: 0,
+            device: 0,
+            id: 'opencl:0:0:NVIDIA GeForce RTX 3090 Ti',
+            name: 'NVIDIA GeForce RTX 3090 Ti',
+            vendor: 'NVIDIA',
+            memoryMiB: 24563,
+            deviceKind: 'discrete',
           },
         ],
         addon: true,
@@ -515,11 +525,13 @@ describe('App', () => {
       queryDe(f, '#testnet-detectGpus').triggerEventHandler('click');
       await f.whenStable();
       f.detectChanges();
-      const box = queryEl<HTMLInputElement>(f, '#testnet-gpu-cuda-0-NVIDIA-GeForce-RTX-3090-Ti');
-      expect(box.type).toBe('checkbox');
-      queryDe(f, '#testnet-gpu-cuda-0-NVIDIA-GeForce-RTX-3090-Ti').triggerEventHandler('change', {
-        target: { checked: true },
-      });
+      expect(has(f, '#testnet-gpu-adapter-nvidia-geforce-rtx-3090-ti')).toBe(true);
+      const cuda = queryEl<HTMLInputElement>(f, '#testnet-gpu-nvidia-geforce-rtx-3090-ti-cuda');
+      expect(cuda.type).toBe('radio');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-gpu-nvidia-geforce-rtx-3090-ti-opencl').type).toBe('radio');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-gpu-nvidia-geforce-rtx-3090-ti-off').type).toBe('radio');
+      expect(has(f, '#testnet-gpu-nvidia-geforce-rtx-3090-ti-webgpu')).toBe(false);
+      queryDe(f, '#testnet-gpu-nvidia-geforce-rtx-3090-ti-cuda').triggerEventHandler('change', {});
       f.detectChanges();
       selectKind(f, 'testnet', 'Stratum');
       setInput(f, '#testnet-stratumWorker', 'tgfcn1abc.cpu');
@@ -527,7 +539,7 @@ describe('App', () => {
       await f.whenStable();
       expect(start).toHaveBeenCalledWith(
         expect.objectContaining({
-          gpuIds: [deviceId],
+          gpus: [{ adapter: 'nvidia geforce rtx 3090 ti', strategy: { kind: 'cuda', index: 0 } }],
         }),
       );
     });
@@ -542,7 +554,7 @@ describe('App', () => {
       expect(start).toHaveBeenCalledWith({
         chain: 'main',
         threads: 4,
-        gpuIds: [],
+        gpus: [],
         mineTo: {
           kind: 'node',
           rpc: cookieRpc('/tmp/x', '127.0.0.1', 4094),
@@ -685,7 +697,7 @@ describe('App', () => {
       await f.whenStable();
       expect(poolStart).toHaveBeenCalledWith({
         chain: 'testnet',
-        rpc: cookieRpc('/tmp/x'),
+        rpc: [cookieRpc('/tmp/x')],
         operator: 'tgfcn1abc',
         feeBps: 200,
         stratumHost: '127.0.0.1',
@@ -744,7 +756,7 @@ describe('App', () => {
       expect(start).toHaveBeenCalledWith({
         chain: 'testnet',
         threads: 4,
-        gpuIds: [],
+        gpus: [],
         mineTo: { kind: 'appPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
       });
     });
@@ -766,7 +778,7 @@ describe('App', () => {
       expect(start).toHaveBeenCalledWith({
         chain: 'testnet',
         threads: 4,
-        gpuIds: [],
+        gpus: [],
         mineTo: {
           kind: 'appPoolDatum',
           worker: 'tgfcn1abc.cpu',

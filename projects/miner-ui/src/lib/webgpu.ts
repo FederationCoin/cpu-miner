@@ -1,10 +1,10 @@
 import { ASIC_POW_WGSL } from './asic-pow.shader';
-import type { GpuDevice, GpuScanReason } from './miner-api';
+import type { GpuScanReason, WebGpuDevice } from './miner-api';
 
 const ADAPTER_REQUEST = { powerPreference: 'high-performance' as const };
 
 export type WebGpuScan = {
-  devices: GpuDevice[];
+  devices: WebGpuDevice[];
   reason: GpuScanReason;
   detail?: string;
 };
@@ -36,12 +36,10 @@ export async function diagnoseWebGpu(): Promise<WebGpuScan> {
       reason: 'ok',
       devices: [
         {
-          id: 'webgpu:0',
+          kind: 'webgpu',
+          adapter: 0,
           name: info?.device || info?.description || 'WebGPU adapter',
           vendor: info?.vendor || 'webgpu',
-          memoryMiB: 0,
-          backend: 'webgpu',
-          kind: 'discrete',
         },
       ],
     };
@@ -51,7 +49,7 @@ export async function diagnoseWebGpu(): Promise<WebGpuScan> {
   }
 }
 
-export async function scanWebGpu(): Promise<GpuDevice[]> {
+export async function scanWebGpu(): Promise<WebGpuDevice[]> {
   const scan = await diagnoseWebGpu();
   return scan.devices;
 }
@@ -143,6 +141,7 @@ export async function webgpuGrind(
   nonceHi: number,
   iter: number,
   groups: number,
+  mask: Uint8Array = new Uint8Array(32),
 ): Promise<{ nonce?: number; nonce2?: number; hashes: number }> {
   const gpu = globalThis.navigator?.gpu;
   if (!gpu) {
@@ -187,7 +186,7 @@ export async function webgpuGrind(
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   });
   device.queue.writeBuffer(workBuf, 0, work);
-  device.queue.writeBuffer(maskBuf, 0, new Uint8Array(32));
+  device.queue.writeBuffer(maskBuf, 0, mask.length === 32 ? mask : new Uint8Array(32));
   device.queue.writeBuffer(targetBuf, 0, target);
   device.queue.writeBuffer(uniformBuf, 0, new Uint32Array([nonceLo >>> 0, nonceHi >>> 0, iter >>> 0, 0]));
   device.queue.writeBuffer(foundBuf, 0, new Uint32Array([0, 0, 0]));

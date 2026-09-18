@@ -8,8 +8,8 @@ Local **Federation Miner** app: Angular UI in the renderer, Node in the main pro
 
 Network is the tenant (toggle upper right). Tabs under it are **Mine | Pool |
 Docs | Finder**. Desktop and the web demo share `@federationcoin/miner-ui`
-(path-mapped workspace; do not `npm publish`). Desktop hashes with CUDA/OpenCL
-or CPU. The web shell is [mine.federationcoin.org](https://mine.federationcoin.org)
+(path-mapped workspace; do not `npm publish`). Desktop hashes with CUDA, OpenCL,
+WebGPU, or CPU. The web shell is [mine.federationcoin.org](https://mine.federationcoin.org)
 (network dropdown in-app) and hashes with WebGPU or CPU over
 `wss://pool.testnet.federationcoin.org/stratum`. Unexpected WSS close
 reconnects with capped backoff and retries in-flight `mining.submit`
@@ -26,7 +26,13 @@ Mine-to kinds:
 - **Host a pool** — Pool tab on desktop. Spawns [`federation-pool`](https://github.com/FederationCoin/federation-pool) (DATUM Prime **28916** + TIDES + Stratum v1 **23334**) against the operator’s `federationcoind`. Friends-and-family grade (JSONL, one process). Testnet default. Main still toasts that MAIN is not live. Cookie stays in the main process. This app does **not** wrap `cpu-miner-cpp` binaries. The web demo’s Pool tab is read-only status for the house testnet pool (MAIN house pool is off).
 - **Docs / Finder** — pool grades, DATUM is bring-your-own-node, and a curated list plus stub register (no fake PKI).
 
-GPU hashing is additive and in-process. Tick GPUs in the pane (all off by default, including Intel iGPU). You do **not** run a second app or `fcminer`. You do **not** install the CUDA Toolkit. Install NVIDIA / AMD / Intel **GPU drivers** (OpenCL ICD) if you want devices listed. No driver: empty GPU list, CPU still mines. A GPU driver fault can take down the whole app. ccminer “blake2b” hashes the wrong construction.
+GPU hashing is additive and in-process. Detect lists each adapter once; pick Off,
+WebGPU, CUDA, or OpenCL (only strategies that can grind). All start Off, including
+Intel iGPU. You do **not** run a second app or `fcminer`. CUDA grind needs
+`asic_pow.ptx` from `nvcc` at build time; without it the same NVIDIA card still
+lists OpenCL. Install NVIDIA / AMD / Intel **GPU drivers** (OpenCL ICD) if you
+want native devices listed. No HIP kernel. A GPU driver fault can take down the
+whole app. ccminer “blake2b” hashes the wrong construction.
 
 Host and port are plain TCP/HTTP. If Electron runs in a WSL GUI and the node is on Windows `127.0.0.1`, that loopback is not Windows loopback. Set **Host** to an address this process can route.
 
@@ -78,6 +84,8 @@ npm run dist:linux
 npm run dist:win
 npm run dist:mac
 ```
+
+`npm run dist:linux` runs `build:gpu` (Linux ELF addon). `npm run dist:win` runs `build:gpu` **only on Windows** (MSVC PE + nvcc PTX), then asserts PE `MZ` + `asic_pow.ptx` + `asic_pow.cl`. WSL `node-gyp` emits an ELF `gpu-hasher.node`; do not run `build:gpu` on Linux before packing `--win`. From WSL, copy a Package PE addon plus PTX into `native/gpu-hasher/dist/` then `dist:win`. Package `windows-2022` and `ubuntu-22.04` x64 install the CUDA Toolkit so `nvcc` produces `asic_pow.ptx` in CI. macOS and linux-arm64 keep OpenCL/WebGPU. Do not reuse the Sep 2026 OpenCL-only PE (no CUDA, host `1<<18` batches). Fast CUDA is the inner-loop kernel (`kLaunchHashes`) plus PTX.
 
 `npm run pack:win` unpacks Electron’s win32 zip without Wine. It does **not** compile a Windows `gpu-hasher.node`. Package CI runs `FC_GPU_REQUIRED=1 npm run build:gpu` on each OS runner.
 

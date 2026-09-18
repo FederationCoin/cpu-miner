@@ -16,7 +16,7 @@ describe('pool CLI resolve and argv', () => {
   it('builds argv without a cookie and refuses dummy MAIN', () => {
     const argv = poolArgv({
       chain: 'testnet',
-      rpc: { host: '127.0.0.1', port: 35332, auth: { kind: 'cookie', datadir: '/tmp/x' } },
+      rpc: [{ host: '127.0.0.1', port: 35332, auth: { kind: 'cookie', datadir: '/tmp/x' } }],
       operator: 'tgfcn1qqq',
       feeBps: 200,
       stratumHost: '127.0.0.1',
@@ -26,11 +26,13 @@ describe('pool CLI resolve and argv', () => {
     });
     expect(argv).toContain('--operator');
     expect(argv).toContain('--datadir');
+    expect(argv).toContain('--rpc-endpoints');
+    expect(argv).toContain('127.0.0.1:35332');
     expect(argv.join(' ')).not.toMatch(/rpc-user/);
     expect(() =>
       poolArgv({
         chain: 'main',
-        rpc: { host: '127.0.0.1', port: 4094, auth: { kind: 'cookie', datadir: '/tmp/x' } },
+        rpc: [{ host: '127.0.0.1', port: 4094, auth: { kind: 'cookie', datadir: '/tmp/x' } }],
         operator: 'gfcn1qqq',
         feeBps: 200,
         stratumHost: '127.0.0.1',
@@ -44,7 +46,7 @@ describe('pool CLI resolve and argv', () => {
   it('emits rpc-user flags instead of datadir for username/password', () => {
     const argv = poolArgv({
       chain: 'testnet',
-      rpc: { host: '10.0.0.9', port: 35332, auth: { kind: 'userpass', user: 'rpcuser', password: 'rpcpass' } },
+      rpc: [{ host: '10.0.0.9', port: 35332, auth: { kind: 'userpass', user: 'rpcuser', password: 'rpcpass' } }],
       operator: 'tgfcn1qqq',
       feeBps: 200,
       stratumHost: '127.0.0.1',
@@ -55,6 +57,23 @@ describe('pool CLI resolve and argv', () => {
     expect(argv).toContain('--rpc-user');
     expect(argv).toContain('rpcuser');
     expect(argv).not.toContain('--datadir');
+  });
+
+  it('joins an ordered RPC list onto --rpc-endpoints', () => {
+    const argv = poolArgv({
+      chain: 'testnet',
+      rpc: [
+        { host: '10.0.0.8', port: 35332, auth: { kind: 'userpass', user: 'rpcuser', password: 'rpcpass' } },
+        { host: '10.0.0.9', port: 35332, auth: { kind: 'userpass', user: 'rpcuser', password: 'rpcpass' } },
+      ],
+      operator: 'tgfcn1qqq',
+      feeBps: 200,
+      stratumHost: '127.0.0.1',
+      stratumPort: 23334,
+      datumHost: '127.0.0.1',
+      datumPort: 28916,
+    });
+    expect(argv).toContain('10.0.0.8:35332,10.0.0.9:35332');
   });
 
   it('parses POOL_STATS lines from the child', () => {

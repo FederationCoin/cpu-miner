@@ -214,6 +214,22 @@ fieldset.gpus .hint {
   max-width: 100%;
 }
 
+fieldset.gpu-adapter {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.65rem 0.55rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 4px;
+}
+
+fieldset.gpu-adapter legend {
+  display: block;
+  padding: 0 0.35rem;
+  color: #e8eaed;
+  font-size: 0.9rem;
+}
+
 .hint-inline {
   color: #9aa0aa;
   font-size: 0.78rem;

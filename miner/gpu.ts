@@ -10,17 +10,42 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** CPU workers use extraNonce2 0..63. GPU g uses 64+g. */
 export const GPU_EXTRANONCE2_BASE = 64;
 
-export type GpuDevice = {
-  id: string;
-  name: string;
-  vendor: string;
-  memoryMiB: number;
-  backend: 'opencl' | 'cuda';
-  kind: 'discrete' | 'integrated';
+export type NativeGpuDevice =
+  | {
+      kind: 'cuda';
+      index: number;
+      id: string;
+      name: string;
+      vendor: string;
+      memoryMiB: number;
+      deviceKind: 'discrete' | 'integrated';
+    }
+  | {
+      kind: 'opencl';
+      platform: number;
+      device: number;
+      id: string;
+      name: string;
+      vendor: string;
+      memoryMiB: number;
+      deviceKind: 'discrete' | 'integrated';
+    };
+
+type AddonDevice = {
+  id?: string;
+  name?: string;
+  vendor?: string;
+  memoryMiB?: number;
+  kind?: string;
+  deviceKind?: string;
+  backend?: string;
+  index?: number;
+  platform?: number;
+  device?: number;
 };
 
 type Native = {
-  listDevices: () => GpuDevice[];
+  listDevices: () => AddonDevice[];
   setKernelSource: (src: string) => void;
   setPtxSource?: (src: string) => void;
   asicPowHash: (work: Uint8Array, xorKey: Uint8Array, xorClear: number) => Buffer;
@@ -94,6 +119,10 @@ function loadNative(): Native | null {
   if (native !== undefined) {
     return native;
   }
+  if (!process.versions.electron) {
+    native = null;
+    return null;
+  }
   const file = addonPath();
   if (!file) {
     native = null;
@@ -122,20 +151,78 @@ export function gpuExtraNonce2(gpuIndex: number): Uint8Array {
   return extra;
 }
 
-export function listGpus(): GpuDevice[] {
+function mapAddonDevice(raw: AddonDevice): NativeGpuDevice | null {
+  const name = String(raw.name ?? '').trim();
+  if (!name) {
+    return null;
+  }
+  const vendor = String(raw.vendor ?? '');
+  const memoryMiB = Number(raw.memoryMiB) || 0;
+  const deviceKind: 'discrete' | 'integrated' =
+    raw.deviceKind === 'integrated' || raw.kind === 'integrated' ? 'integrated' : 'discrete';
+  const api = raw.kind === 'cuda' || raw.backend === 'cuda' || String(raw.id ?? '').startsWith('cuda:') ? 'cuda' : 'opencl';
+  if (api === 'cuda') {
+    const fromId = /^cuda:(\d+):/.exec(String(raw.id ?? ''));
+    const index = Number.isInteger(raw.index) ? Number(raw.index) : fromId ? Number(fromId[1]) : NaN;
+    if (!Number.isInteger(index) || index < 0) {
+      return null;
+    }
+    return {
+      kind: 'cuda',
+      index,
+      id: String(raw.id ?? `cuda:${index}:${name}`),
+      name,
+      vendor,
+      memoryMiB,
+      deviceKind,
+    };
+  }
+  const fromId = /^opencl:(\d+):(\d+):/.exec(String(raw.id ?? ''));
+  const platform = Number.isInteger(raw.platform) ? Number(raw.platform) : fromId ? Number(fromId[1]) : NaN;
+  const device = Number.isInteger(raw.device) ? Number(raw.device) : fromId ? Number(fromId[2]) : NaN;
+  if (!Number.isInteger(platform) || platform < 0 || !Number.isInteger(device) || device < 0) {
+    return null;
+  }
+  return {
+    kind: 'opencl',
+    platform,
+    device,
+    id: String(raw.id ?? `opencl:${platform}:${device}:${name}`),
+    name,
+    vendor,
+    memoryMiB,
+    deviceKind,
+  };
+}
+
+export function listGpus(): NativeGpuDevice[] {
   return scanGpus().devices;
 }
 
-export function scanGpus(): { devices: GpuDevice[]; addon: boolean } {
+export function scanGpus(): { devices: NativeGpuDevice[]; addon: boolean } {
   const n = loadNative();
   if (!n) {
     return { devices: [], addon: false };
   }
   try {
-    return { devices: n.listDevices() ?? [], addon: true };
+    const devices = (n.listDevices() ?? []).map(mapAddonDevice).filter((d): d is NativeGpuDevice => d !== null);
+    return { devices, addon: true };
   } catch {
     return { devices: [], addon: true };
   }
+}
+
+export function nativeIdForStrategy(
+  devices: NativeGpuDevice[],
+  strategy: { kind: 'cuda'; index: number } | { kind: 'opencl'; platform: number; device: number },
+): string | null {
+  if (strategy.kind === 'cuda') {
+    return devices.find((d) => d.kind === 'cuda' && d.index === strategy.index)?.id ?? null;
+  }
+  return (
+    devices.find((d) => d.kind === 'opencl' && d.platform === strategy.platform && d.device === strategy.device)?.id ??
+    null
+  );
 }
 
 export function stopGpu(): void {

@@ -9,6 +9,7 @@
 namespace gpu {
 
 void set_cuda_ptx_source(std::string src);
+bool cuda_ptx_loaded();
 std::vector<GpuDeviceInfo> list_cuda_devices();
 
 class CudaEngine {

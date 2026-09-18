@@ -15,17 +15,17 @@ namespace {
 std::vector<gpu::GpuDeviceInfo> list_pow_devices()
 {
     std::vector<gpu::GpuDeviceInfo> list;
-    try {
-        list = gpu::list_cuda_devices();
-    } catch (...) {
-        list.clear();
-    }
-    if (list.empty()) {
+    if (gpu::cuda_ptx_loaded()) {
         try {
-            list = gpu::list_opencl_devices();
+            auto cuda = gpu::list_cuda_devices();
+            list.insert(list.end(), cuda.begin(), cuda.end());
         } catch (...) {
-            list.clear();
         }
+    }
+    try {
+        auto ocl = gpu::list_opencl_devices();
+        list.insert(list.end(), ocl.begin(), ocl.end());
+    } catch (...) {
     }
     return list;
 }
@@ -75,8 +75,12 @@ Napi::Value ListDevices(const Napi::CallbackInfo& info)
         o.Set("name", d.name);
         o.Set("vendor", d.vendor);
         o.Set("memoryMiB", Napi::Number::New(env, static_cast<double>(d.memory_mib)));
-            o.Set("backend", d.backend.empty() ? "opencl" : d.backend);
-        o.Set("kind", d.kind);
+        const std::string api = d.backend.empty() ? "opencl" : d.backend;
+        o.Set("kind", api);
+        o.Set("deviceKind", d.kind);
+        o.Set("index", Napi::Number::New(env, d.device_index));
+        o.Set("platform", Napi::Number::New(env, d.platform_index));
+        o.Set("device", Napi::Number::New(env, d.device_index));
         arr.Set(i, o);
     }
     return arr;

@@ -11,7 +11,7 @@ import { concat, toHex, u256ToHex, writeLe32 } from './bytes.js';
 import { serializeBlock } from './coinbase.js';
 import { buildJobFromGbt, fillFromSubmit, jobKey, type GbtResult, type Job } from './gbt.js';
 import { logHistory, pushLog, redactSecret, type LogLine } from './log.js';
-import { datumWorkHeader, datumWorkRoot, headerHash, hashMeetsTarget, targetFromCompact } from './pow.js';
+import { datumWorkHeader, datumWorkRoot, headerHash, hashMeetsTarget, targetFromCompact, xorKeyMaskBytes } from './pow.js';
 import { grindTargetForShare, shareWorkFromTargetByte, specAfterShareAccept } from './difficulty.js';
 import {
   cookiePath,
@@ -23,7 +23,8 @@ import {
   RPC_PORT,
   type RpcAuth,
 } from './rpc.js';
-import { gpuExtraNonce2, listGpus, scanGpus, startGpuGrind, stopGpu } from './gpu.js';
+import { nativeIdForStrategy, gpuExtraNonce2, listGpus, scanGpus, startGpuGrind, stopGpu } from './gpu.js';
+import { parseGpuPicks, type GpuPick } from './gpu-pick.js';
 import {
   IDLE_POOL_STATS,
   parsePoolStatsLine,
@@ -82,7 +83,7 @@ let cookieAuth: RpcAuth | null = null;
 let rpcAuthKind: RpcAuthKind = 'cookie';
 let cookieSecret = '';
 let stratumSecret = '';
-let activeGpuIds: string[] = [];
+let activeGpuPicks: GpuPick[] = [];
 let poolChild: ChildProcess | null = null;
 let poolStatsState: PoolStats = { ...IDLE_POOL_STATS };
 
@@ -171,6 +172,8 @@ function stopHasherBecauseAppPoolStopped(): void {
 
 function killWorkers(): void {
   stopGpu();
+  gpuJobSpec = null;
+  win?.webContents.send('miner:webgpu-stop', { gen });
   for (const w of workers) {
     w.terminate();
   }
@@ -223,6 +226,8 @@ type GrindSpec = {
   height: number;
   onFound: (msg: Extract<WorkerMsg, { type: 'found' }>, extraNonce12: Uint8Array) => void;
 };
+
+let gpuJobSpec: GrindSpec | null = null;
 
 function huntBlockAfterShare(lastSpec: GrindSpec | null, nBits: number, threads: number): GrindSpec | null {
   if (!lastSpec || !running || stopRequested) {
@@ -293,23 +298,37 @@ function spawnWorkers(spec: GrindSpec, threads: number): void {
 }
 
 function spawnGpu(spec: GrindSpec, target: Uint8Array): void {
-  const ids = activeGpuIds.filter((id) => id.trim());
-  if (ids.length === 0) {
+  const picks = activeGpuPicks;
+  if (picks.length === 0) {
     return;
   }
-  const known = new Set(listGpus().map((d) => d.id));
+  gpuJobSpec = spec;
+  const devices = listGpus();
   const myGen = gen;
-  for (let g = 0; g < ids.length; g++) {
-    const id = ids[g]!;
-    if (!known.has(id)) {
-      emitLog(activeKind, `gpu: skipped missing device ${id}`);
-      continue;
-    }
+  for (let g = 0; g < picks.length; g++) {
+    const pick = picks[g]!;
     const extraNonce2 = gpuExtraNonce2(g);
     const extraNonce12 = concat(spec.extraNonce1, extraNonce2);
     const root = datumWorkRoot(spec.coinb1, extraNonce12);
     const nonce8 = new Uint8Array(8);
     const work = datumWorkHeader(spec.prevHidden, nonce8, spec.ntime8, root);
+    if (pick.strategy.kind === 'webgpu') {
+      const mask = xorKeyMaskBytes(spec.xorKey, spec.xorClear);
+      win?.webContents.send('miner:webgpu-job', {
+        gen: myGen,
+        label: pick.adapter,
+        work: Array.from(work),
+        target: Array.from(target),
+        mask: Array.from(mask),
+        extraNonce2: Array.from(extraNonce2),
+      });
+      continue;
+    }
+    const id = nativeIdForStrategy(devices, pick.strategy);
+    if (!id) {
+      emitLog(activeKind, `gpu: skipped missing device ${pick.strategy.kind}`);
+      continue;
+    }
     const started = startGpuGrind({
       deviceId: id,
       work,
@@ -341,8 +360,8 @@ function spawnGpu(spec: GrindSpec, target: Uint8Array): void {
       },
       onLog: (message) => emitLog(activeKind, message, true),
     });
-    if (started) {
-      emitLog(activeKind, `gpu: hashing on ${id}`);
+    if (!started) {
+      emitLog(activeKind, `gpu: start failed ${id}`, true);
     }
   }
 }
@@ -478,6 +497,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
       let shareDiff = 1n;
       let lastSpec: GrindSpec | null = null;
       let lastNBits = 0;
+      let poolHeight = 0;
       const client = new StratumClient(opts.host, opts.port, opts.worker, opts.password, {
         onSubscribed: (sub) => {
           extraNonce1 = new Uint8Array(sub.extraNonce1);
@@ -495,6 +515,21 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
           lastError = reason;
           status = reason;
           emitLog('stratum', reason, true);
+          emitStats();
+        },
+        onPoolStats: (stats) => {
+          poolHeight = stats.height;
+          height = stats.height;
+          if (stats.status) {
+            poolStatsState = {
+              ...poolStatsState,
+              running: true,
+              height: stats.height,
+              workers: stats.workers,
+              status: stats.status,
+            };
+            emitPoolStats();
+          }
           emitStats();
         },
         onNotify: (job) => {
@@ -515,7 +550,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
               xorKey: new Uint8Array(16),
               xorClear: 0,
               extraNonce1,
-              height: 0,
+              height: poolHeight,
               onFound: (msg: Extract<WorkerMsg, { type: 'found' }>, _en12: Uint8Array) => {
                 const nonce8 = new Uint8Array(8);
                 writeLe32(nonce8, 0, msg.nonce);
@@ -739,7 +774,7 @@ function prepareStart(opts: MinerStartOpts): void {
   cookieSecret = '';
   stratumSecret = '';
   rpcAuthKind = 'cookie';
-  activeGpuIds = (opts.gpuIds ?? []).filter((id) => id.trim());
+  activeGpuPicks = parseGpuPicks(opts.gpus);
   if (mineTo.kind === 'node') {
     payoutScript(mineTo.payout, activeChain);
     bindNodeRpc(mineTo.rpc, activeChain);
@@ -888,6 +923,37 @@ ipcMain.handle('miner:info', (): MinerInfo => {
 ipcMain.handle('miner:logHistory', (): LogLine[] => logHistory());
 
 ipcMain.handle('miner:gpus', () => scanGpus());
+
+ipcMain.handle('miner:webgpu-found', (_e, msg: { gen: number; nonce: number; nonce2: number; hashes: number; extraNonce2: number[] }) => {
+  const spec = gpuJobSpec;
+  if (!spec || msg.gen !== gen) {
+    return;
+  }
+  const extraNonce2 = Uint8Array.from(msg.extraNonce2 ?? []);
+  spec.onFound(
+    {
+      type: 'found',
+      nonce: msg.nonce,
+      nonce2: msg.nonce2,
+      ntime8: spec.ntime8,
+      extraNonce2,
+      hashes: msg.hashes,
+      gen: msg.gen,
+    },
+    concat(spec.extraNonce1, extraNonce2),
+  );
+});
+
+ipcMain.handle('miner:webgpu-progress', (_e, msg: { gen: number; hashes: number }) => {
+  if (msg.gen !== gen) {
+    return;
+  }
+  noteHashes(msg.hashes);
+});
+
+ipcMain.handle('miner:webgpu-log', (_e, message: string) => {
+  emitLog(activeKind, String(message ?? ''), true);
+});
 
 ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
   try {

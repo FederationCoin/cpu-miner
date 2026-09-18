@@ -116,16 +116,16 @@ describe('MiningService', () => {
     expect(svc.stats()).not.toBe(shared);
   });
 
-  it('records the WebGPU scan reason', async () => {
+  it('records the WebGPU scan reason from the renderer', async () => {
     const miner = stubMiner({
-      gpus: vi.fn().mockResolvedValue({ devices: [], addon: false, reason: 'no-adapter' }),
+      gpus: vi.fn().mockResolvedValue({ devices: [], addon: false }),
     });
     window.miner = miner;
     const svc = TestBed.inject(MiningService);
     const scan = await svc.refreshGpus();
-    expect(scan.reason).toBe('no-adapter');
+    expect(scan.addon).toBe(false);
     expect(svc.gpuScanned()).toBe(true);
-    expect(svc.gpuReason()).toBe('no-adapter');
+    expect(svc.gpuReason()).toBe('no-api');
     expect(svc.gpuDevices()).toEqual([]);
   });
 });

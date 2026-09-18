@@ -24,7 +24,8 @@ import {
   type StratumNotify,
   type StratumWsTransport,
 } from './stratum-ws';
-import { diagnoseWebGpu, webgpuGrind } from './webgpu';
+import { webgpuGrind } from './webgpu';
+import { parseGpuPicks, type GpuPick } from './gpu-catalog';
 
 export const GRIND_GRACE_MS = 3000;
 
@@ -78,7 +79,7 @@ export class WebHasherHost implements HasherHost {
   private grindTimer: number | null = null;
   private graceTimer: number | null = null;
   private nonce = 0;
-  private gpuIds: string[] = [];
+  private gpuPicks: GpuPick[] = [];
 
   constructor(
     private readonly hosted: HostedEndpoints,
@@ -114,7 +115,7 @@ export class WebHasherHost implements HasherHost {
       this.startStatsWatch();
       return { ok: false, error: 'worker is empty' };
     }
-    this.gpuIds = opts.gpuIds ?? [];
+    this.gpuPicks = parseGpuPicks(opts.gpus);
     this.running = true;
     this.stopFlag = false;
     this.socketLive = false;
@@ -234,8 +235,7 @@ export class WebHasherHost implements HasherHost {
   }
 
   async gpus(): Promise<GpuScan> {
-    const scan = await diagnoseWebGpu();
-    return { devices: scan.devices, addon: scan.devices.length > 0, reason: scan.reason };
+    return { devices: [], addon: false };
   }
 
   pickDatadir(): Promise<string | null> {
@@ -373,7 +373,7 @@ export class WebHasherHost implements HasherHost {
     const root = datumWorkRoot(job.coinb1, extraNonce12);
     const nonce8 = new Uint8Array(8);
     const work = datumWorkHeader(job.prevHidden, nonce8, job.ntime8, root);
-    const useGpu = this.gpuIds.includes('webgpu:0');
+    const useGpu = this.gpuPicks.some((p) => p.strategy.kind === 'webgpu');
     const step = () => {
       if (!this.grindMayRun(client)) {
         return;

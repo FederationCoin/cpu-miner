@@ -36,7 +36,7 @@ void grind_loop(GpuJob job, FoundFn found, ProgressFn progress, LogFn log, DoneF
     try {
         uint8_t mask[32];
         xor_key_mask_bytes(job.xor_key, job.xor_clear, mask);
-        const bool cuda = job.device.id.rfind("cuda:", 0) == 0;
+        const bool cuda = job.device.backend == "cuda";
         CudaEngine cudaEng;
         OpenClEngine oclEng;
         std::string err;
@@ -52,6 +52,9 @@ void grind_loop(GpuJob job, FoundFn found, ProgressFn progress, LogFn log, DoneF
                 log(std::string("gpu: ") + err);
             }
             return;
+        }
+        if (log) {
+            log(std::string("gpu: hashing on ") + job.device.id);
         }
         uint64_t cursor = 0;
         uint64_t hashes = 0;

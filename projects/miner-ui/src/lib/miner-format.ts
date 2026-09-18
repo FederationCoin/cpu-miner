@@ -17,13 +17,13 @@ export function gpuStatusHint(state: {
   if (!state.scanned) {
     return 'No GPUs listed yet. Detect loads OpenCL or CUDA in-process (a bad ICD can take down this app). CPU threads still mine.';
   }
-  if (!state.addon) {
+  if (!state.addon && state.deviceCount === 0) {
     return 'No GPU hasher in this build. CPU threads still mine.';
   }
   if (state.deviceCount === 0) {
-    return 'No OpenCL or CUDA GPUs. On WSL, CUDA lists NVIDIA cards when OpenCL is empty. CPU threads still mine.';
+    return 'No OpenCL or CUDA GPUs. CUDA is listed only when asic_pow.ptx loaded. CPU threads still mine.';
   }
-  return 'Off until you tick a card. CPU workers stay on. Combined hashrate below. ccminer “blake2b” is the wrong PoW.';
+  return 'Off until you pick a strategy. CPU workers stay on. Combined hashrate below. ccminer “blake2b” is the wrong PoW.';
 }
 
 export function cookiePathHint(datadir: string, chainId: MinerChain): string {
@@ -77,11 +77,11 @@ export function gpuStatusHintWeb(state: {
   if (!state.scanned) {
     return 'No GPUs listed yet. Detect uses WebGPU. Open Help to check chrome://gpu and enable it. CPU threads still mine.';
   }
-  if (!state.addon || state.deviceCount === 0) {
+  if (state.deviceCount === 0) {
     if (state.reason === 'no-api') {
       return 'This browser has no WebGPU API. Open Help to check chrome://gpu and enable it. CPU threads in this tab still mine.';
     }
     return 'No WebGPU adapter. Open Help to check chrome://gpu and enable it. CPU threads in this tab still mine.';
   }
-  return 'Off until you tick the adapter. CPU workers stay on. Combined hashrate below.';
+  return 'Off until you pick WebGPU. CPU workers stay on. Combined hashrate below.';
 }

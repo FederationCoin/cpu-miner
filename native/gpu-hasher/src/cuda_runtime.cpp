@@ -155,6 +155,12 @@ void set_cuda_ptx_source(std::string src)
     g_ptx = std::move(src);
 }
 
+bool cuda_ptx_loaded()
+{
+    std::lock_guard<std::mutex> lock(g_mu);
+    return !g_ptx.empty();
+}
+
 std::vector<GpuDeviceInfo> list_cuda_devices()
 {
     std::vector<GpuDeviceInfo> out;

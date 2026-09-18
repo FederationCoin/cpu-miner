@@ -27,9 +27,9 @@
     "test:live-electron": "node scripts/live-electron.mjs",
     "test:live-block": "node ../federation-pool/scripts/live-block-payouts.mjs --mode all",
     "test:gpu": "make -C native/gpu-hasher test",
-    "dist": "npm run build:app && npm run build:gpu && electron-builder --linux --win --publish never",
+    "dist": "npm run dist:linux",
     "dist:linux": "npm run build:app && npm run build:gpu && electron-builder --linux --publish never",
-    "dist:win": "npm run build:app && npm run build:gpu && electron-builder --win --publish never",
+    "dist:win": "npm run build:app && node scripts/dist-win.mjs",
     "pack:win": "npm run build:app && node scripts/pack-win.mjs",
     "dist:mac": "npm run build:app && npm run build:gpu && electron-builder --mac --publish never"
   },

@@ -8,7 +8,7 @@ describe('gpuStatusHintWeb', () => {
     expect(
       gpuStatusHintWeb({ detecting: false, scanned: true, addon: false, deviceCount: 0, reason: 'no-api' }),
     ).toMatch(/no WebGPU API/);
-    expect(gpuStatusHintWeb({ detecting: false, scanned: true, addon: true, deviceCount: 1 })).toMatch(/Off until you tick the adapter/);
+    expect(gpuStatusHintWeb({ detecting: false, scanned: true, addon: false, deviceCount: 1 })).toMatch(/Off until you pick WebGPU/);
   });
 });
 
@@ -27,7 +27,7 @@ describe('gpuStatusHint', () => {
     expect(gpuStatusHint({ detecting: false, scanned: false, addon: false, deviceCount: 0 })).toMatch(/No GPUs listed yet/);
     expect(gpuStatusHint({ detecting: false, scanned: true, addon: false, deviceCount: 0 })).toMatch(/No GPU hasher/);
     expect(gpuStatusHint({ detecting: false, scanned: true, addon: true, deviceCount: 0 })).toMatch(/No OpenCL or CUDA GPUs/);
-    expect(gpuStatusHint({ detecting: false, scanned: true, addon: true, deviceCount: 1 })).toMatch(/Off until you tick a card/);
+    expect(gpuStatusHint({ detecting: false, scanned: true, addon: true, deviceCount: 1 })).toMatch(/Off until you pick a strategy/);
   });
 });
 

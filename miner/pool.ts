@@ -6,7 +6,7 @@ import { parseHost, parsePort } from './rpc.js';
 
 export type PoolStartOpts = {
   chain: MinerChain;
-  rpc: RpcConnect;
+  rpc: RpcConnect[];
   operator: string;
   feeBps: number;
   stratumHost: string;
@@ -69,12 +69,26 @@ export function resolvePoolCli(env: NodeJS.ProcessEnv, here: string, resourcesPa
   return null;
 }
 
+export function rpcEndpointArg(rpc: { host: string; port: number }): string {
+  const host = rpc.host.startsWith('[') || !rpc.host.includes(':') ? rpc.host : `[${rpc.host}]`;
+  return `${host}:${rpc.port}`;
+}
+
 export function poolArgv(opts: PoolStartOpts): string[] {
   const chain = parseChain(opts.chain);
   if (chain === 'main' && !MAIN_IS_LIVE) {
     throw new Error('MAIN is not live; host a pool on testnet');
   }
-  const rpc = parseRpcConnect(opts.rpc, chain);
+  if (!Array.isArray(opts.rpc) || opts.rpc.length === 0) {
+    throw new Error('rpc list is empty');
+  }
+  const parsed = opts.rpc.map((r) => parseRpcConnect(r, chain));
+  const auth0 = parsed[0].auth;
+  for (const r of parsed) {
+    if (JSON.stringify(r.auth) !== JSON.stringify(auth0)) {
+      throw new Error('every RPC node uses the same cookie or the same username/password');
+    }
+  }
   parseHost(opts.stratumHost);
   parsePort(opts.stratumPort);
   parseHost(opts.datumHost);
@@ -89,10 +103,8 @@ export function poolArgv(opts: PoolStartOpts): string[] {
   const args = [
     '--chain',
     chain,
-    '--rpc-host',
-    rpc.host,
-    '--rpc-port',
-    String(rpc.port),
+    '--rpc-endpoints',
+    parsed.map((r) => rpcEndpointArg(r)).join(','),
     '--operator',
     opts.operator.trim(),
     '--fee-bps',
@@ -106,10 +118,10 @@ export function poolArgv(opts: PoolStartOpts): string[] {
     '--datum-port',
     String(opts.datumPort),
   ];
-  if (rpc.auth.kind === 'cookie') {
-    args.push('--datadir', rpc.auth.datadir);
+  if (auth0.kind === 'cookie') {
+    args.push('--datadir', auth0.datadir);
   } else {
-    args.push('--rpc-user', rpc.auth.user, '--rpc-password', rpc.auth.password);
+    args.push('--rpc-user', auth0.user, '--rpc-password', auth0.password);
   }
   return args;
 }
