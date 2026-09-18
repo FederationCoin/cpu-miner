@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HASHER_HOST } from './hasher-host';
-import type { PoolStartOpts, PoolStats } from './miner-api';
+import { tidesSatsField, type PoolStartOpts, type PoolStats } from './miner-api';
 
 export const IDLE_POOL_STATS: PoolStats = {
   running: false,
@@ -16,6 +16,9 @@ export const IDLE_POOL_STATS: PoolStats = {
   datumHost: '',
   datumPort: 0,
   payouts: [],
+  minerNet: '0',
+  operatorFee: '0',
+  unfilledRemainder: '0',
 };
 
 @Injectable({ providedIn: 'root' })
@@ -35,7 +38,16 @@ export class PoolService {
     }
     this.bound = true;
     this.unsub.push(
-      this.host.onPoolStats((s) => this.stats.set({ ...s, payouts: [...s.payouts] })),
+      this.host.onPoolStats((s) =>
+        this.stats.set({
+          ...IDLE_POOL_STATS,
+          ...s,
+          payouts: [...(s.payouts ?? [])],
+          minerNet: tidesSatsField(s.minerNet),
+          operatorFee: tidesSatsField(s.operatorFee),
+          unfilledRemainder: tidesSatsField(s.unfilledRemainder),
+        }),
+      ),
     );
   }
 

@@ -119,6 +119,23 @@
     <dd class="mono">{{ paneStats().lastError || '—' }}</dd>
   </dl>
 
+  <fieldset class="partition" [attr.id]="id('tides-split')">
+    <legend>TIDES split</legend>
+    <p class="hint">
+      Fee is a percent of each miner’s window share (default 2%). A block find
+      credits ~nDiff of the 8 × nDiff window on later coinbases. Unfilled
+      remainder goes to the operator.
+    </p>
+    <dl>
+      <dt>Miner net</dt>
+      <dd>{{ formatPayout(paneStats().minerNet) }}</dd>
+      <dt>Operator fee</dt>
+      <dd>{{ formatPayout(paneStats().operatorFee) }}</dd>
+      <dt>Unfilled remainder</dt>
+      <dd>{{ formatPayout(paneStats().unfilledRemainder) }}</dd>
+    </dl>
+  </fieldset>
+
   @if (paneStats().payouts.length > 0) {
     <fieldset class="partition" [attr.id]="id('tides')">
       <legend>TIDES coinbase</legend>

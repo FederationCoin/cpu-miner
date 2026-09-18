@@ -81,14 +81,20 @@ describe('pool CLI resolve and argv', () => {
     expect(s?.workers).toBe(2);
     expect(s?.chain).toBe('testnet');
     expect(s?.payouts).toEqual([]);
+    expect(s?.minerNet).toBe('0');
+    expect(s?.operatorFee).toBe('0');
+    expect(s?.unfilledRemainder).toBe('0');
     expect(parsePoolStatsLine('hello')).toBeNull();
   });
 
   it('parses TIDES payouts on POOL_STATS', () => {
     const s = parsePoolStatsLine(
-      'POOL_STATS {"running":true,"chain":"testnet","height":3,"workers":2,"accepted":1,"rejected":0,"lastError":"","status":"ok","stratumHost":"127.0.0.1","stratumPort":23334,"datumHost":"127.0.0.1","datumPort":28916,"payouts":[{"miner":"tgfcn1abc","sats":"5000000000"}]}',
+      'POOL_STATS {"running":true,"chain":"testnet","height":3,"workers":2,"accepted":1,"rejected":0,"lastError":"","status":"ok","stratumHost":"127.0.0.1","stratumPort":23334,"datumHost":"127.0.0.1","datumPort":28916,"payouts":[{"miner":"tgfcn1abc","sats":"5000000000"}],"minerNet":"246","operatorFee":"4","unfilledRemainder":"750"}',
     );
     expect(s?.payouts).toEqual([{ miner: 'tgfcn1abc', sats: '5000000000' }]);
+    expect(s?.minerNet).toBe('246');
+    expect(s?.operatorFee).toBe('4');
+    expect(s?.unfilledRemainder).toBe('750');
   });
 
   it('falls back to packaged then sibling paths', () => {

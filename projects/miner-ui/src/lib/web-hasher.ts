@@ -8,13 +8,14 @@ import {
   writeLe32,
 } from './asic-pow';
 import type { HasherHost } from './hasher-host';
-import type {
-  GpuScan,
-  MinerInfo,
-  MinerStartOpts,
-  MinerStats,
-  PoolStartOpts,
-  PoolStats,
+import {
+  tidesSatsField,
+  type GpuScan,
+  type MinerInfo,
+  type MinerStartOpts,
+  type MinerStats,
+  type PoolStartOpts,
+  type PoolStats,
 } from './miner-api';
 import type { HostedEndpoints } from './miner-shell';
 import {
@@ -57,6 +58,9 @@ export const IDLE_WEB_POOL: PoolStats = {
   datumHost: '',
   datumPort: 0,
   payouts: [],
+  minerNet: '0',
+  operatorFee: '0',
+  unfilledRemainder: '0',
 };
 
 export class WebHasherHost implements HasherHost {
@@ -346,6 +350,9 @@ export class WebHasherHost implements HasherHost {
       datumHost: this.hosted.datumTcp.host,
       datumPort: this.hosted.datumTcp.port,
       payouts: Array.isArray(raw.payouts) ? raw.payouts : [],
+      minerNet: tidesSatsField(raw.minerNet),
+      operatorFee: tidesSatsField(raw.operatorFee),
+      unfilledRemainder: tidesSatsField(raw.unfilledRemainder),
     };
     if (this.running) {
       this.statsState.height = this.poolState.height;

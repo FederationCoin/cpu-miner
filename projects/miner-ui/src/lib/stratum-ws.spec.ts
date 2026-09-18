@@ -522,11 +522,17 @@ describe('StratumWsClient outbox', () => {
           datumHost: '127.0.0.1',
           datumPort: 28916,
           payouts: [{ miner: 'tgfcn1abc', sats: '34180' }],
+          minerNet: '34180',
+          operatorFee: '698',
+          unfilledRemainder: '4999931640',
         },
       ],
     });
     expect(stats?.height).toBe(2);
     expect(stats?.payouts).toEqual([{ miner: 'tgfcn1abc', sats: '34180' }]);
+    expect(stats?.minerNet).toBe('34180');
+    expect(stats?.operatorFee).toBe('698');
+    expect(stats?.unfilledRemainder).toBe('4999931640');
     expect(parsePoolStats({ method: 'mining.notify', params: [] })).toBeNull();
   });
 

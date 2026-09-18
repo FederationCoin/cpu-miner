@@ -31,7 +31,17 @@ export type PoolStats = {
   datumHost: string;
   datumPort: number;
   payouts: TidesPayout[];
+  minerNet: string;
+  operatorFee: string;
+  unfilledRemainder: string;
 };
+
+export function tidesSatsField(raw: unknown): string {
+  if (typeof raw === 'string' && /^-?\d+$/.test(raw)) {
+    return raw;
+  }
+  return '0';
+}
 
 export const IDLE_POOL_STATS: PoolStats = {
   running: false,
@@ -47,6 +57,9 @@ export const IDLE_POOL_STATS: PoolStats = {
   datumHost: '',
   datumPort: 0,
   payouts: [],
+  minerNet: '0',
+  operatorFee: '0',
+  unfilledRemainder: '0',
 };
 
 export function resolvePoolCli(env: NodeJS.ProcessEnv, here: string, resourcesPath: string): string | null {
@@ -136,7 +149,13 @@ export function parsePoolStatsLine(line: string): PoolStats | null {
     if (typeof rec.running !== 'boolean') {
       return null;
     }
-    return { ...rec, payouts: normalizePayouts(rec.payouts) };
+    return {
+      ...rec,
+      payouts: normalizePayouts(rec.payouts),
+      minerNet: tidesSatsField(rec.minerNet),
+      operatorFee: tidesSatsField(rec.operatorFee),
+      unfilledRemainder: tidesSatsField(rec.unfilledRemainder),
+    };
   } catch {
     return null;
   }
