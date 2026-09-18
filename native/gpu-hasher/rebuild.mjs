@@ -28,9 +28,12 @@ function envHasCl(env) {
   return false;
 }
 
-/** nvcc -ptx needs the MSVC host compiler on PATH. node-gyp/MSBuild already found VS. */
+/** nvcc -ptx needs MSVC INCLUDE/LIB plus cl.exe, even when cl.exe is already on PATH. */
 function msvcEnv(env) {
-  if (process.platform !== 'win32' || envHasCl(env)) {
+  if (process.platform !== 'win32') {
+    return env;
+  }
+  if (envHasCl(env) && env.INCLUDE && /MSVC/i.test(env.INCLUDE)) {
     return env;
   }
   const vswhere = join(
@@ -74,6 +77,17 @@ function msvcEnv(env) {
   return next;
 }
 
+function cudaIncludeArgs(env) {
+  const roots = [env.CUDA_PATH, env.CUDA_PATH_V12_6].filter(Boolean);
+  for (const root of roots) {
+    const inc = join(root, 'include');
+    if (existsSync(join(inc, 'cuda_runtime.h'))) {
+      return [`-I${inc}`];
+    }
+  }
+  return [];
+}
+
 let electronVersion = '44.3.0';
 try {
   electronVersion = require('electron/package.json').version;
@@ -109,7 +123,15 @@ copyFileSync(join(here, 'kernel', 'asic_pow.cl'), join(dist, 'asic_pow.cl'));
 const nvccEnv = msvcEnv({ ...process.env });
 const nvcc = spawnSync(
   'nvcc',
-  ['-ptx', '-O2', '-arch=compute_75', join(here, 'kernel', 'asic_pow.cu'), '-o', join(dist, 'asic_pow.ptx')],
+  [
+    '-ptx',
+    '-O2',
+    '-arch=compute_75',
+    ...cudaIncludeArgs(nvccEnv),
+    join(here, 'kernel', 'asic_pow.cu'),
+    '-o',
+    join(dist, 'asic_pow.ptx'),
+  ],
   { cwd: here, stdio: 'inherit', env: nvccEnv },
 );
 const nvccMissing = Boolean(nvcc.error && nvcc.error.code === 'ENOENT');
