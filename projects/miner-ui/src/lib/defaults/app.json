@@ -1,4 +1,5 @@
 {
+  "registryBaseUrl": "https://pools.federationcoin.org",
   "chains": {
     "testnet": {
       "mineToKind": "node",

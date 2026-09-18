@@ -1,5 +1,6 @@
 import { InjectionToken } from '@angular/core';
 import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from './miner-api';
+import type { RegistryRequest, RegistryResponse } from './registry';
 
 export type HasherHost = {
   canMine: boolean;
@@ -14,6 +15,7 @@ export type HasherHost = {
   poolStart: (opts: PoolStartOpts) => Promise<{ ok: boolean; error?: string }>;
   poolStop: () => Promise<void>;
   onPoolStats: (cb: (s: PoolStats) => void) => () => void;
+  registryRequest?: (req: RegistryRequest) => Promise<RegistryResponse>;
 };
 
 export const HASHER_HOST = new InjectionToken<HasherHost>('HASHER_HOST');

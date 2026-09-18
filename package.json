@@ -11,7 +11,9 @@
     "node": ">=26"
   },
   "packageManager": "npm@11.19.1",
-  "workspaces": ["projects/miner-ui"],
+  "workspaces": [
+    "projects/miner-ui"
+  ],
   "scripts": {
     "ng": "ng",
     "start": "npm run build:app && node native/gpu-hasher/rebuild.mjs && electron .",
@@ -41,6 +43,7 @@
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
     "@noble/hashes": "^2.4.0",
+    "canonicalize": "^2.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -74,12 +77,16 @@
       {
         "from": "native/gpu-hasher/dist/",
         "to": "gpu-hasher",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "vendor/federation-pool/",
         "to": "federation-pool",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "files": [
@@ -91,19 +98,27 @@
       "!**/electron.png"
     ],
     "linux": {
-      "target": ["AppImage", "zip"],
+      "target": [
+        "AppImage",
+        "zip"
+      ],
       "category": "Utility",
       "synopsis": "Unsigned FederationCoin CPU miner (RPC or Stratum v1)"
     },
     "win": {
       "signAndEditExecutable": false,
-      "target": ["portable", "zip"]
+      "target": [
+        "portable",
+        "zip"
+      ]
     },
     "mac": {
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "target": ["zip"]
+      "target": [
+        "zip"
+      ]
     }
   }
 }

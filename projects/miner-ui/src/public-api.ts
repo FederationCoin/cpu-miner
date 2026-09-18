@@ -18,4 +18,4 @@ export * from './lib/pool-pane';
 export * from './lib/docs-pane';
 export * from './lib/finder-pane';
 export * from './lib/network-workspace';
-export * from './lib/finder-data';
+export * from './lib/registry';

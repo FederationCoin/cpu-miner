@@ -11,6 +11,7 @@ describe('miner defaults JSON', () => {
     expect(WEB_DEFAULTS.hosted.stratumWss).toBe('wss://pool.testnet.federationcoin.org/stratum');
     expect(WEB_DEFAULTS.chains.testnet.mineToKind).toBe('hostedPoolStratum');
     expect(WEB_DEFAULTS.chains.testnet.datumWebsocket.url).toBe('wss://pool.testnet.federationcoin.org/datum');
+    expect(WEB_DEFAULTS.registryBaseUrl).toBe('https://pools.federationcoin.org');
   });
 
   it('app testnet Stratum is loopback TCP 23334', () => {
@@ -22,5 +23,6 @@ describe('miner defaults JSON', () => {
     expect(APP_DEFAULTS.chains.testnet.mineToKind).toBe('node');
     expect(APP_DEFAULTS.chains.testnet.pool.stratumPort).toBe(23334);
     expect(APP_DEFAULTS.chains.testnet.datumWebsocket.url).toBe('wss://pool.testnet.federationcoin.org/datum');
+    expect(APP_DEFAULTS.registryBaseUrl).toBe('https://pools.federationcoin.org');
   });
 });

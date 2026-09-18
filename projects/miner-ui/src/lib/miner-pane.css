@@ -18,7 +18,9 @@ label {
   font-size: 0.9rem;
 }
 
-input:not([type='checkbox']):not([type='radio']) {
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
   box-sizing: border-box;
   width: 100%;
   padding: 0.45rem 0.55rem;
@@ -28,6 +30,12 @@ input:not([type='checkbox']):not([type='radio']) {
   color: #e8eaed;
   font: inherit;
   user-select: text;
+}
+
+textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  resize: vertical;
 }
 
 .row {

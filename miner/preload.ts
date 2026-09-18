@@ -103,4 +103,11 @@ contextBridge.exposeInMainWorld('miner', {
   poolStop: () => ipcRenderer.invoke('pool:stop'),
   poolRefresh: () => ipcRenderer.invoke('pool:refresh'),
   onPoolStats: (cb: (s: PoolStats) => void) => listen('pool:stats', cb),
+  registryRequest: (req: {
+    method: string;
+    path: string;
+    chain: 'main' | 'testnet';
+    body?: unknown;
+    authorization?: string;
+  }) => ipcRenderer.invoke('registry:request', req),
 });

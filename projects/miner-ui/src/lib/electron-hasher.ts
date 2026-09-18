@@ -1,5 +1,6 @@
 import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from './miner-api';
 import type { HasherHost } from './hasher-host';
+import type { RegistryRequest } from './registry';
 import { bindDesktopWebGpu } from './webgpu-desktop';
 
 export class ElectronHasherHost implements HasherHost {
@@ -68,5 +69,13 @@ export class ElectronHasherHost implements HasherHost {
 
   onPoolStats(cb: (s: PoolStats) => void): () => void {
     return window.miner?.onPoolStats(cb) ?? (() => undefined);
+  }
+
+  registryRequest(req: RegistryRequest) {
+    const api = window.miner;
+    if (!api?.registryRequest) {
+      return Promise.reject(new Error('Open this app with npm start (Electron), not ng serve.'));
+    }
+    return api.registryRequest(req);
   }
 }

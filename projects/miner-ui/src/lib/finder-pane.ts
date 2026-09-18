@@ -1,9 +1,21 @@
-import { Component, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, NgZone, effect, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { debounceTime } from 'rxjs';
 import type { MinerChain } from './chain';
-import { CURATED_POOLS, EMPTY_POOL_SLOTS, type PoolListing } from './finder-data';
+import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
-import { PoolService } from './pool.service';
+import { MiningService } from './mining.service';
+import {
+  envelopeAuthorization,
+  mainFinderLive,
+  payloadHashHex,
+  registryFetch,
+  sparrowSignatureToBase64Url,
+  type ListingPublic,
+  type RegistryConnect,
+  type RegistryRequest,
+} from './registry';
 
 @Component({
   selector: 'app-finder-pane',
@@ -13,38 +25,235 @@ import { PoolService } from './pool.service';
 })
 export class FinderPane {
   readonly chain = input.required<MinerChain>();
-  protected readonly pool = inject(PoolService);
   protected readonly shell = inject(MINER_SHELL);
+  protected readonly mining = inject(MiningService);
+  private readonly host = inject(HASHER_HOST);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly zone = inject(NgZone);
   protected readonly notice = signal('');
+  protected readonly error = signal('');
+  protected readonly items = signal<ListingPublic[]>([]);
+  protected readonly inactive = signal(false);
+  protected readonly sparrowMessage = signal('');
+  protected readonly commandJson = signal('');
+  protected readonly stakeKind = signal('');
   protected readonly form = new FormGroup({
-    name: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
-    tag: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
-    stratum: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
-    datum: new FormControl({ value: '', disabled: true }, { nonNullable: true }),
+    name: new FormControl('', { nonNullable: true }),
+    websiteUrl: new FormControl('', { nonNullable: true }),
+    connectKind: new FormControl<'stratumOnly' | 'datumOnly' | 'stratumAndDatum'>('stratumAndDatum', {
+      nonNullable: true,
+    }),
+    stratum: new FormControl('', { nonNullable: true }),
+    datum: new FormControl('', { nonNullable: true }),
+    wallet: new FormControl('', { nonNullable: true }),
+    signature: new FormControl('', { nonNullable: true }),
+    signingBlockHash: new FormControl('', { nonNullable: true }),
+    signingBlockHeight: new FormControl('', { nonNullable: true }),
   });
+  private pendingCommand: unknown;
+
+  constructor() {
+    effect(() => {
+      const chain = this.chain();
+      void chain;
+      this.zone.run(() => {
+        void this.reload();
+      });
+    });
+    this.form.controls.wallet.valueChanges.pipe(debounceTime(400), takeUntilDestroyed(this.destroyRef)).subscribe((wallet) => {
+      void this.previewStake(wallet);
+    });
+  }
 
   protected id(suffix: string): string {
     return `${this.chain()}-finder-${suffix}`;
   }
 
-  protected listings(): PoolListing[] {
-    if (this.chain() === 'main') {
-      return EMPTY_POOL_SLOTS;
-    }
-    return CURATED_POOLS;
+  protected liveTenant(): boolean {
+    return mainFinderLive(this.chain());
   }
 
-  protected listingHint(p: PoolListing): string {
-    if (!p.house || this.shell.kind !== 'webDemo') {
-      return p.hashrateHint;
-    }
-    const s = this.pool.stats();
-    return `${s.workers} workers · ${s.accepted} shares accepted · height ${s.height}. House demo, not the pool of record.`;
+  protected baseUrl(): string {
+    return this.shell.defaults.registryBaseUrl.replace(/\/$/, '');
   }
 
-  protected submit(): void {
+  private async transport(req: RegistryRequest) {
+    if (this.shell.kind === 'desktop') {
+      if (!this.host.registryRequest) {
+        throw new Error('Open this app with npm start (Electron), not ng serve.');
+      }
+      return this.host.registryRequest(req);
+    }
+    return registryFetch(req, this.baseUrl());
+  }
+
+  protected async reload(): Promise<void> {
+    this.error.set('');
+    if (!mainFinderLive(this.chain())) {
+      this.items.set([]);
+      this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
+      return;
+    }
+    const path = this.inactive() ? '/v1/listings/inactive' : '/v1/listings';
+    try {
+      const res = await this.transport({ method: 'GET', path, chain: this.chain() });
+      const body = res.json as { items?: ListingPublic[]; title?: string };
+      if (res.status >= 400) {
+        this.error.set(body.title ?? 'Find failed');
+        this.items.set([]);
+        return;
+      }
+      this.items.set(body.items ?? []);
+      this.notice.set('');
+    } catch (e) {
+      this.error.set(e instanceof Error ? e.message : 'Find failed');
+      this.items.set([]);
+    }
+  }
+
+  protected toggleInactive(): void {
+    this.inactive.set(!this.inactive());
+    void this.reload();
+  }
+
+  protected connectHint(p: ListingPublic): string {
+    const c = p.connect;
+    if (c.kind === 'stratumOnly') {
+      return `stratum ${c.stratum.host}:${c.stratum.port}`;
+    }
+    if (c.kind === 'datumOnly') {
+      return `datum ${c.datum.host}:${c.datum.port}`;
+    }
+    return `stratum ${c.stratum.host}:${c.stratum.port} · datum ${c.datum.host}:${c.datum.port}`;
+  }
+
+  private connectFromForm(): RegistryConnect {
+    const v = this.form.getRawValue();
+    const parseHp = (raw: string) => {
+      const [host, port] = raw.split(':');
+      return { host: host.trim(), port: Number(port) };
+    };
+    if (v.connectKind === 'stratumOnly') {
+      return { kind: 'stratumOnly', stratum: parseHp(v.stratum) };
+    }
+    if (v.connectKind === 'datumOnly') {
+      return { kind: 'datumOnly', datum: parseHp(v.datum) };
+    }
+    return { kind: 'stratumAndDatum', stratum: parseHp(v.stratum), datum: parseHp(v.datum) };
+  }
+
+  protected compose(): void {
+    if (!this.liveTenant()) {
+      this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
+      return;
+    }
+    this.error.set('');
+    const v = this.form.getRawValue();
+    const command = {
+      commandKind: 'registerListing',
+      name: v.name.trim(),
+      ...(v.websiteUrl.trim() ? { websiteUrl: v.websiteUrl.trim() } : {}),
+      connect: this.connectFromForm(),
+    };
+    const hash = payloadHashHex(command);
+    this.pendingCommand = command;
+    this.commandJson.set(JSON.stringify(command, null, 2));
+    this.sparrowMessage.set(hash);
     this.notice.set(
-      'Register is work in progress. A verifiable directory is later: coinbase ASCII tag plus a Stratum we can connect to, and observed work. A form post is not a listing.',
+      'Copy the 64-hex message below into federation-sparrow Sign/Verify. Sign with the listing P2WPKH wallet, then paste the signature.',
     );
+  }
+
+  private async previewStake(wallet: string): Promise<void> {
+    const w = wallet.trim();
+    if (!w || !mainFinderLive(this.chain())) {
+      this.stakeKind.set('');
+      return;
+    }
+    try {
+      const res = await this.transport({
+        method: 'GET',
+        path: `/v1/stake-preview?wallet=${encodeURIComponent(w)}`,
+        chain: this.chain(),
+      });
+      const body = res.json as { kind?: string; title?: string };
+      if (res.status >= 400) {
+        this.stakeKind.set(body.title ?? 'stake preview failed');
+        return;
+      }
+      this.stakeKind.set(body.kind ?? '');
+    } catch {
+      this.stakeKind.set('');
+    }
+  }
+
+  protected async submit(): Promise<void> {
+    if (!this.liveTenant()) {
+      this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
+      return;
+    }
+    this.error.set('');
+    const v = this.form.getRawValue();
+    if (!this.pendingCommand || !this.sparrowMessage()) {
+      this.compose();
+      return;
+    }
+    const env = {
+      messageVersion: 1,
+      commandKind: 'registerListing' as const,
+      chain: this.chain(),
+      wallet: v.wallet.trim(),
+      payloadHash: this.sparrowMessage(),
+      signature: sparrowSignatureToBase64Url(v.signature),
+      signingBlockHash: v.signingBlockHash.trim().toLowerCase(),
+      signingBlockHeight: Number.parseInt(v.signingBlockHeight, 10) || 0,
+    };
+    const res = await this.transport({
+      method: 'POST',
+      path: '/v1/listings',
+      chain: this.chain(),
+      body: this.pendingCommand,
+      authorization: envelopeAuthorization(env),
+    });
+    if (res.status >= 400) {
+      const body = res.json as { title?: string };
+      this.error.set(body.title ?? 'Register failed');
+      return;
+    }
+    this.notice.set('Listing registered.');
+    await this.reload();
+  }
+
+  protected setDesktopMinerTarget(p: ListingPublic): void {
+    if (this.shell.kind !== 'desktop') {
+      this.notice.set('Use the desktop mill to point the hasher at this listing.');
+      return;
+    }
+    const chain = this.chain();
+    const c = p.connect;
+    if (c.kind === 'datumOnly') {
+      localStorage.setItem(`fc.${chain}.kind`, 'datum');
+      localStorage.setItem(`fc.${chain}.datum.host`, c.datum.host);
+      localStorage.setItem(`fc.${chain}.datum.port`, String(c.datum.port));
+      this.mining.warn(`Mine target set to DATUM ${c.datum.host}:${c.datum.port}. Open Mine and Start.`);
+      return;
+    }
+    localStorage.setItem(`fc.${chain}.kind`, 'stratum');
+    localStorage.setItem(`fc.${chain}.stratum.host`, c.stratum.host);
+    localStorage.setItem(`fc.${chain}.stratum.port`, String(c.stratum.port));
+    if (c.kind === 'stratumAndDatum') {
+      localStorage.setItem(`fc.${chain}.datum.host`, c.datum.host);
+      localStorage.setItem(`fc.${chain}.datum.port`, String(c.datum.port));
+    }
+    this.mining.warn(`Mine target set to ${c.stratum.host}:${c.stratum.port}. Open Mine and Start.`);
+  }
+
+  protected async testCpuShares(p: ListingPublic): Promise<void> {
+    const wss = p.connect.wss;
+    if (!wss) {
+      this.notice.set('This listing has no WSS extra for a CPU share test.');
+      return;
+    }
+    this.notice.set(`Share test WSS ${wss.host}${wss.path} is client-side only. The registry does not open it.`);
   }
 }

@@ -29,6 +29,7 @@ export type WebChainDefaults = {
 
 export type WebDefaults = {
   hosted: HostedEndpoints;
+  registryBaseUrl: string;
   chains: {
     main: WebChainDefaults;
     testnet: WebChainDefaults;
@@ -51,6 +52,7 @@ export type AppChainDefaults = {
 };
 
 export type AppDefaults = {
+  registryBaseUrl: string;
   chains: {
     main: AppChainDefaults;
     testnet: AppChainDefaults;

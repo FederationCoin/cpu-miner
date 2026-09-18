@@ -1,4 +1,5 @@
 import type { GpuPick, NativeGpuDevice } from './gpu-catalog';
+import type { RegistryRequest, RegistryResponse } from './registry';
 
 export type MinerChain = 'main' | 'testnet';
 
@@ -171,6 +172,7 @@ export type MinerApi = {
   webGpuFound?: (msg: WebGpuIpcFound) => Promise<void>;
   webGpuProgress?: (msg: WebGpuIpcProgress) => Promise<void>;
   webGpuLog?: (message: string) => Promise<void>;
+  registryRequest?: (req: RegistryRequest) => Promise<RegistryResponse>;
 };
 
 declare global {

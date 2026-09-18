@@ -1,41 +1,87 @@
 <div class="pane" [attr.id]="id('root')">
   <p class="hint">
-    Pools should be abundant. This list is curated for the demo. A public registry that proves the
-    name you post is the worker who hashed is still a TODO: coinbase tag, advertised Stratum, and
-    observed hashrate. DNS TXT is correlation, not cryptographic identity.
+    Find is a public directory. Identity is a Sparrow-signed P2WPKH wallet and a 3090 Ti 24h stake,
+    not a captcha. FederationCoin origin is not the pool of record. House pool stays on Pool.
   </p>
+  @if (error()) {
+    <p class="warn" [attr.id]="id('error')">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="hint" [attr.id]="id('notice')">{{ notice() }}</p>
+  }
+
+  @if (liveTenant()) {
+  <div class="row">
+    <button type="button" [id]="id('reload')" (click)="reload()">Refresh</button>
+    <button type="button" [id]="id('inactive')" (click)="toggleInactive()">
+      {{ inactive() ? 'Show live' : 'Show inactive' }}
+    </button>
+  </div>
 
   <ul class="finder-list">
-    @for (p of listings(); track p.id) {
-      <li>
-        <strong>{{ p.name }}</strong>
-        <span class="hint-inline">{{ p.tag }}</span>
-        <p class="mono">{{ p.stratum }}</p>
-        <p class="mono">{{ p.datum }}</p>
-        <p class="hint">{{ listingHint(p) }}</p>
-      </li>
+    @for (p of items(); track p.poolId) {
+    <li>
+      <strong>{{ p.name }}</strong>
+      @if (p.coinbaseTag) {
+        <span class="hint-inline">{{ p.coinbaseTag }}</span>
+      }
+      <p class="mono">{{ connectHint(p) }}</p>
+      <p class="hint">score {{ p.reviewScore }} @if (p.hasHostileFlag) { · hostile }</p>
+      <div class="row">
+        <button type="button" [id]="id('target-' + p.poolId)" (click)="setDesktopMinerTarget(p)">Mine this</button>
+        <button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">CPU share test</button>
+      </div>
+    </li>
+    } @empty {
+    <li class="hint" [attr.id]="id('empty')">No listings in this set.</li>
     }
   </ul>
 
-  <fieldset class="partition" disabled [formGroup]="form">
-    <legend>Register (work in progress)</legend>
+  <fieldset class="partition" [formGroup]="form">
+    <legend>Register</legend>
     <p class="hint">
-      This form is disabled. A verifiable directory is later: coinbase ASCII tag, a Stratum we can
-      connect to, and observed work. A form post is not a listing.
+      Coinbase tag is observed, not a form field. Compose the command, sign the 64-hex payload hash
+      in federation-sparrow, paste the signature.
     </p>
     <label [attr.for]="id('name')">Name</label>
     <input [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
-    <label [attr.for]="id('tag')">Coinbase tag</label>
-    <input [id]="id('tag')" type="text" autocomplete="off" spellcheck="false" formControlName="tag" placeholder="/YourPool/" />
+    <label [attr.for]="id('website')">Website (https, optional)</label>
+    <input [id]="id('website')" type="text" autocomplete="off" spellcheck="false" formControlName="websiteUrl" />
+    <label [attr.for]="id('connectKind')">Connect</label>
+    <select [id]="id('connectKind')" formControlName="connectKind">
+      <option value="stratumAndDatum">Stratum and DATUM</option>
+      <option value="stratumOnly">Stratum only</option>
+      <option value="datumOnly">DATUM only</option>
+    </select>
     <label [attr.for]="id('stratum')">Stratum host:port</label>
     <input [id]="id('stratum')" type="text" autocomplete="off" spellcheck="false" formControlName="stratum" />
     <label [attr.for]="id('datum')">DATUM host:port</label>
     <input [id]="id('datum')" type="text" autocomplete="off" spellcheck="false" formControlName="datum" />
-    <div class="row">
-      <button type="button" [id]="id('register')" disabled (click)="submit()">Submit listing</button>
-    </div>
-    @if (notice()) {
-      <p class="hint">{{ notice() }}</p>
+    <label [attr.for]="id('wallet')">P2WPKH wallet</label>
+    <input [id]="id('wallet')" type="text" autocomplete="off" spellcheck="false" formControlName="wallet" />
+    @if (stakeKind()) {
+      <p class="hint" [attr.id]="id('stake')">Stake preview: {{ stakeKind() }}</p>
     }
+    <label [attr.for]="id('signHeight')">Signing block height</label>
+    <input [id]="id('signHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="signingBlockHeight" />
+    <label [attr.for]="id('signHash')">Signing block hash</label>
+    <input [id]="id('signHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
+    <div class="row">
+      <button type="button" [id]="id('compose')" (click)="compose()">Compose Sparrow message</button>
+    </div>
+    @if (commandJson()) {
+      <label [attr.for]="id('command')">Command (review before signing)</label>
+      <textarea [id]="id('command')" readonly rows="8">{{ commandJson() }}</textarea>
+    }
+    @if (sparrowMessage()) {
+      <label [attr.for]="id('sparrow')">Copy into federation-sparrow Sign/Verify</label>
+      <textarea [id]="id('sparrow')" readonly rows="2">{{ sparrowMessage() }}</textarea>
+    }
+    <label [attr.for]="id('signature')">Signature (paste from Sparrow)</label>
+    <input [id]="id('signature')" type="text" autocomplete="off" spellcheck="false" formControlName="signature" />
+    <div class="row">
+      <button type="button" [id]="id('register')" (click)="submit()">Submit listing</button>
+    </div>
   </fieldset>
+  }
 </div>

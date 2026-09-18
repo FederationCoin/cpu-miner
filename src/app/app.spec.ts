@@ -118,6 +118,7 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
         }
       };
     }),
+    registryRequest: vi.fn(async () => ({ status: 200, json: { items: [] } })),
     ...overrides,
   };
   return api;
@@ -687,11 +688,66 @@ describe('App', () => {
       selectTab(f, 'testnet', 'docs');
       expect(queryEl(f, '#testnet-docs-root').textContent).toMatch(/friends/i);
       selectTab(f, 'testnet', 'finder');
-      expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/abundant/i);
-      expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/Empty slot/);
-      expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/work in progress/i);
-      expect(queryEl<HTMLButtonElement>(f, '#testnet-finder-register').disabled).toBe(true);
-      expect(queryEl<HTMLInputElement>(f, '#testnet-finder-name').disabled).toBe(true);
+      expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/public directory/i);
+      expect(queryEl<HTMLButtonElement>(f, '#testnet-finder-register').disabled).toBe(false);
+      expect(queryEl<HTMLInputElement>(f, '#testnet-finder-name').disabled).toBe(false);
+      expect(has(f, '#testnet-finder-compose')).toBe(true);
+      expect(has(f, '#testnet-finder-inactive')).toBe(true);
+    });
+
+    it('Finder lists live registry order and does not call MAIN', async () => {
+      const listing = {
+        poolId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        chain: 'testnet' as const,
+        operatorWallet: 'tgfcn1qw508d6qejxtdg4y5r3zarvary0c5xw7k',
+        name: 'Abundant hashes',
+        connect: { kind: 'stratumOnly' as const, stratum: { host: 'stratum.example.com', port: 23334 } },
+        reviewScore: 1,
+        hasHostileFlag: false,
+      };
+      const registryRequest = vi.fn(async (req: { method: string; path: string; chain: string }) => {
+        if (req.path === '/v1/listings') {
+          return { status: 200, json: { items: [listing] } };
+        }
+        if (req.path === '/v1/listings/inactive') {
+          return { status: 200, json: { items: [] } };
+        }
+        return { status: 200, json: { kind: 'stakeReady' } };
+      });
+      const f = await render(stubMiner({ registryRequest }));
+      selectTab(f, 'testnet', 'finder');
+      await f.whenStable();
+      f.detectChanges();
+      await vi.waitFor(() => {
+        f.detectChanges();
+        expect(queryEl(f, '#testnet-finder-root').textContent).toContain('Abundant hashes');
+      });
+      expect(queryEl(f, '#testnet-finder-root').textContent).toContain('stratum.example.com:23334');
+      expect(registryRequest.mock.calls.some((c) => c[0].chain === 'main')).toBe(false);
+      queryEl<HTMLButtonElement>(f, '#testnet-finder-inactive').click();
+      await f.whenStable();
+      f.detectChanges();
+      await vi.waitFor(() => {
+        expect(registryRequest.mock.calls.some((c) => c[0].path === '/v1/listings/inactive')).toBe(true);
+        f.detectChanges();
+        expect(queryEl(f, '#testnet-finder-empty').textContent).toMatch(/No listings/i);
+      });
+      setInput(f, '#testnet-finder-name', 'Example');
+      setInput(f, '#testnet-finder-stratum', 'stratum.example.com:23334');
+      setInput(f, '#testnet-finder-datum', 'datum.example.com:28916');
+      queryEl<HTMLButtonElement>(f, '#testnet-finder-compose').click();
+      f.detectChanges();
+      expect(queryEl<HTMLTextAreaElement>(f, '#testnet-finder-sparrow').value).toMatch(/^[0-9a-f]{64}$/);
+      expect(queryEl(f, '#testnet-finder-command').textContent).toContain('registerListing');
+      selectNetwork(f, 'main');
+      selectTab(f, 'main', 'finder');
+      await f.whenStable();
+      f.detectChanges();
+      await vi.waitFor(() => {
+        f.detectChanges();
+        expect(queryEl(f, '#main-finder-notice').textContent).toMatch(/Main is not live/i);
+      });
+      expect(registryRequest.mock.calls.some((c) => c[0].chain === 'main')).toBe(false);
     });
 
     it('Start on pool sends spawn IPC without a cookie', async () => {

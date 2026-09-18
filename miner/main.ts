@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -45,6 +45,7 @@ import {
   type RpcConnect,
 } from './mine-to.js';
 import type { MinerInfo, MinerStats } from './preload.js';
+import { registryOrigin, registryRequestWithFetch, type RegistryFetchReq } from './registry-fetch.js';
 import { StratumClient } from './stratum.js';
 import type { WorkerInit, WorkerMsg } from './worker.js';
 
@@ -1047,6 +1048,14 @@ ipcMain.handle('pool:refresh', () => {
   poolChild.stdin.write('REFRESH\n');
   emitLog('pool', 'refresh job');
   return { ok: true as const };
+});
+
+ipcMain.handle('registry:request', async (_e, req: RegistryFetchReq) => {
+  const chain = parseChain(req.chain);
+  if (chain === 'main' && !MAIN_IS_LIVE) {
+    throw new Error('Main is not live');
+  }
+  return registryRequestWithFetch((url, init) => net.fetch(url, init), registryOrigin(), { ...req, chain });
 });
 
 ipcMain.handle(
