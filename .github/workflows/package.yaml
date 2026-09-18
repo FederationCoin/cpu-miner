@@ -104,12 +104,30 @@ jobs:
           echo "GYP_MSVS_VERSION=2022" >> $env:GITHUB_ENV
       # nvcc -ptx does not need a GPU. Do not stitch Linux PTX into the Windows PE.
       - name: CUDA Toolkit (nvcc)
-        if: matrix.cuda
+        if: matrix.cuda && runner.os != 'Windows'
         uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d # v0.2.36
         with:
           cuda: '12.6.3'
           method: network
           sub-packages: '["nvcc"]'
+      # Windows nvcc-only network install has no cuda_runtime.h for cl.exe.
+      - name: CUDA Toolkit (nvcc and cudart)
+        if: matrix.cuda && runner.os == 'Windows'
+        uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d # v0.2.36
+        with:
+          cuda: '12.6.3'
+          method: network
+          sub-packages: '["nvcc","cudart"]'
+      # nvcc -ptx needs cl.exe on PATH. Do not dump vcvars into GITHUB_ENV
+      # (that overwrites runner vars and breaks node/npm on the next step).
+      - name: MSVC host compiler for nvcc
+        if: runner.os == 'Windows' && matrix.cuda
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $cl = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find '**\Hostx64\x64\cl.exe' | Select-Object -First 1
+          if (-not $cl) { throw 'vswhere did not find Hostx64 cl.exe' }
+          echo (Split-Path $cl) >> $env:GITHUB_PATH
       - run: npm ci
       - name: Native GPU hasher (Electron ABI)
         env:
