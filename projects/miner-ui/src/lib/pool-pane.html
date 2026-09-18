@@ -122,9 +122,10 @@
   <fieldset class="partition" [attr.id]="id('tides-split')">
     <legend>TIDES split</legend>
     <p class="hint">
-      Fee is a percent of each miner’s window share (default 2%). A block find
-      credits ~nDiff of the 8 × nDiff window on later coinbases. Unfilled
-      remainder goes to the operator.
+      Fee is a percent of each miner’s window share (default 2%). Each proof is
+      credited at its assigned share target. If the log is thinner than 8 × nDiff,
+      miners split the full coinbase minus fee. Unfilled remainder is floor dust,
+      not an empty-window tax.
     </p>
     <dl>
       <dt>Miner net</dt>
