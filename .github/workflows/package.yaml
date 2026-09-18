@@ -110,6 +110,24 @@ jobs:
           cuda: '12.6.3'
           method: network
           sub-packages: '["nvcc"]'
+      # nvcc -ptx needs cl.exe. node-gyp/MSBuild finds VS; the nvcc spawn does not.
+      - name: MSVC host compiler for nvcc
+        if: runner.os == 'Windows' && matrix.cuda
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'vswhere did not find MSVC' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw "missing $vcvars" }
+          cmd.exe /c "call `"$vcvars`" && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+              $name = $Matches[1]
+              if ($name -match '^[A-Za-z_][A-Za-z0-9_]*$') {
+                echo "$name=$($Matches[2])" >> $env:GITHUB_ENV
+              }
+            }
+          }
       - run: npm ci
       - name: Native GPU hasher (Electron ABI)
         env:
