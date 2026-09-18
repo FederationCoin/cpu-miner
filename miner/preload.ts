@@ -71,6 +71,9 @@ export type PoolStats = {
   datumHost: string;
   datumPort: number;
   payouts: TidesPayout[];
+  minerNet: string;
+  operatorFee: string;
+  unfilledRemainder: string;
 };
 
 export type { LogLine };

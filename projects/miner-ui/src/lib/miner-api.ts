@@ -140,7 +140,17 @@ export type PoolStats = {
   datumHost: string;
   datumPort: number;
   payouts: TidesPayout[];
+  minerNet: string;
+  operatorFee: string;
+  unfilledRemainder: string;
 };
+
+export function tidesSatsField(raw: unknown): string {
+  if (typeof raw === 'string' && /^-?\d+$/.test(raw)) {
+    return raw;
+  }
+  return '0';
+}
 
 export type MinerApi = {
   start: (opts: MinerStartOpts) => Promise<{ ok: boolean; error?: string }>;

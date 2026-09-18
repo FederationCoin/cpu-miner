@@ -1,5 +1,5 @@
 import { parseHex, toHex } from './asic-pow';
-import type { MinerChain, PoolStats, TidesPayout } from './miner-api';
+import { tidesSatsField, type MinerChain, type PoolStats, type TidesPayout } from './miner-api';
 
 export const STRATUM_UA = 'federationcoin-web-miner/0.1';
 
@@ -186,6 +186,9 @@ export function parsePoolStats(msg: unknown): PoolStats | null {
     datumHost?: unknown;
     datumPort?: unknown;
     payouts?: unknown;
+    minerNet?: unknown;
+    operatorFee?: unknown;
+    unfilledRemainder?: unknown;
   };
   const chain: MinerChain | null = o.chain === 'main' ? 'main' : o.chain === 'testnet' ? 'testnet' : null;
   return {
@@ -202,6 +205,9 @@ export function parsePoolStats(msg: unknown): PoolStats | null {
     datumHost: typeof o.datumHost === 'string' ? o.datumHost : '',
     datumPort: Number(o.datumPort) || 0,
     payouts: parseTidesPayouts(o.payouts),
+    minerNet: tidesSatsField(o.minerNet),
+    operatorFee: tidesSatsField(o.operatorFee),
+    unfilledRemainder: tidesSatsField(o.unfilledRemainder),
   };
 }
 

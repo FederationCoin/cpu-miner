@@ -83,6 +83,9 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
         datumHost: opts.datumHost,
         datumPort: opts.datumPort,
         payouts: [],
+        minerNet: '0',
+        operatorFee: '0',
+        unfilledRemainder: '0',
       });
       return { ok: true };
     }),
@@ -101,6 +104,9 @@ function stubMiner(overrides: Partial<MinerApi> = {}): MinerApi {
         datumHost: '',
         datumPort: 0,
         payouts: [],
+        minerNet: '0',
+        operatorFee: '0',
+        unfilledRemainder: '0',
       });
     }),
     poolRefresh: vi.fn(async () => ({ ok: true })),
@@ -815,10 +821,16 @@ describe('App', () => {
           { miner: 'tgfcn1operator', sats: '4999931640' },
           { miner: 'tgfcn1alice', sats: '34180' },
         ],
+        minerNet: '34180',
+        operatorFee: '698',
+        unfilledRemainder: '4999931640',
       });
       f.detectChanges();
       expect(queryEl(f, '#testnet-pool-tides').textContent).toContain('tgfcn1alice');
       expect(queryEl(f, '#testnet-pool-tides').textContent).toContain('0.00034180');
+      expect(queryEl(f, '#testnet-pool-tides-split').textContent).toContain('Miner net');
+      expect(queryEl(f, '#testnet-pool-tides-split').textContent).toContain('0.00034180');
+      expect(queryEl(f, '#testnet-pool-tides-split').textContent).toContain('49.99931640');
     });
 
     it('Host a pool Main warning stays not-live', async () => {
