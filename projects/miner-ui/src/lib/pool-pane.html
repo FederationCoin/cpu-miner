@@ -125,7 +125,8 @@
       Fee is a percent of each miner’s window share (default 2%). Each proof is
       credited at its assigned share target. If the log is thinner than 8 × nDiff,
       miners split the full coinbase minus fee. Unfilled remainder is floor dust,
-      not an empty-window tax.
+      not an empty-window tax. Mining to the operator address is one coinbase
+      row: that line is their own work plus fees, not a second output.
     </p>
     <dl>
       <dt>Miner net</dt>
