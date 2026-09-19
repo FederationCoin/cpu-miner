@@ -19,12 +19,21 @@ export type ListingPublic = {
   chain: MinerChain;
   operatorWallet: string;
   name: string;
-  websiteUrl?: string;
+  websiteUrl: string;
   connect: RegistryConnect;
-  coinbaseTag?: string;
+  coinbaseTag: string;
+  listingDomain: string;
+  attestationCount: number;
+  listerConfirmedCoinbasePayee: boolean;
   reviewScore: number;
   hasHostileFlag: boolean;
   metrics?: { hashrate?: number; volatility?: number };
+};
+
+export type FindGroup = {
+  domain: string;
+  listings: ListingPublic[];
+  multipleClaims: boolean;
 };
 
 export type RegistryRequest = {

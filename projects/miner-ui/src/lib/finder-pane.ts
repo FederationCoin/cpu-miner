@@ -12,6 +12,7 @@ import {
   payloadHashHex,
   registryFetch,
   sparrowSignatureToBase64Url,
+  type FindGroup,
   type ListingPublic,
   type RegistryConnect,
   type RegistryRequest,
@@ -32,7 +33,7 @@ export class FinderPane {
   private readonly zone = inject(NgZone);
   protected readonly notice = signal('');
   protected readonly error = signal('');
-  protected readonly items = signal<ListingPublic[]>([]);
+  protected readonly groups = signal<FindGroup[]>([]);
   protected readonly inactive = signal(false);
   protected readonly sparrowMessage = signal('');
   protected readonly commandJson = signal('');
@@ -40,6 +41,7 @@ export class FinderPane {
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true }),
     websiteUrl: new FormControl('', { nonNullable: true }),
+    coinbaseTag: new FormControl('', { nonNullable: true }),
     connectKind: new FormControl<'stratumOnly' | 'datumOnly' | 'stratumAndDatum'>('stratumAndDatum', {
       nonNullable: true,
     }),
@@ -90,24 +92,28 @@ export class FinderPane {
   protected async reload(): Promise<void> {
     this.error.set('');
     if (!mainFinderLive(this.chain())) {
-      this.items.set([]);
+      this.groups.set([]);
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
       return;
     }
     const path = this.inactive() ? '/v1/listings/inactive' : '/v1/listings';
     try {
       const res = await this.transport({ method: 'GET', path, chain: this.chain() });
-      const body = res.json as { items?: ListingPublic[]; title?: string };
+      const body = res.json as { items?: ListingPublic[]; groups?: FindGroup[]; title?: string };
       if (res.status >= 400) {
         this.error.set(body.title ?? 'Find failed');
-        this.items.set([]);
+        this.groups.set([]);
         return;
       }
-      this.items.set(body.items ?? []);
+      if (body.groups?.length) {
+        this.groups.set(body.groups);
+      } else {
+        this.groups.set([{ domain: '', listings: body.items ?? [], multipleClaims: false }]);
+      }
       this.notice.set('');
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : 'Find failed');
-      this.items.set([]);
+      this.groups.set([]);
     }
   }
 
@@ -152,7 +158,8 @@ export class FinderPane {
     const command = {
       commandKind: 'registerListing',
       name: v.name.trim(),
-      ...(v.websiteUrl.trim() ? { websiteUrl: v.websiteUrl.trim() } : {}),
+      websiteUrl: v.websiteUrl.trim(),
+      coinbaseTag: v.coinbaseTag.trim(),
       connect: this.connectFromForm(),
     };
     const hash = payloadHashHex(command);

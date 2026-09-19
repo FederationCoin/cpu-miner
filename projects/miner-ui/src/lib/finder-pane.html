@@ -19,18 +19,31 @@
   </div>
 
   <ul class="finder-list">
-    @for (p of items(); track p.poolId) {
+    @for (g of groups(); track g.domain) {
     <li>
-      <strong>{{ p.name }}</strong>
-      @if (p.coinbaseTag) {
+      <p class="hint">
+        {{ g.domain }}
+        @if (g.multipleClaims) {
+          · multiple listings claim this domain; confirm the connect you use
+        }
+      </p>
+      @for (p of g.listings; track p.poolId) {
+      <div class="partition">
+        <strong>{{ p.name }}</strong>
         <span class="hint-inline">{{ p.coinbaseTag }}</span>
-      }
-      <p class="mono">{{ connectHint(p) }}</p>
-      <p class="hint">score {{ p.reviewScore }} @if (p.hasHostileFlag) { · hostile }</p>
-      <div class="row">
-        <button type="button" [id]="id('target-' + p.poolId)" (click)="setDesktopMinerTarget(p)">Mine this</button>
-        <button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">CPU share test</button>
+        <p class="mono">{{ connectHint(p) }}</p>
+        <p class="hint">
+          attestations {{ p.attestationCount }}
+          @if (p.listerConfirmedCoinbasePayee) { · lister payee in last window }
+          · score {{ p.reviewScore }}
+          @if (p.hasHostileFlag) { · hostile }
+        </p>
+        <div class="row">
+          <button type="button" [id]="id('target-' + p.poolId)" (click)="setDesktopMinerTarget(p)">Mine this</button>
+          <button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">CPU share test</button>
+        </div>
       </div>
+      }
     </li>
     } @empty {
     <li class="hint" [attr.id]="id('empty')">No listings in this set.</li>
@@ -40,13 +53,17 @@
   <fieldset class="partition" [formGroup]="form">
     <legend>Register</legend>
     <p class="hint">
-      Coinbase tag is observed, not a form field. Compose the command, sign the 64-hex payload hash
-      in federation-sparrow, paste the signature.
+      Brand, Stratum, and DATUM must share one domain so a listing cannot point your brand at someone
+      else's pool. The leftover risk is a dead hostname or wrong port on a domain you already control,
+      not a hijack onto a foreign pool. Compose the command, sign the 64-hex payload hash in
+      federation-sparrow, paste the signature.
     </p>
     <label [attr.for]="id('name')">Name</label>
     <input [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
-    <label [attr.for]="id('website')">Website (https, optional)</label>
+    <label [attr.for]="id('website')">Website (https)</label>
     <input [id]="id('website')" type="text" autocomplete="off" spellcheck="false" formControlName="websiteUrl" />
+    <label [attr.for]="id('tag')">Coinbase tag</label>
+    <input [id]="id('tag')" type="text" autocomplete="off" spellcheck="false" formControlName="coinbaseTag" />
     <label [attr.for]="id('connectKind')">Connect</label>
     <select [id]="id('connectKind')" formControlName="connectKind">
       <option value="stratumAndDatum">Stratum and DATUM</option>
