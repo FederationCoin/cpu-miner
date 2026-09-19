@@ -10,6 +10,7 @@
     >
       Mine
     </button>
+    @if (showHostPool()) {
     <button
       type="button"
       role="tab"
@@ -18,8 +19,9 @@
       [attr.aria-selected]="tab() === 'pool'"
       (click)="selectTab('pool')"
     >
-      Pool
+      Host a pool
     </button>
+    }
     <button
       type="button"
       role="tab"
@@ -48,9 +50,9 @@
       <app-miner-pane [chain]="chain()" />
     </section>
   }
-  @if (tab() === 'pool') {
+  @if (tab() === 'pool' && showHostPool()) {
     <section class="pane-col" [attr.id]="chain() + '-pool'">
-      <h2>Pool</h2>
+      <h2>Host a pool</h2>
       <app-pool-pane [chain]="chain()" />
     </section>
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advertisedAttestKinds, attestConnectFromListing, envelopeAuthorization, mainFinderLive, payloadHashHex } from './registry';
+import { advertisedAttestKinds, attestConnectFromListing, envelopeAuthorization, mainFinderLive, payloadHashHex, signedPayloadHash } from './registry';
 
 describe('registry helpers', () => {
   it('hashes RFC 8785 JCS of the command', () => {
@@ -16,6 +16,14 @@ describe('registry helpers', () => {
         commandKind: 'registerListing',
       }),
     ).toBe(hash);
+  });
+
+  it('binds signing height and hash into the payload hash', () => {
+    const command = { commandKind: 'registerListing', name: 'Example' };
+    const hash = 'ab'.repeat(32);
+    expect(signedPayloadHash(command, 1, hash)).toMatch(/^[0-9a-f]{64}$/);
+    expect(signedPayloadHash(command, 1, hash)).not.toBe(signedPayloadHash(command, 2, hash));
+    expect(signedPayloadHash(command, 1, hash)).not.toBe(payloadHashHex(command));
   });
 
   it('builds a Bearer envelope as base64url JSON', () => {

@@ -675,20 +675,27 @@ describe('App', () => {
       expect(has(f, '#testnet-pool-rpcUser')).toBe(false);
     });
 
-    it('has Mine Pool Docs Finder tabs under the network toggle', async () => {
+    it('has Mine Host a pool Docs Finder tabs under the network toggle', async () => {
       const f = await render(stubMiner());
       expect(has(f, '#testnet-tab-mine')).toBe(true);
       expect(has(f, '#testnet-tab-pool')).toBe(true);
+      expect(queryEl(f, '#testnet-tab-pool').textContent).toMatch(/Host a pool/);
       expect(has(f, '#testnet-tab-docs')).toBe(true);
       expect(has(f, '#testnet-tab-finder')).toBe(true);
       expect(has(f, '#testnet-mineToHostedPoolStratum')).toBe(false);
       selectTab(f, 'testnet', 'pool');
+      expect(queryEl(f, '#testnet-pool').textContent).toMatch(/Host a pool/);
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-stratumPort').value).toBe('23334');
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-datumPort').value).toBe('28916');
       selectTab(f, 'testnet', 'docs');
       expect(queryEl(f, '#testnet-docs-root').textContent).toMatch(/friends/i);
       selectTab(f, 'testnet', 'finder');
       expect(queryEl(f, '#testnet-finder-root').textContent).toMatch(/public directory/i);
+      expect(queryEl(f, '#testnet-finder-root').textContent).not.toMatch(/House pool stays on Pool/);
+      expect(has(f, '#testnet-finder-listings')).toBe(true);
+      expect(has(f, '#testnet-finder-register-pane')).toBe(true);
+      expect(has(f, '#testnet-finder-refresh-tip')).toBe(true);
+      expect(has(f, '#testnet-finder-attest-dialog')).toBe(true);
       expect(queryEl<HTMLButtonElement>(f, '#testnet-finder-register').disabled).toBe(false);
       expect(queryEl<HTMLInputElement>(f, '#testnet-finder-name').disabled).toBe(false);
       expect(has(f, '#testnet-finder-compose')).toBe(true);
@@ -712,6 +719,17 @@ describe('App', () => {
         if (req.path === '/v1/listings/inactive') {
           return { status: 200, json: { items: [] } };
         }
+        if (req.path === '/v1/sign-context') {
+          return {
+            status: 200,
+            json: {
+              signingBlockHeight: 10,
+              signingBlockHash: 'ab'.repeat(32),
+              stakeRequiredSats: '1',
+              mineSeconds: 3600,
+            },
+          };
+        }
         return { status: 200, json: { kind: 'stakeReady' } };
       });
       const f = await render(stubMiner({ registryRequest }));
@@ -723,6 +741,8 @@ describe('App', () => {
         expect(queryEl(f, '#testnet-finder-root').textContent).toContain('Abundant hashes');
       });
       expect(queryEl(f, '#testnet-finder-root').textContent).toContain('stratum.example.com:23334');
+      expect(has(f, '#testnet-finder-target-01ARZ3NDEKTSV4RRFFQ69G5FAV')).toBe(true);
+      expect(has(f, '#testnet-finder-attest-stratum-01ARZ3NDEKTSV4RRFFQ69G5FAV')).toBe(true);
       expect(registryRequest.mock.calls.some((c) => c[0].chain === 'main')).toBe(false);
       queryEl<HTMLButtonElement>(f, '#testnet-finder-inactive').click();
       await f.whenStable();
@@ -732,6 +752,10 @@ describe('App', () => {
         f.detectChanges();
         expect(queryEl(f, '#testnet-finder-empty').textContent).toMatch(/No listings/i);
       });
+      await vi.waitFor(() => {
+        f.detectChanges();
+        expect(queryEl<HTMLInputElement>(f, '#testnet-finder-signHeight').value).toBe('10');
+      });
       setInput(f, '#testnet-finder-name', 'Example');
       setInput(f, '#testnet-finder-stratum', 'stratum.example.com:23334');
       setInput(f, '#testnet-finder-datum', 'datum.example.com:28916');
@@ -739,6 +763,8 @@ describe('App', () => {
       f.detectChanges();
       expect(queryEl<HTMLTextAreaElement>(f, '#testnet-finder-sparrow').value).toMatch(/^[0-9a-f]{64}$/);
       expect(queryEl(f, '#testnet-finder-command').textContent).toContain('registerListing');
+      expect(queryEl(f, '#testnet-finder-command').textContent).toContain('"signingBlockHeight": 10');
+      expect(queryEl(f, '#testnet-finder-command').textContent).toContain('signingBlockHash');
       selectNetwork(f, 'main');
       selectTab(f, 'main', 'finder');
       await f.whenStable();

@@ -1,32 +1,4 @@
 <div class="pane" [formGroup]="form" [attr.data-tides]="tidesJson()">
-  @if (hostedMainDisabled()) {
-    <p class="warn" data-pool-main-warning>
-      Federation pool is not supported on main. It is offered only as a demonstration piece on
-      testnet. Point a miner at another pool if you have one. DATUM on main still needs your own
-      node and the desktop app.
-    </p>
-  } @else if (isHosted()) {
-    <h3>{{ hostedLabel() }}</h3>
-    <p class="hint">
-      This pool is already set up and running if you want to mine. Settings are read-only; the
-      server image owns the config. Not the pool of record.
-    </p>
-    <dl>
-      <dt>Stratum TCP</dt>
-      <dd class="mono">{{ hostedStratum() }}</dd>
-      <dt>Stratum WSS</dt>
-      <dd class="mono">{{ hostedWss() }}</dd>
-      <dt>DATUM TCP</dt>
-      <dd class="mono">{{ hostedDatum() }}</dd>
-      <dt>DATUM WSS</dt>
-      <dd class="mono">{{ hostedDatumWss() }}</dd>
-    </dl>
-    <p class="hint">
-      DATUM is bring your own node. The desktop app can connect DATUM to these TCP ports with
-      <em>your</em> bitcoind. Pool <code>WSS /datum</code> is the coinbaser wrap only. This page
-      will not proxy ours.
-    </p>
-  } @else {
     <p class="hint">
       Starts a local DATUM Prime + TIDES + Stratum v1 process against
       <code>federationcoind</code>. This is a <strong>friends-and-family</strong> pool: one
@@ -102,7 +74,6 @@
       <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
       <button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
     </div>
-  }
 
   <dl>
     <dt>Status</dt>

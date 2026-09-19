@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { vi } from 'vitest';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
 import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStats } from './miner-api';
 import { MINER_SHELL, webDemoShell } from './miner-shell';
@@ -238,5 +239,42 @@ describe('web demo shell', () => {
     expect(localStorage.getItem('fc.testnet.kind')).toBe('stratumWebsocket');
     expect(localStorage.getItem('fc.testnet.stratumWebsocket.host')).toBe('pool.testnet.federationcoin.org');
     expect(localStorage.getItem('fc.testnet.stratum.host')).toBe('stratum.testnet.federationcoin.org');
+  });
+
+  it('hides Host a pool on the web mill and splits Finder', async () => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const u = String(input);
+      if (u.includes('/v1/sign-context')) {
+        return new Response(
+          JSON.stringify({
+            signingBlockHeight: 10,
+            signingBlockHash: 'ab'.repeat(32),
+            stakeRequiredSats: '1',
+            mineSeconds: 3600,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ groups: [], items: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    try {
+      const f = await render();
+      expect(has(f, '#testnet-tab-pool')).toBe(false);
+      (f.nativeElement.querySelector('#testnet-tab-finder') as HTMLButtonElement).click();
+      await f.whenStable();
+      f.detectChanges();
+      expect(has(f, '#testnet-finder-listings')).toBe(true);
+      expect(has(f, '#testnet-finder-register-pane')).toBe(true);
+      expect(has(f, '#testnet-finder-refresh-tip')).toBe(true);
+      expect(has(f, '#testnet-finder-attest-dialog')).toBe(true);
+      expect(f.nativeElement.querySelector('[id^="testnet-finder-target-"]')).toBeNull();
+      expect(f.nativeElement.textContent).toMatch(/listing WSS advertise/);
+      expect(f.nativeElement.textContent).not.toMatch(/House pool stays on Pool/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

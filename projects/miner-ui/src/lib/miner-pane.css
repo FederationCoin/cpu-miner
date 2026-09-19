@@ -255,3 +255,33 @@ fieldset.gpu-adapter legend {
   border: 1px solid #3a3f4b;
   border-radius: 4px;
 }
+
+.finder-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .finder-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.finder-subpane {
+  min-width: 0;
+}
+
+dialog.finder-attest {
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 1rem 1.1rem 1.2rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 6px;
+  background: #16181e;
+  color: #e8eaed;
+}
+
+dialog.finder-attest::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}

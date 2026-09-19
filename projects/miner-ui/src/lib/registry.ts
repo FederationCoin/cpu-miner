@@ -83,6 +83,14 @@ export function payloadHashHex(command: unknown): string {
   return bytesToHex(sha256(new TextEncoder().encode(jcs)));
 }
 
+export function signedPayloadHash(
+  command: unknown,
+  signingBlockHeight: number,
+  signingBlockHash: string,
+): string {
+  return payloadHashHex({ command, signingBlockHeight, signingBlockHash });
+}
+
 export function envelopeAuthorization(env: object): string {
   const json = JSON.stringify(env);
   const bytes = new TextEncoder().encode(json);

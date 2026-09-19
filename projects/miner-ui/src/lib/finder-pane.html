@@ -1,11 +1,12 @@
 <div class="pane" [attr.id]="id('root')">
   <p class="hint">
     Find is a public directory. Identity is a Sparrow-signed P2WPKH wallet and listing stake,
-    not a captcha. FederationCoin origin is not the pool of record. House pool stays on Pool.
-    Sign the 64-hex payload hash in federation-sparrow Sign/Verify using
+    not a captcha. FederationCoin origin is not the pool of record. Sign the 64-hex payload hash
+    in federation-sparrow Sign/Verify using
     <strong>Standard (Electrum)</strong> only, not BIP137 or BIP322. Paste it as one
     line. Electrum hashes <code>Bitcoin Signed Message</code>; the registry also
-    accepts <code>FederationCoin Signed Message</code>.
+    accepts <code>FederationCoin Signed Message</code>. Attest from a button on a listing;
+    that opens a dialog.
   </p>
   @if (error()) {
     <p class="warn" [attr.id]="id('error')">{{ error() }}</p>
@@ -18,132 +19,158 @@
   @if (stakeLine()) {
     <p class="hint" [attr.id]="id('stake-line')">{{ stakeLine() }}</p>
   }
-  <div class="row">
-    <button type="button" [id]="id('reload')" (click)="reload()">Refresh</button>
-    <button type="button" [id]="id('inactive')" (click)="toggleInactive()">
-      {{ inactive() ? 'Show live' : 'Show inactive' }}
-    </button>
+
+  <div class="finder-split">
+    <section class="finder-subpane" [attr.id]="id('listings')">
+      <h3>Listings</h3>
+      <div class="row">
+        <button type="button" [id]="id('reload')" (click)="reloadListings()">Refresh</button>
+        <button type="button" [id]="id('inactive')" (click)="toggleInactive()">
+          {{ inactive() ? 'Show live' : 'Show inactive' }}
+        </button>
+      </div>
+      @if (!isDesktop()) {
+        <p class="hint">In-page mining needs a listing WSS advertise. Mine this stays on the desktop mill (TCP).</p>
+      }
+
+      <ul class="finder-list">
+        @for (g of groups(); track g.domain) {
+        <li>
+          <p class="hint">
+            {{ g.domain }}
+            @if (g.multipleClaims) {
+              · multiple listings claim this domain; confirm the connect you use
+            }
+          </p>
+          @for (p of g.listings; track p.poolId) {
+          <div class="partition">
+            <strong>{{ p.name }}</strong>
+            <span class="hint-inline">{{ p.coinbaseTag }}</span>
+            <p class="mono">{{ connectHint(p) }}</p>
+            <p class="hint">
+              attestations {{ p.attestationCount }}
+              @if (p.listerConfirmedCoinbasePayee) { · lister payee in last window }
+              · score {{ p.reviewScore }}
+              @if (p.hasHostileFlag) { · hostile }
+            </p>
+            <div class="row">
+              @if (isDesktop()) {
+                <button type="button" [id]="id('target-' + p.poolId)" (click)="setDesktopMinerTarget(p)">Mine this</button>
+              }
+              <button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">CPU share test</button>
+            </div>
+            <div class="row">
+              @for (kind of advertisedKinds(p); track kind) {
+              <button type="button" [id]="id('attest-' + kind + '-' + p.poolId)" (click)="openAttest(p, kind)">
+                Attest {{ kind === 'stratum' ? 'stratum' : 'DATUM' }} {{ attestHostPort(p, kind) }}
+              </button>
+              }
+            </div>
+          </div>
+          }
+        </li>
+        } @empty {
+        <li class="hint" [attr.id]="id('empty')">No listings in this set.</li>
+        }
+      </ul>
+    </section>
+
+    <section class="finder-subpane" [attr.id]="id('register-pane')">
+      <fieldset class="partition" [formGroup]="form">
+        <legend>Register</legend>
+        <p class="hint">
+          Brand, Stratum, and DATUM must share one domain so a listing cannot point your brand at someone
+          else's pool. The leftover risk is a dead hostname or wrong port on a domain you already control,
+          not a hijack onto a foreign pool. Compose the command, sign the 64-hex payload hash in
+          federation-sparrow, paste the signature.
+        </p>
+        <label [attr.for]="id('name')">Name</label>
+        <input [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
+        <label [attr.for]="id('website')">Website (https)</label>
+        <input [id]="id('website')" type="text" autocomplete="off" spellcheck="false" formControlName="websiteUrl" />
+        <label [attr.for]="id('tag')">Coinbase tag</label>
+        <input [id]="id('tag')" type="text" autocomplete="off" spellcheck="false" formControlName="coinbaseTag" />
+        <label [attr.for]="id('connectKind')">Connect</label>
+        <select [id]="id('connectKind')" formControlName="connectKind">
+          <option value="stratumAndDatum">Stratum and DATUM</option>
+          <option value="stratumOnly">Stratum only</option>
+          <option value="datumOnly">DATUM only</option>
+        </select>
+        <label [attr.for]="id('stratum')">Stratum host:port</label>
+        <input [id]="id('stratum')" type="text" autocomplete="off" spellcheck="false" formControlName="stratum" />
+        <label [attr.for]="id('datum')">DATUM host:port</label>
+        <input [id]="id('datum')" type="text" autocomplete="off" spellcheck="false" formControlName="datum" />
+        <label [attr.for]="id('wallet')">P2WPKH wallet</label>
+        <input [id]="id('wallet')" type="text" autocomplete="off" spellcheck="false" formControlName="wallet" />
+        @if (stakeKind()) {
+          <p class="hint" [attr.id]="id('stake')">Stake preview: {{ stakeKind() }}</p>
+        }
+        <label [attr.for]="id('signHeight')">Signing block height</label>
+        <input [id]="id('signHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="signingBlockHeight" />
+        <label [attr.for]="id('signHash')">Signing block hash</label>
+        <input [id]="id('signHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
+        <div class="row">
+          <button type="button" [id]="id('refresh-tip')" (click)="refreshTip()">Refresh tip</button>
+        </div>
+        <div class="row">
+          <button type="button" [id]="id('compose')" (click)="composeRegister()">Compose Sparrow message</button>
+        </div>
+        @if (commandJson()) {
+          <label [attr.for]="id('command')">Command (review before signing)</label>
+          <textarea [id]="id('command')" readonly rows="8">{{ commandJson() }}</textarea>
+        }
+        @if (sparrowMessage()) {
+          <label [attr.for]="id('sparrow')">Copy into federation-sparrow Sign/Verify</label>
+          <textarea [id]="id('sparrow')" readonly rows="2">{{ sparrowMessage() }}</textarea>
+        }
+        <label [attr.for]="id('signature')">Signature (paste from Sparrow)</label>
+        <input [id]="id('signature')" type="text" autocomplete="off" spellcheck="false" formControlName="signature" />
+        <div class="row">
+          <button type="button" [id]="id('register')" (click)="submitRegister()">Submit listing</button>
+        </div>
+      </fieldset>
+    </section>
   </div>
 
-  <ul class="finder-list">
-    @for (g of groups(); track g.domain) {
-    <li>
+  <dialog class="finder-attest" [attr.id]="id('attest-dialog')" #attestDialog>
+    <form [formGroup]="attestForm" method="dialog">
+      <h3>Attest listing</h3>
       <p class="hint">
-        {{ g.domain }}
-        @if (g.multipleClaims) {
-          · multiple listings claim this domain; confirm the connect you use
-        }
+        Coinbase height is the block that paid you with this listing's tag. Sign the 64-hex payload hash
+        in federation-sparrow with the attester P2WPKH wallet.
       </p>
-      @for (p of g.listings; track p.poolId) {
-      <div class="partition">
-        <strong>{{ p.name }}</strong>
-        <span class="hint-inline">{{ p.coinbaseTag }}</span>
-        <p class="mono">{{ connectHint(p) }}</p>
-        <p class="hint">
-          attestations {{ p.attestationCount }}
-          @if (p.listerConfirmedCoinbasePayee) { · lister payee in last window }
-          · score {{ p.reviewScore }}
-          @if (p.hasHostileFlag) { · hostile }
-        </p>
-        <div class="row">
-          <button type="button" [id]="id('target-' + p.poolId)" (click)="setDesktopMinerTarget(p)">Mine this</button>
-          <button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">CPU share test</button>
-        </div>
-        <p class="hint">
-          Pick the Stratum or DATUM host you actually connected. Changing that endpoint later drops
-          this attestation from the score until it matches again.
-        </p>
-        <div class="row">
-          @for (kind of advertisedKinds(p); track kind) {
-          <button type="button" [id]="id('attest-' + kind + '-' + p.poolId)" (click)="composeAttest(p, kind)">
-            Attest {{ kind === 'stratum' ? 'stratum' : 'DATUM' }} {{ attestHostPort(p, kind) }}
-          </button>
-          }
-        </div>
-      </div>
+      @if (attestSummary()) {
+        <p class="mono" [attr.id]="id('attest-summary')">{{ attestSummary() }}</p>
       }
-    </li>
-    } @empty {
-    <li class="hint" [attr.id]="id('empty')">No listings in this set.</li>
-    }
-  </ul>
-
-  <fieldset class="partition" [formGroup]="form">
-    <legend>Attest</legend>
-    <p class="hint">
-      Coinbase height is the block that paid you with this listing's tag. Sign the 64-hex payload hash
-      in federation-sparrow with the attester P2WPKH wallet.
-    </p>
-    @if (attestSummary()) {
-      <p class="mono" [attr.id]="id('attest-summary')">{{ attestSummary() }}</p>
-    }
-    <label [attr.for]="id('attestHeight')">Coinbase height</label>
-    <input [id]="id('attestHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="attestHeight" />
-    <div class="row">
-      <button type="button" [id]="id('compose-attest')" (click)="composeAttestCommand()">Compose attest message</button>
-    </div>
-    @if (attestCommandJson()) {
-      <label [attr.for]="id('attest-command')">Attest command (review before signing)</label>
-      <textarea [id]="id('attest-command')" readonly rows="8">{{ attestCommandJson() }}</textarea>
-    }
-    @if (attestSparrowMessage()) {
-      <label [attr.for]="id('attest-sparrow')">Copy into federation-sparrow Sign/Verify</label>
-      <textarea [id]="id('attest-sparrow')" readonly rows="2">{{ attestSparrowMessage() }}</textarea>
-    }
-    <div class="row">
-      <button type="button" [id]="id('submit-attest')" (click)="submitAttest()">Submit attestation</button>
-    </div>
-  </fieldset>
-
-  <fieldset class="partition" [formGroup]="form">
-    <legend>Register</legend>
-    <p class="hint">
-      Brand, Stratum, and DATUM must share one domain so a listing cannot point your brand at someone
-      else's pool. The leftover risk is a dead hostname or wrong port on a domain you already control,
-      not a hijack onto a foreign pool. Compose the command, sign the 64-hex payload hash in
-      federation-sparrow, paste the signature.
-    </p>
-    <label [attr.for]="id('name')">Name</label>
-    <input [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
-    <label [attr.for]="id('website')">Website (https)</label>
-    <input [id]="id('website')" type="text" autocomplete="off" spellcheck="false" formControlName="websiteUrl" />
-    <label [attr.for]="id('tag')">Coinbase tag</label>
-    <input [id]="id('tag')" type="text" autocomplete="off" spellcheck="false" formControlName="coinbaseTag" />
-    <label [attr.for]="id('connectKind')">Connect</label>
-    <select [id]="id('connectKind')" formControlName="connectKind">
-      <option value="stratumAndDatum">Stratum and DATUM</option>
-      <option value="stratumOnly">Stratum only</option>
-      <option value="datumOnly">DATUM only</option>
-    </select>
-    <label [attr.for]="id('stratum')">Stratum host:port</label>
-    <input [id]="id('stratum')" type="text" autocomplete="off" spellcheck="false" formControlName="stratum" />
-    <label [attr.for]="id('datum')">DATUM host:port</label>
-    <input [id]="id('datum')" type="text" autocomplete="off" spellcheck="false" formControlName="datum" />
-    <label [attr.for]="id('wallet')">P2WPKH wallet</label>
-    <input [id]="id('wallet')" type="text" autocomplete="off" spellcheck="false" formControlName="wallet" />
-    @if (stakeKind()) {
-      <p class="hint" [attr.id]="id('stake')">Stake preview: {{ stakeKind() }}</p>
-    }
-    <label [attr.for]="id('signHeight')">Signing block height</label>
-    <input [id]="id('signHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="signingBlockHeight" />
-    <label [attr.for]="id('signHash')">Signing block hash</label>
-    <input [id]="id('signHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
-    <div class="row">
-      <button type="button" [id]="id('compose')" (click)="composeRegister()">Compose Sparrow message</button>
-    </div>
-    @if (commandJson()) {
-      <label [attr.for]="id('command')">Command (review before signing)</label>
-      <textarea [id]="id('command')" readonly rows="8">{{ commandJson() }}</textarea>
-    }
-    @if (sparrowMessage()) {
-      <label [attr.for]="id('sparrow')">Copy into federation-sparrow Sign/Verify</label>
-      <textarea [id]="id('sparrow')" readonly rows="2">{{ sparrowMessage() }}</textarea>
-    }
-    <label [attr.for]="id('signature')">Signature (paste from Sparrow)</label>
-    <input [id]="id('signature')" type="text" autocomplete="off" spellcheck="false" formControlName="signature" />
-    <div class="row">
-      <button type="button" [id]="id('register')" (click)="submitRegister()">Submit listing</button>
-    </div>
-  </fieldset>
+      <label [attr.for]="id('attestWallet')">Attester P2WPKH wallet</label>
+      <input [id]="id('attestWallet')" type="text" autocomplete="off" spellcheck="false" formControlName="wallet" />
+      <label [attr.for]="id('attestHeight')">Coinbase height</label>
+      <input [id]="id('attestHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="coinbaseHeight" />
+      <label [attr.for]="id('attestSignHeight')">Signing block height</label>
+      <input [id]="id('attestSignHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="signingBlockHeight" />
+      <label [attr.for]="id('attestSignHash')">Signing block hash</label>
+      <input [id]="id('attestSignHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
+      <div class="row">
+        <button type="button" [id]="id('attest-refresh-tip')" (click)="refreshTip()">Refresh tip</button>
+      </div>
+      <div class="row">
+        <button type="button" [id]="id('compose-attest')" (click)="composeAttestCommand()">Compose attest message</button>
+      </div>
+      @if (attestCommandJson()) {
+        <label [attr.for]="id('attest-command')">Attest command (review before signing)</label>
+        <textarea [id]="id('attest-command')" readonly rows="8">{{ attestCommandJson() }}</textarea>
+      }
+      @if (attestSparrowMessage()) {
+        <label [attr.for]="id('attest-sparrow')">Copy into federation-sparrow Sign/Verify</label>
+        <textarea [id]="id('attest-sparrow')" readonly rows="2">{{ attestSparrowMessage() }}</textarea>
+      }
+      <label [attr.for]="id('attest-signature')">Signature (paste from Sparrow)</label>
+      <input [id]="id('attest-signature')" type="text" autocomplete="off" spellcheck="false" formControlName="signature" />
+      <div class="row">
+        <button type="button" [id]="id('submit-attest')" (click)="submitAttest()">Submit attestation</button>
+        <button type="button" [id]="id('close-attest')" (click)="closeAttest()">Close</button>
+      </div>
+    </form>
+  </dialog>
   }
 </div>

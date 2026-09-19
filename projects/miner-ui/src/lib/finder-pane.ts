@@ -1,4 +1,4 @@
-import { Component, DestroyRef, NgZone, effect, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, NgZone, effect, inject, input, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { debounceTime } from 'rxjs';
@@ -12,8 +12,8 @@ import {
   attestConnectFromListing,
   envelopeAuthorization,
   mainFinderLive,
-  payloadHashHex,
   registryFetch,
+  signedPayloadHash,
   sparrowSignatureToBase64Url,
   type AttestConnect,
   type AttestKind,
@@ -36,6 +36,7 @@ export class FinderPane {
   private readonly host = inject(HASHER_HOST);
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
+  private readonly attestDialog = viewChild<ElementRef<HTMLDialogElement>>('attestDialog');
   protected readonly notice = signal('');
   protected readonly error = signal('');
   protected readonly groups = signal<FindGroup[]>([]);
@@ -60,7 +61,13 @@ export class FinderPane {
     signature: new FormControl('', { nonNullable: true }),
     signingBlockHash: new FormControl('', { nonNullable: true }),
     signingBlockHeight: new FormControl('', { nonNullable: true }),
-    attestHeight: new FormControl('', { nonNullable: true }),
+  });
+  protected readonly attestForm = new FormGroup({
+    wallet: new FormControl('', { nonNullable: true }),
+    coinbaseHeight: new FormControl('', { nonNullable: true }),
+    signature: new FormControl('', { nonNullable: true }),
+    signingBlockHash: new FormControl('', { nonNullable: true }),
+    signingBlockHeight: new FormControl('', { nonNullable: true }),
   });
   private pendingRegister: unknown;
   private pendingAttest:
@@ -72,7 +79,8 @@ export class FinderPane {
       const chain = this.chain();
       void chain;
       this.zone.run(() => {
-        void this.reload();
+        void this.reloadListings();
+        void this.fillSignContext();
       });
     });
     this.form.controls.wallet.valueChanges.pipe(debounceTime(400), takeUntilDestroyed(this.destroyRef)).subscribe((wallet) => {
@@ -86,6 +94,10 @@ export class FinderPane {
 
   protected liveTenant(): boolean {
     return mainFinderLive(this.chain());
+  }
+
+  protected isDesktop(): boolean {
+    return this.shell.kind === 'desktop';
   }
 
   protected baseUrl(): string {
@@ -111,7 +123,7 @@ export class FinderPane {
     return registryFetch(req, this.baseUrl());
   }
 
-  protected async reload(): Promise<void> {
+  protected async reloadListings(): Promise<void> {
     this.error.set('');
     if (!mainFinderLive(this.chain())) {
       this.groups.set([]);
@@ -128,20 +140,29 @@ export class FinderPane {
         this.groups.set([]);
         return;
       }
-      if (body.groups?.length) {
+      const items = body.items ?? [];
+      if (body.groups && body.groups.length > 0) {
         this.groups.set(body.groups);
+      } else if (items.length > 0) {
+        this.groups.set([{ domain: '', listings: items, multipleClaims: false }]);
       } else {
-        this.groups.set([{ domain: '', listings: body.items ?? [], multipleClaims: false }]);
+        this.groups.set([]);
       }
       this.notice.set('');
-      await this.fillSignContext();
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : 'Find failed');
       this.groups.set([]);
     }
   }
 
+  protected async refreshTip(): Promise<void> {
+    await this.fillSignContext();
+  }
+
   private async fillSignContext(): Promise<void> {
+    if (!mainFinderLive(this.chain())) {
+      return;
+    }
     try {
       const res = await this.transport({ method: 'GET', path: '/v1/sign-context', chain: this.chain() });
       const body = res.json as {
@@ -155,11 +176,15 @@ export class FinderPane {
         this.stakeLine.set(body.title ?? '');
         return;
       }
-      if (typeof body.signingBlockHeight === 'number') {
-        this.form.controls.signingBlockHeight.setValue(String(body.signingBlockHeight));
+      const height = typeof body.signingBlockHeight === 'number' ? String(body.signingBlockHeight) : '';
+      const hash = body.signingBlockHash ?? '';
+      if (height) {
+        this.form.controls.signingBlockHeight.setValue(height);
+        this.attestForm.controls.signingBlockHeight.setValue(height);
       }
-      if (body.signingBlockHash) {
-        this.form.controls.signingBlockHash.setValue(body.signingBlockHash);
+      if (hash) {
+        this.form.controls.signingBlockHash.setValue(hash);
+        this.attestForm.controls.signingBlockHash.setValue(hash);
       }
       const hours = (body.mineSeconds ?? 0) / 3600;
       const hourLabel = hours === 1 ? '1 hour' : `${hours} hours`;
@@ -176,7 +201,7 @@ export class FinderPane {
 
   protected toggleInactive(): void {
     this.inactive.set(!this.inactive());
-    void this.reload();
+    void this.reloadListings();
   }
 
   protected connectHint(p: ListingPublic): string {
@@ -205,6 +230,16 @@ export class FinderPane {
     return { kind: 'stratumAndDatum', stratum: parseHp(v.stratum), datum: parseHp(v.datum) };
   }
 
+  private tipFrom(form: { signingBlockHeight: string; signingBlockHash: string }): {
+    signingBlockHeight: number;
+    signingBlockHash: string;
+  } {
+    return {
+      signingBlockHeight: Number.parseInt(form.signingBlockHeight, 10) || 0,
+      signingBlockHash: form.signingBlockHash.trim().toLowerCase(),
+    };
+  }
+
   protected composeRegister(): void {
     if (!this.liveTenant()) {
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
@@ -219,23 +254,32 @@ export class FinderPane {
       coinbaseTag: v.coinbaseTag.trim(),
       connect: this.connectFromForm(),
     };
-    const hash = payloadHashHex(command);
+    const tip = this.tipFrom(v);
+    const hash = signedPayloadHash(command, tip.signingBlockHeight, tip.signingBlockHash);
     this.pendingRegister = command;
-    this.commandJson.set(JSON.stringify(command, null, 2));
+    this.commandJson.set(JSON.stringify({ command, ...tip }, null, 2));
     this.sparrowMessage.set(hash);
     this.notice.set(
       'Copy the 64-hex message below into federation-sparrow Sign/Verify Format Standard (Electrum). Sign with the listing P2WPKH wallet, then paste the signature.',
     );
   }
 
-  protected composeAttest(p: ListingPublic, kind: AttestKind): void {
+  protected async openAttest(p: ListingPublic, kind: AttestKind): Promise<void> {
     const connect = attestConnectFromListing(p.connect, kind);
     if (!connect) {
       return;
     }
     this.pendingAttest = { poolId: p.poolId, connect };
     this.attestSummary.set(`Attest ${kind === 'stratum' ? 'stratum' : 'DATUM'} ${connect.host}:${connect.port} on ${p.name}`);
-    this.composeAttestCommand();
+    this.attestCommandJson.set('');
+    this.attestSparrowMessage.set('');
+    this.attestForm.controls.signature.setValue('');
+    await this.fillSignContext();
+    this.attestDialog()?.nativeElement.showModal();
+  }
+
+  protected closeAttest(): void {
+    this.attestDialog()?.nativeElement.close();
   }
 
   protected composeAttestCommand(): void {
@@ -248,15 +292,17 @@ export class FinderPane {
       return;
     }
     this.error.set('');
-    const height = Number.parseInt(this.form.getRawValue().attestHeight, 10) || 0;
+    const v = this.attestForm.getRawValue();
+    const height = Number.parseInt(v.coinbaseHeight, 10) || 0;
     const command = {
       commandKind: 'attestListing',
       poolId: this.pendingAttest.poolId,
       height,
       connect: this.pendingAttest.connect,
     };
-    const hash = payloadHashHex(command);
-    this.attestCommandJson.set(JSON.stringify(command, null, 2));
+    const tip = this.tipFrom(v);
+    const hash = signedPayloadHash(command, tip.signingBlockHeight, tip.signingBlockHash);
+    this.attestCommandJson.set(JSON.stringify({ command, ...tip }, null, 2));
     this.attestSparrowMessage.set(hash);
     this.notice.set(
       'Copy the attest 64-hex message into federation-sparrow Sign/Verify Format Standard (Electrum). Sign with the attester P2WPKH wallet, then paste the signature.',
@@ -297,6 +343,7 @@ export class FinderPane {
       this.composeRegister();
       return;
     }
+    const tip = this.tipFrom(v);
     const env = {
       messageVersion: 1,
       commandKind: 'registerListing' as const,
@@ -304,8 +351,8 @@ export class FinderPane {
       wallet: v.wallet.trim(),
       payloadHash: this.sparrowMessage(),
       signature: sparrowSignatureToBase64Url(v.signature),
-      signingBlockHash: v.signingBlockHash.trim().toLowerCase(),
-      signingBlockHeight: Number.parseInt(v.signingBlockHeight, 10) || 0,
+      signingBlockHash: tip.signingBlockHash,
+      signingBlockHeight: tip.signingBlockHeight,
     };
     const res = await this.transport({
       method: 'POST',
@@ -320,7 +367,7 @@ export class FinderPane {
       return;
     }
     this.notice.set('Listing registered.');
-    await this.reload();
+    await this.reloadListings();
   }
 
   protected async submitAttest(): Promise<void> {
@@ -333,14 +380,15 @@ export class FinderPane {
       this.composeAttestCommand();
       return;
     }
-    const v = this.form.getRawValue();
-    const height = Number.parseInt(v.attestHeight, 10) || 0;
+    const v = this.attestForm.getRawValue();
+    const height = Number.parseInt(v.coinbaseHeight, 10) || 0;
     const command = {
       commandKind: 'attestListing' as const,
       poolId: this.pendingAttest.poolId,
       height,
       connect: this.pendingAttest.connect,
     };
+    const tip = this.tipFrom(v);
     const env = {
       messageVersion: 1,
       commandKind: 'attestListing' as const,
@@ -348,8 +396,8 @@ export class FinderPane {
       wallet: v.wallet.trim(),
       payloadHash: this.attestSparrowMessage(),
       signature: sparrowSignatureToBase64Url(v.signature),
-      signingBlockHash: v.signingBlockHash.trim().toLowerCase(),
-      signingBlockHeight: Number.parseInt(v.signingBlockHeight, 10) || 0,
+      signingBlockHash: tip.signingBlockHash,
+      signingBlockHeight: tip.signingBlockHeight,
     };
     const res = await this.transport({
       method: 'POST',
@@ -364,12 +412,13 @@ export class FinderPane {
       return;
     }
     this.notice.set('Attestation recorded.');
-    await this.reload();
+    this.closeAttest();
+    await this.reloadListings();
   }
 
   protected setDesktopMinerTarget(p: ListingPublic): void {
     if (this.shell.kind !== 'desktop') {
-      this.notice.set('Use the desktop mill to point the hasher at this listing.');
+      this.notice.set('In-page mining needs a listing WSS advertise.');
       return;
     }
     const chain = this.chain();
