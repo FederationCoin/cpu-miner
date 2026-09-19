@@ -42,6 +42,17 @@
           <button type="button" [id]="id('target-' + p.poolId)" (click)="setDesktopMinerTarget(p)">Mine this</button>
           <button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">CPU share test</button>
         </div>
+        <p class="hint">
+          Pick the Stratum or DATUM host you actually connected. Changing that endpoint later drops
+          this attestation from the score until it matches again.
+        </p>
+        <div class="row">
+          @for (kind of advertisedKinds(p); track kind) {
+          <button type="button" [id]="id('attest-' + kind + '-' + p.poolId)" (click)="composeAttest(p, kind)">
+            Attest {{ kind === 'stratum' ? 'stratum' : 'DATUM' }} {{ attestHostPort(p, kind) }}
+          </button>
+          }
+        </div>
       </div>
       }
     </li>
@@ -49,6 +60,33 @@
     <li class="hint" [attr.id]="id('empty')">No listings in this set.</li>
     }
   </ul>
+
+  <fieldset class="partition" [formGroup]="form">
+    <legend>Attest</legend>
+    <p class="hint">
+      Coinbase height is the block that paid you with this listing's tag. Sign the 64-hex payload hash
+      in federation-sparrow with the attester P2WPKH wallet.
+    </p>
+    @if (attestSummary()) {
+      <p class="mono" [attr.id]="id('attest-summary')">{{ attestSummary() }}</p>
+    }
+    <label [attr.for]="id('attestHeight')">Coinbase height</label>
+    <input [id]="id('attestHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="attestHeight" />
+    <div class="row">
+      <button type="button" [id]="id('compose-attest')" (click)="composeAttestCommand()">Compose attest message</button>
+    </div>
+    @if (attestCommandJson()) {
+      <label [attr.for]="id('attest-command')">Attest command (review before signing)</label>
+      <textarea [id]="id('attest-command')" readonly rows="8">{{ attestCommandJson() }}</textarea>
+    }
+    @if (attestSparrowMessage()) {
+      <label [attr.for]="id('attest-sparrow')">Copy into federation-sparrow Sign/Verify</label>
+      <textarea [id]="id('attest-sparrow')" readonly rows="2">{{ attestSparrowMessage() }}</textarea>
+    }
+    <div class="row">
+      <button type="button" [id]="id('submit-attest')" (click)="submitAttest()">Submit attestation</button>
+    </div>
+  </fieldset>
 
   <fieldset class="partition" [formGroup]="form">
     <legend>Register</legend>
@@ -84,7 +122,7 @@
     <label [attr.for]="id('signHash')">Signing block hash</label>
     <input [id]="id('signHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
     <div class="row">
-      <button type="button" [id]="id('compose')" (click)="compose()">Compose Sparrow message</button>
+      <button type="button" [id]="id('compose')" (click)="composeRegister()">Compose Sparrow message</button>
     </div>
     @if (commandJson()) {
       <label [attr.for]="id('command')">Command (review before signing)</label>
@@ -97,7 +135,7 @@
     <label [attr.for]="id('signature')">Signature (paste from Sparrow)</label>
     <input [id]="id('signature')" type="text" autocomplete="off" spellcheck="false" formControlName="signature" />
     <div class="row">
-      <button type="button" [id]="id('register')" (click)="submit()">Submit listing</button>
+      <button type="button" [id]="id('register')" (click)="submitRegister()">Submit listing</button>
     </div>
   </fieldset>
   }

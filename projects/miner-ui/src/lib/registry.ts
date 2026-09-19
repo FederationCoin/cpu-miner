@@ -14,6 +14,12 @@ export type RegistryConnect =
       wss?: { host: string; path: string };
     };
 
+export type AttestConnect =
+  | { kind: 'stratum'; host: string; port: number }
+  | { kind: 'datum'; host: string; port: number };
+
+export type AttestKind = AttestConnect['kind'];
+
 export type ListingPublic = {
   poolId: string;
   chain: MinerChain;
@@ -35,6 +41,29 @@ export type FindGroup = {
   listings: ListingPublic[];
   multipleClaims: boolean;
 };
+
+export function advertisedAttestKinds(connect: RegistryConnect): AttestKind[] {
+  if (connect.kind === 'stratumOnly') {
+    return ['stratum'];
+  }
+  if (connect.kind === 'datumOnly') {
+    return ['datum'];
+  }
+  return ['stratum', 'datum'];
+}
+
+export function attestConnectFromListing(connect: RegistryConnect, kind: AttestKind): AttestConnect | undefined {
+  if (kind === 'stratum') {
+    if (connect.kind === 'datumOnly') {
+      return undefined;
+    }
+    return { kind: 'stratum', host: connect.stratum.host, port: connect.stratum.port };
+  }
+  if (connect.kind === 'stratumOnly') {
+    return undefined;
+  }
+  return { kind: 'datum', host: connect.datum.host, port: connect.datum.port };
+}
 
 export type RegistryRequest = {
   method: string;

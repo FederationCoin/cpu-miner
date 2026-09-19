@@ -7,11 +7,15 @@ import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import { MiningService } from './mining.service';
 import {
+  advertisedAttestKinds,
+  attestConnectFromListing,
   envelopeAuthorization,
   mainFinderLive,
   payloadHashHex,
   registryFetch,
   sparrowSignatureToBase64Url,
+  type AttestConnect,
+  type AttestKind,
   type FindGroup,
   type ListingPublic,
   type RegistryConnect,
@@ -37,6 +41,9 @@ export class FinderPane {
   protected readonly inactive = signal(false);
   protected readonly sparrowMessage = signal('');
   protected readonly commandJson = signal('');
+  protected readonly attestSummary = signal('');
+  protected readonly attestCommandJson = signal('');
+  protected readonly attestSparrowMessage = signal('');
   protected readonly stakeKind = signal('');
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true }),
@@ -51,8 +58,12 @@ export class FinderPane {
     signature: new FormControl('', { nonNullable: true }),
     signingBlockHash: new FormControl('', { nonNullable: true }),
     signingBlockHeight: new FormControl('', { nonNullable: true }),
+    attestHeight: new FormControl('', { nonNullable: true }),
   });
-  private pendingCommand: unknown;
+  private pendingRegister: unknown;
+  private pendingAttest:
+    | { poolId: string; connect: AttestConnect }
+    | undefined;
 
   constructor() {
     effect(() => {
@@ -77,6 +88,15 @@ export class FinderPane {
 
   protected baseUrl(): string {
     return this.shell.defaults.registryBaseUrl.replace(/\/$/, '');
+  }
+
+  protected advertisedKinds(p: ListingPublic): AttestKind[] {
+    return advertisedAttestKinds(p.connect);
+  }
+
+  protected attestHostPort(p: ListingPublic, kind: AttestKind): string {
+    const c = attestConnectFromListing(p.connect, kind);
+    return c ? `${c.host}:${c.port}` : '';
   }
 
   private async transport(req: RegistryRequest) {
@@ -148,7 +168,7 @@ export class FinderPane {
     return { kind: 'stratumAndDatum', stratum: parseHp(v.stratum), datum: parseHp(v.datum) };
   }
 
-  protected compose(): void {
+  protected composeRegister(): void {
     if (!this.liveTenant()) {
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
       return;
@@ -163,11 +183,46 @@ export class FinderPane {
       connect: this.connectFromForm(),
     };
     const hash = payloadHashHex(command);
-    this.pendingCommand = command;
+    this.pendingRegister = command;
     this.commandJson.set(JSON.stringify(command, null, 2));
     this.sparrowMessage.set(hash);
     this.notice.set(
       'Copy the 64-hex message below into federation-sparrow Sign/Verify. Sign with the listing P2WPKH wallet, then paste the signature.',
+    );
+  }
+
+  protected composeAttest(p: ListingPublic, kind: AttestKind): void {
+    const connect = attestConnectFromListing(p.connect, kind);
+    if (!connect) {
+      return;
+    }
+    this.pendingAttest = { poolId: p.poolId, connect };
+    this.attestSummary.set(`Attest ${kind === 'stratum' ? 'stratum' : 'DATUM'} ${connect.host}:${connect.port} on ${p.name}`);
+    this.composeAttestCommand();
+  }
+
+  protected composeAttestCommand(): void {
+    if (!this.liveTenant()) {
+      this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
+      return;
+    }
+    if (!this.pendingAttest) {
+      this.notice.set('Pick Attest stratum or Attest DATUM on a listing card first.');
+      return;
+    }
+    this.error.set('');
+    const height = Number.parseInt(this.form.getRawValue().attestHeight, 10) || 0;
+    const command = {
+      commandKind: 'attestListing',
+      poolId: this.pendingAttest.poolId,
+      height,
+      connect: this.pendingAttest.connect,
+    };
+    const hash = payloadHashHex(command);
+    this.attestCommandJson.set(JSON.stringify(command, null, 2));
+    this.attestSparrowMessage.set(hash);
+    this.notice.set(
+      'Copy the attest 64-hex message into federation-sparrow Sign/Verify. Sign with the attester P2WPKH wallet, then paste the signature.',
     );
   }
 
@@ -194,15 +249,15 @@ export class FinderPane {
     }
   }
 
-  protected async submit(): Promise<void> {
+  protected async submitRegister(): Promise<void> {
     if (!this.liveTenant()) {
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
       return;
     }
     this.error.set('');
     const v = this.form.getRawValue();
-    if (!this.pendingCommand || !this.sparrowMessage()) {
-      this.compose();
+    if (!this.pendingRegister || !this.sparrowMessage()) {
+      this.composeRegister();
       return;
     }
     const env = {
@@ -219,7 +274,7 @@ export class FinderPane {
       method: 'POST',
       path: '/v1/listings',
       chain: this.chain(),
-      body: this.pendingCommand,
+      body: this.pendingRegister,
       authorization: envelopeAuthorization(env),
     });
     if (res.status >= 400) {
@@ -228,6 +283,50 @@ export class FinderPane {
       return;
     }
     this.notice.set('Listing registered.');
+    await this.reload();
+  }
+
+  protected async submitAttest(): Promise<void> {
+    if (!this.liveTenant()) {
+      this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
+      return;
+    }
+    this.error.set('');
+    if (!this.pendingAttest || !this.attestSparrowMessage()) {
+      this.composeAttestCommand();
+      return;
+    }
+    const v = this.form.getRawValue();
+    const height = Number.parseInt(v.attestHeight, 10) || 0;
+    const command = {
+      commandKind: 'attestListing' as const,
+      poolId: this.pendingAttest.poolId,
+      height,
+      connect: this.pendingAttest.connect,
+    };
+    const env = {
+      messageVersion: 1,
+      commandKind: 'attestListing' as const,
+      chain: this.chain(),
+      wallet: v.wallet.trim(),
+      payloadHash: this.attestSparrowMessage(),
+      signature: sparrowSignatureToBase64Url(v.signature),
+      signingBlockHash: v.signingBlockHash.trim().toLowerCase(),
+      signingBlockHeight: Number.parseInt(v.signingBlockHeight, 10) || 0,
+    };
+    const res = await this.transport({
+      method: 'POST',
+      path: `/v1/listings/${this.pendingAttest.poolId}/attestations`,
+      chain: this.chain(),
+      body: command,
+      authorization: envelopeAuthorization(env),
+    });
+    if (res.status >= 400) {
+      const body = res.json as { title?: string };
+      this.error.set(body.title ?? 'Attest failed');
+      return;
+    }
+    this.notice.set('Attestation recorded.');
     await this.reload();
   }
 
