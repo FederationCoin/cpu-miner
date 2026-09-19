@@ -6,6 +6,7 @@ import type { MinerChain } from './chain';
 import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import { MiningService } from './mining.service';
+import { formatSats } from './miner-format';
 import {
   advertisedAttestKinds,
   attestConnectFromListing,
@@ -45,6 +46,7 @@ export class FinderPane {
   protected readonly attestCommandJson = signal('');
   protected readonly attestSparrowMessage = signal('');
   protected readonly stakeKind = signal('');
+  protected readonly stakeLine = signal('');
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true }),
     websiteUrl: new FormControl('', { nonNullable: true }),
@@ -113,6 +115,7 @@ export class FinderPane {
     this.error.set('');
     if (!mainFinderLive(this.chain())) {
       this.groups.set([]);
+      this.stakeLine.set('');
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
       return;
     }
@@ -131,9 +134,43 @@ export class FinderPane {
         this.groups.set([{ domain: '', listings: body.items ?? [], multipleClaims: false }]);
       }
       this.notice.set('');
+      await this.fillSignContext();
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : 'Find failed');
       this.groups.set([]);
+    }
+  }
+
+  private async fillSignContext(): Promise<void> {
+    try {
+      const res = await this.transport({ method: 'GET', path: '/v1/sign-context', chain: this.chain() });
+      const body = res.json as {
+        signingBlockHeight?: number;
+        signingBlockHash?: string;
+        stakeRequiredSats?: string;
+        mineSeconds?: number;
+        title?: string;
+      };
+      if (res.status >= 400) {
+        this.stakeLine.set(body.title ?? '');
+        return;
+      }
+      if (typeof body.signingBlockHeight === 'number') {
+        this.form.controls.signingBlockHeight.setValue(String(body.signingBlockHeight));
+      }
+      if (body.signingBlockHash) {
+        this.form.controls.signingBlockHash.setValue(body.signingBlockHash);
+      }
+      const hours = (body.mineSeconds ?? 0) / 3600;
+      const hourLabel = hours === 1 ? '1 hour' : `${hours} hours`;
+      const shown = body.stakeRequiredSats ? formatSats(body.stakeRequiredSats) : '';
+      this.stakeLine.set(
+        shown
+          ? `Listing stake is ${hourLabel} of RTX 3090 Ti work (${shown} GFCN).`
+          : `Listing stake is ${hourLabel} of RTX 3090 Ti work.`,
+      );
+    } catch {
+      this.stakeLine.set('');
     }
   }
 
@@ -187,7 +224,7 @@ export class FinderPane {
     this.commandJson.set(JSON.stringify(command, null, 2));
     this.sparrowMessage.set(hash);
     this.notice.set(
-      'Copy the 64-hex message below into federation-sparrow Sign/Verify. Sign with the listing P2WPKH wallet, then paste the signature.',
+      'Copy the 64-hex message below into federation-sparrow Sign/Verify Format Standard (Electrum). Sign with the listing P2WPKH wallet, then paste the signature.',
     );
   }
 
@@ -222,7 +259,7 @@ export class FinderPane {
     this.attestCommandJson.set(JSON.stringify(command, null, 2));
     this.attestSparrowMessage.set(hash);
     this.notice.set(
-      'Copy the attest 64-hex message into federation-sparrow Sign/Verify. Sign with the attester P2WPKH wallet, then paste the signature.',
+      'Copy the attest 64-hex message into federation-sparrow Sign/Verify Format Standard (Electrum). Sign with the attester P2WPKH wallet, then paste the signature.',
     );
   }
 

@@ -1,7 +1,9 @@
 <div class="pane" [attr.id]="id('root')">
   <p class="hint">
-    Find is a public directory. Identity is a Sparrow-signed P2WPKH wallet and a 3090 Ti 24h stake,
+    Find is a public directory. Identity is a Sparrow-signed P2WPKH wallet and listing stake,
     not a captcha. FederationCoin origin is not the pool of record. House pool stays on Pool.
+    Sign the 64-hex payload hash in federation-sparrow Sign/Verify using
+    <strong>Standard (Electrum)</strong> only, not BIP137 or BIP322.
   </p>
   @if (error()) {
     <p class="warn" [attr.id]="id('error')">{{ error() }}</p>
@@ -11,6 +13,9 @@
   }
 
   @if (liveTenant()) {
+  @if (stakeLine()) {
+    <p class="hint" [attr.id]="id('stake-line')">{{ stakeLine() }}</p>
+  }
   <div class="row">
     <button type="button" [id]="id('reload')" (click)="reload()">Refresh</button>
     <button type="button" [id]="id('inactive')" (click)="toggleInactive()">
