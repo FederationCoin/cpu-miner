@@ -3,7 +3,9 @@
     Find is a public directory. Identity is a Sparrow-signed P2WPKH wallet and listing stake,
     not a captcha. FederationCoin origin is not the pool of record. House pool stays on Pool.
     Sign the 64-hex payload hash in federation-sparrow Sign/Verify using
-    <strong>Standard (Electrum)</strong> only, not BIP137 or BIP322.
+    <strong>Standard (Electrum)</strong> only, not BIP137 or BIP322. Paste it as one
+    line. Electrum hashes <code>Bitcoin Signed Message</code>; the registry also
+    accepts <code>FederationCoin Signed Message</code>.
   </p>
   @if (error()) {
     <p class="warn" [attr.id]="id('error')">{{ error() }}</p>
