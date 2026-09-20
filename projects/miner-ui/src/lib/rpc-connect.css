@@ -70,6 +70,7 @@ fieldset.partition {
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.55rem 0.85rem 0.75rem;
+  background: #1a1204;
 }
 
 fieldset.mode {

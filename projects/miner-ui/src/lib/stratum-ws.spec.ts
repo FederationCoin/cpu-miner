@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   authorizeLine,
+  fetchGatewayPoolInfo,
+  isLoopbackWsHost,
   nextWsBackoff,
   parseNotify,
+  parsePoolInfoNotify,
+  parsePoolInfoRpc,
   parsePoolStats,
   parseSetDifficulty,
   parseSubscribeResult,
+  poolInfoLine,
   notifyIgnoreReason,
   shareBodyKey,
   isTcpStratumEndpoint,
@@ -593,5 +598,88 @@ describe('PoolStatsClient', () => {
     });
     expect(heights).toEqual([2]);
     client.close();
+  });
+});
+
+describe('client.pool_info', () => {
+  it('parses notify, result, and JSON-RPC error', () => {
+    const fields = {
+      prime: 'prime.example:28916',
+      name: 'House',
+      coinbaseTag: 'TAG',
+      websiteUrl: 'https://ex.example',
+    };
+    expect(
+      parsePoolInfoNotify({
+        id: null,
+        method: 'client.pool_info',
+        params: [fields],
+      }),
+    ).toEqual(fields);
+    expect(parsePoolInfoRpc({ id: 9, error: null, result: fields })).toEqual({ kind: 'provided', fields });
+    expect(parsePoolInfoRpc({ id: 9, error: [24, 'pool info disabled', null], result: null })).toEqual({
+      kind: 'notProvided',
+    });
+    expect(JSON.parse(poolInfoLine())).toEqual({ id: 9, method: 'client.pool_info', params: [] });
+  });
+
+  it('treats localhost and loopback gateway URLs as loopback', () => {
+    expect(isLoopbackWsHost('ws://127.0.0.1:23335/stratum')).toBe(true);
+    expect(isLoopbackWsHost('ws://localhost:23335/stratum')).toBe(true);
+    expect(isLoopbackWsHost('ws://[::1]:23335/stratum')).toBe(true);
+    expect(isLoopbackWsHost('wss://pool.example/stratum')).toBe(false);
+  });
+
+  it('sends client.pool_info on open when onPoolInfo is set and accepts an error without dropping mining', () => {
+    const sockets: FakeWebSocket[] = [];
+    const infos: string[] = [];
+    const client = new StratumWsClient(
+      'ws://127.0.0.1:23335/stratum',
+      'tgfcn1abc.cpu',
+      'x',
+      silentHandlers({
+        onPoolInfo: (info) => infos.push(info.kind),
+      }),
+      {
+        open: (url) => {
+          const ws = new FakeWebSocket(url);
+          sockets.push(ws);
+          return ws as unknown as WebSocket;
+        },
+      },
+    );
+    client.connect();
+    sockets[0]!.openNow();
+    expect(sockets[0]!.sent.some((l) => l.includes('client.pool_info'))).toBe(true);
+    handshake(sockets[0]!);
+    sockets[0]!.pushLine({ id: 9, error: [24, 'pool info disabled', null], result: null });
+    expect(infos).toEqual(['notProvided']);
+    expect(client.isOpen()).toBe(true);
+    client.requestPoolInfo();
+    expect(sockets[0]!.sent.filter((l) => l.includes('client.pool_info')).length).toBe(2);
+    client.close();
+  });
+
+  it('one-shot fetch closes after a result and does not subscribe', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const pending = fetchGatewayPoolInfo('ws://127.0.0.1:23335/stratum', {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
+    sockets[0]!.openNow();
+    expect(sockets[0]!.sent.some((l) => l.includes('client.pool_info'))).toBe(true);
+    expect(sockets[0]!.sent.some((l) => l.includes('mining.subscribe'))).toBe(false);
+    sockets[0]!.pushLine({
+      id: 9,
+      error: null,
+      result: { prime: 'p.example:28916', name: '', coinbaseTag: '', websiteUrl: '' },
+    });
+    await expect(pending).resolves.toEqual({
+      kind: 'provided',
+      fields: { prime: 'p.example:28916', name: '', coinbaseTag: '', websiteUrl: '' },
+    });
   });
 });

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ConnectionKinds,
+  ConnectionKindLabel,
+  RegisterConnectionKinds,
   canAddPoolConnection,
   connectionEquals,
   envelopeAuthorization,
@@ -71,7 +73,7 @@ describe('registry helpers', () => {
     ).toEqual([{ kind: 'stratumWs', url: 'wss://a.example.com/stratum' }]);
   });
 
-  it('Mine this is first Stratum or Stratum WS; Prime is DATUM Prime rows', () => {
+  it('Mine this is first Stratum or Stratum WS; Prime is DATUM Prime Pool rows', () => {
     const tcp = { connections: [{ kind: 'stratum' as const, url: 's.example.com:23334' }] };
     const wss = {
       connections: [
@@ -108,5 +110,11 @@ describe('registry helpers', () => {
     expect(twelve).toHaveLength(12);
     expect(canAddPoolConnection(twelve, 'stratum')).toBe(false);
     expect(canAddPoolConnection(twelve, 'stratumWs')).toBe(false);
+  });
+
+  it('does not offer DATUM Prime Pool WS on register Kind', () => {
+    expect(RegisterConnectionKinds).toEqual(['stratum', 'stratumWs', 'datumPrime']);
+    expect(ConnectionKinds).toContain('datumPrimeWs');
+    expect(ConnectionKindLabel.datumPrime).toBe('DATUM Prime Pool');
   });
 });

@@ -8,6 +8,7 @@ export const MaxPoolConnections = 12;
 export const MaxPoolConnectionsPerKind = 3;
 
 export const ConnectionKinds = ['stratum', 'stratumWs', 'datumPrime', 'datumPrimeWs'] as const;
+export const RegisterConnectionKinds = ['stratum', 'stratumWs', 'datumPrime'] as const;
 export type ConnectionKind = (typeof ConnectionKinds)[number];
 export type PoolConnection = { kind: ConnectionKind; url: string };
 
@@ -51,8 +52,8 @@ export type FindGroup = {
 export const ConnectionKindLabel: Record<ConnectionKind, string> = {
   stratum: 'Stratum',
   stratumWs: 'Stratum WS',
-  datumPrime: 'DATUM Prime',
-  datumPrimeWs: 'DATUM Prime WS',
+  datumPrime: 'DATUM Prime Pool',
+  datumPrimeWs: 'DATUM Prime Pool WS',
 };
 
 export const ConnectionKindPlaceholder: Record<ConnectionKind, string> = {

@@ -1,6 +1,6 @@
 <div class="pane" [formGroup]="form" [attr.data-tides]="tidesJson()">
     <p class="hint">
-      Starts a local DATUM Prime + TIDES + Stratum v1 process against
+      Starts a local DATUM Prime Pool + TIDES + Stratum v1 process against
       <code>federationcoind</code>. This is a <strong>friends-and-family</strong> pool: one
       process, JSONL on disk, not hardened. If a share is dropped you can get right with people
       you know. That is a problem at scale (strangers, public hashrate). Not the pool of record.
@@ -56,9 +56,9 @@
       </fieldset>
     </app-defaults-fold>
 
-    <app-defaults-fold [foldId]="id('datum-fold')" title="DATUM Prime bind" [summary]="bindSummary(form.controls.datumHost.value, form.controls.datumPort.value)">
+    <app-defaults-fold [foldId]="id('datum-fold')" title="DATUM Prime Pool bind" [summary]="bindSummary(form.controls.datumHost.value, form.controls.datumPort.value)">
       <fieldset class="partition">
-        <legend>DATUM Prime bind</legend>
+        <legend>DATUM Prime Pool bind</legend>
         <label [attr.for]="id('datumHost')">Host</label>
         <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="datumHost" />
         <label [attr.for]="id('datumPort')">Port</label>

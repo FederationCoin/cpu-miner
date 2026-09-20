@@ -212,6 +212,88 @@ export function parsePoolStats(msg: unknown): PoolStats | null {
   };
 }
 
+export const POOL_INFO_RPC_ID = 9;
+
+export type GatewayPoolInfoFields = {
+  prime: string;
+  name: string;
+  coinbaseTag: string;
+  websiteUrl: string;
+};
+
+export type GatewayPoolInfoRpc =
+  | { kind: 'provided'; fields: GatewayPoolInfoFields }
+  | { kind: 'notProvided' };
+
+export function poolInfoLine(id = POOL_INFO_RPC_ID): string {
+  return JSON.stringify({ id, method: 'client.pool_info', params: [] });
+}
+
+function asInfoString(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
+export function parsePoolInfoObject(raw: unknown): GatewayPoolInfoFields | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const o = raw as {
+    prime?: unknown;
+    name?: unknown;
+    coinbaseTag?: unknown;
+    websiteUrl?: unknown;
+  };
+  return {
+    prime: asInfoString(o.prime),
+    name: asInfoString(o.name),
+    coinbaseTag: asInfoString(o.coinbaseTag),
+    websiteUrl: asInfoString(o.websiteUrl),
+  };
+}
+
+export function parsePoolInfoNotify(msg: unknown): GatewayPoolInfoFields | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { method?: unknown; params?: unknown };
+  if (rec.method !== 'client.pool_info' || !Array.isArray(rec.params) || rec.params.length < 1) {
+    return null;
+  }
+  return parsePoolInfoObject(rec.params[0]);
+}
+
+export function parsePoolInfoRpc(msg: unknown, id = POOL_INFO_RPC_ID): GatewayPoolInfoRpc | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { id?: unknown; result?: unknown; error?: unknown; method?: unknown };
+  if (rec.id !== id) {
+    return null;
+  }
+  if (rec.error != null) {
+    return { kind: 'notProvided' };
+  }
+  const fields = parsePoolInfoObject(rec.result);
+  if (!fields) {
+    return { kind: 'notProvided' };
+  }
+  return { kind: 'provided', fields };
+}
+
+export function isLoopbackWsHost(url: string): boolean {
+  const raw = url.trim();
+  if (!raw) {
+    return false;
+  }
+  try {
+    const u = new URL(raw.includes('://') ? raw : `ws://${raw}`);
+    const h = u.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    return h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0:0:0:0:0:0:0:1';
+  } catch {
+    return false;
+  }
+}
+
 function parseTidesPayouts(raw: unknown): TidesPayout[] {
   if (!Array.isArray(raw)) {
     return [];
@@ -255,6 +337,7 @@ export type StratumWsHandlers = {
   onJobIgnored: (reason: string) => void;
   onDisconnected?: (reason: string) => void;
   onPoolStats?: (stats: PoolStats) => void;
+  onPoolInfo?: (info: GatewayPoolInfoRpc) => void;
 };
 
 export type StratumWsClock = {
@@ -379,6 +462,9 @@ export class StratumWsClient {
       }
       this.write(subscribeLine(1, this.sessionId));
       this.write(authorizeLine(2, this.worker, this.password));
+      if (this.handlers.onPoolInfo) {
+        this.write(poolInfoLine());
+      }
     });
     ws.addEventListener('message', (ev: MessageEvent<string>) => {
       if (gen !== this.sockGen) {
@@ -454,6 +540,14 @@ export class StratumWsClient {
       /* ignore */
     }
     this.handlers.onClose('stopped');
+  }
+
+  isOpen(): boolean {
+    return socketOpen(this.ws);
+  }
+
+  requestPoolInfo(): boolean {
+    return this.write(poolInfoLine());
   }
 
   private clock(): StratumWsClock {
@@ -560,6 +654,13 @@ export class StratumWsClient {
       }
       return;
     }
+    if (rec.method === 'client.pool_info') {
+      const fields = parsePoolInfoNotify(msg);
+      if (fields) {
+        this.handlers.onPoolInfo?.({ kind: 'provided', fields });
+      }
+      return;
+    }
     if (rec.method === 'mining.notify') {
       const job = parseNotify(msg);
       if (job) {
@@ -590,6 +691,13 @@ export class StratumWsClient {
       this.backoffMs = 0;
       this.handlers.onAuthorized();
       this.flushOutbox();
+      return;
+    }
+    if (rec.id === POOL_INFO_RPC_ID) {
+      const info = parsePoolInfoRpc(msg);
+      if (info) {
+        this.handlers.onPoolInfo?.(info);
+      }
       return;
     }
     if (typeof rec.id === 'number' && rec.id >= 10) {
@@ -657,6 +765,86 @@ export class StratumWsClient {
 }
 
 export const WATCH_STATS_LINE = JSON.stringify({ id: null, method: 'client.watch_stats', params: [] });
+
+export function fetchGatewayPoolInfo(
+  url: string,
+  transport?: StratumWsTransport,
+  timeoutMs = 8000,
+): Promise<GatewayPoolInfoRpc> {
+  return new Promise((resolve) => {
+    let done = false;
+    let buf = '';
+    const clock =
+      transport?.clock ??
+      ({
+        now: () => Date.now(),
+        schedule: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+        cancel: (id) => {
+          clearTimeout(id);
+        },
+      } satisfies StratumWsClock);
+    const finish = (info: GatewayPoolInfoRpc) => {
+      if (done) {
+        return;
+      }
+      done = true;
+      clock.cancel(timer);
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
+      resolve(info);
+    };
+    const ws = transport?.open ? transport.open(url) : new WebSocket(url);
+    const timer = clock.schedule(() => finish({ kind: 'notProvided' }), timeoutMs);
+    const ingest = (line: string) => {
+      let msg: unknown;
+      try {
+        msg = JSON.parse(line) as unknown;
+      } catch {
+        return;
+      }
+      const notify = parsePoolInfoNotify(msg);
+      if (notify) {
+        finish({ kind: 'provided', fields: notify });
+        return;
+      }
+      const rpc = parsePoolInfoRpc(msg);
+      if (rpc) {
+        finish(rpc);
+      }
+    };
+    ws.addEventListener('open', () => {
+      if (done || ws.readyState !== 1) {
+        return;
+      }
+      ws.send(`${poolInfoLine()}\n`);
+    });
+    ws.addEventListener('message', (ev: MessageEvent<string>) => {
+      if (done || typeof ev.data !== 'string') {
+        return;
+      }
+      buf += ev.data.endsWith('\n') ? ev.data : `${ev.data}\n`;
+      for (;;) {
+        const nl = buf.indexOf('\n');
+        if (nl < 0) {
+          break;
+        }
+        let line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (line.endsWith('\r')) {
+          line = line.slice(0, -1);
+        }
+        if (line) {
+          ingest(line);
+        }
+      }
+    });
+    ws.addEventListener('error', () => finish({ kind: 'notProvided' }));
+    ws.addEventListener('close', () => finish({ kind: 'notProvided' }));
+  });
+}
 
 /** Idle SPA: same /stratum URL, stats only. Close this before opening StratumWsClient. */
 export class PoolStatsClient {

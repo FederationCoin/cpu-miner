@@ -1,10 +1,12 @@
-import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, effect, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import type { GpuAdapter, GpuPick, GpuStrategy, MineTo, MineToKind, MinerStartOpts, MinerStats } from './miner-api';
 import { isWebStratumKind, STRATUM_PASSWORD } from './miner-api';
 import { CHAINS, type ChainConfig, type MinerChain } from './chain';
@@ -17,12 +19,23 @@ import {
   setAdapterPick,
   strategyKindLabel,
 } from './gpu-catalog';
+import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import { IDLE_STATS, MiningService } from './mining.service';
 import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
-import { isTcpStratumEndpoint, stratumWsUrl } from './stratum-ws';
+import { isLoopbackWsHost, isTcpStratumEndpoint, stratumWsUrl, type GatewayPoolInfoRpc } from './stratum-ws';
 import { DefaultsFold } from './defaults-fold';
 import { WebgpuHelp } from './webgpu-help';
+
+const POOL_INFO_DEBOUNCE_MS = 5000;
+
+const LOOPBACK_GATEWAY_TOOLTIP =
+  'localhost gateway needs Apps On Device; if you rejected the prompt and still want to mine to a localhost DATUM Gateway, re-enable it in site settings';
+
+export type GatewayPoolInfoView =
+  | { kind: 'notRequested' }
+  | { kind: 'notProvided'; asOf: number }
+  | { kind: 'provided'; asOf: number; prime: string; name: string; coinbaseTag: string; websiteUrl: string };
 
 const DROPPED_KINDS = new Set([
   'datum',
@@ -52,6 +65,8 @@ function emptyWsGroup(): FormGroup<{ url: FormControl<string>; worker: FormContr
     MatInputModule,
     MatButtonModule,
     MatCardModule,
+    MatIconModule,
+    MatTooltipModule,
   ],
   styleUrl: './miner-pane.css',
   templateUrl: './miner-pane.html',
@@ -61,11 +76,16 @@ export class MinerPane implements OnInit {
   readonly chain = input.required<MinerChain>();
   protected readonly mining = inject(MiningService);
   protected readonly shell = inject(MINER_SHELL);
+  private readonly host = inject(HASHER_HOST);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly gpuPicks = signal<GpuPick[]>([]);
   protected readonly gpuDetecting = signal(false);
   protected readonly webgpuHelpAutoOpen = signal(false);
   protected readonly formError = signal('');
+  protected readonly poolInfoView = signal<GatewayPoolInfoView>({ kind: 'notRequested' });
+  protected readonly loopbackGatewayTooltip = LOOPBACK_GATEWAY_TOOLTIP;
+  private lastPoolInfoAt = 0;
 
   protected readonly form = new FormGroup({
     kind: new FormControl<MineToKind>('node', { nonNullable: true }),
@@ -128,6 +148,11 @@ export class MinerPane implements OnInit {
     this.form.controls.kind.setValue(savedKind && allowed.includes(savedKind) ? savedKind : fallback);
     this.gpuPicks.set(this.loadGpuPicks());
     this.form.valueChanges.subscribe(() => this.persist());
+    this.form.controls.gatewayWebsocket.controls.url.valueChanges.subscribe(() => {
+      this.poolInfoView.set({ kind: 'notRequested' });
+    });
+    const unsubInfo = this.host.onGatewayPoolInfo?.((info) => this.applyPoolInfoRpc(info));
+    this.destroyRef.onDestroy(() => unsubInfo?.());
     this.persist();
   }
 
@@ -189,6 +214,44 @@ export class MinerPane implements OnInit {
 
   protected kind(): MineToKind {
     return this.form.controls.kind.value;
+  }
+
+  protected gatewayLoopbackWarning(): boolean {
+    return this.kind() === 'datumGatewayWebsocket' && isLoopbackWsHost(this.form.controls.gatewayWebsocket.controls.url.value);
+  }
+
+  protected async fetchPoolInfo(): Promise<void> {
+    if (this.kind() !== 'datumGatewayWebsocket') {
+      return;
+    }
+    const now = Date.now();
+    if (now - this.lastPoolInfoAt < POOL_INFO_DEBOUNCE_MS) {
+      return;
+    }
+    this.lastPoolInfoAt = now;
+    if (this.host.miningSocketOpen?.()) {
+      this.host.requestGatewayPoolInfo?.();
+      return;
+    }
+    const url = this.form.controls.gatewayWebsocket.controls.url.value.trim();
+    if (!url || !this.host.fetchGatewayPoolInfo) {
+      return;
+    }
+    const info = await this.host.fetchGatewayPoolInfo(url);
+    this.applyPoolInfoRpc(info);
+  }
+
+  protected formatPoolInfoAsOf(asOf: number): string {
+    return new Date(asOf).toLocaleString();
+  }
+
+  private applyPoolInfoRpc(info: GatewayPoolInfoRpc): void {
+    const asOf = Date.now();
+    if (info.kind === 'provided') {
+      this.poolInfoView.set({ kind: 'provided', asOf, ...info.fields });
+      return;
+    }
+    this.poolInfoView.set({ kind: 'notProvided', asOf });
   }
 
   protected async start(): Promise<void> {

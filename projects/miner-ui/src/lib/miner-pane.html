@@ -48,9 +48,8 @@
         }
         @if (kind() === 'datumGatewayWebsocket') {
           <p class="hint">
-            This is your local gateway’s Stratum listener, not Prime and not the pool.
-            Point the gateway at a DATUM Prime listing from Pool Finder.
-            Mining to localhost gateway requires 'Apps On Device' permission.
+            This is your local gateway’s Stratum listener, not the DATUM Prime Pool and not the pool.
+            Point the gateway at a DATUM Prime Pool listing from Pool Finder.
           </p>
         }
       }
@@ -159,7 +158,62 @@
             placeholder="ws://127.0.0.1:23335/stratum"
             formControlName="url"
           />
+          @if (gatewayLoopbackWarning()) {
+            <mat-icon
+              matSuffix
+              class="url-warn"
+              [id]="id('gatewayLoopbackWarning')"
+              [matTooltip]="loopbackGatewayTooltip"
+            >warning</mat-icon>
+          }
         </mat-form-field>
+        <mat-card class="pool-info-card" [attr.id]="id('pool-info')">
+          <mat-card-header>
+            <mat-card-title>Pool info</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            @if (poolInfoView(); as info) {
+              @switch (info.kind) {
+                @case ('notRequested') {
+                  <p class="hint">Not yet requested</p>
+                  <button mat-stroked-button type="button" [id]="id('pool-info-fetch')" (click)="fetchPoolInfo()">
+                    Fetch pool info
+                  </button>
+                }
+                @case ('notProvided') {
+                  <p>Gateway is not providing pool info</p>
+                  <p class="hint">as of {{ formatPoolInfoAsOf(info.asOf) }}</p>
+                  <button mat-stroked-button type="button" [id]="id('pool-info-refresh')" (click)="fetchPoolInfo()">
+                    Refresh
+                  </button>
+                }
+                @case ('provided') {
+                  <p>Gateway published pool info</p>
+                  <dl>
+                    <dt>DATUM Prime Pool</dt>
+                    <dd class="mono">{{ info.prime || '—' }}</dd>
+                    @if (info.name) {
+                      <dt>Name</dt>
+                      <dd>{{ info.name }}</dd>
+                    }
+                    @if (info.coinbaseTag) {
+                      <dt>Coinbase tag</dt>
+                      <dd class="mono">{{ info.coinbaseTag }}</dd>
+                    }
+                    @if (info.websiteUrl) {
+                      <dt>Website</dt>
+                      <dd class="mono">{{ info.websiteUrl }}</dd>
+                    }
+                  </dl>
+                  <p class="hint">as of {{ formatPoolInfoAsOf(info.asOf) }}</p>
+                  <button mat-stroked-button type="button" [id]="id('pool-info-refresh')" (click)="fetchPoolInfo()">
+                    Refresh
+                  </button>
+                }
+              }
+            }
+          </mat-card-content>
+        </mat-card>
         <mat-form-field appearance="outline">
           <mat-label>Worker</mat-label>
           <input

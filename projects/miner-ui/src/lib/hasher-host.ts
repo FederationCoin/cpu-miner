@@ -1,6 +1,7 @@
 import { InjectionToken } from '@angular/core';
 import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, MinerToast, PoolStartOpts, PoolStats } from './miner-api';
 import type { RegistryRequest, RegistryResponse } from './registry';
+import type { GatewayPoolInfoRpc } from './stratum-ws';
 
 export type HasherHost = {
   canMine: boolean;
@@ -16,6 +17,10 @@ export type HasherHost = {
   poolStop: () => Promise<void>;
   onPoolStats: (cb: (s: PoolStats) => void) => () => void;
   registryRequest?: (req: RegistryRequest) => Promise<RegistryResponse>;
+  miningSocketOpen?: () => boolean;
+  requestGatewayPoolInfo?: () => boolean;
+  fetchGatewayPoolInfo?: (url: string) => Promise<GatewayPoolInfoRpc>;
+  onGatewayPoolInfo?: (cb: (info: GatewayPoolInfoRpc) => void) => () => void;
 };
 
 export const HASHER_HOST = new InjectionToken<HasherHost>('HASHER_HOST');

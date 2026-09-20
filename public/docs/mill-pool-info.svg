@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 280" role="img" aria-labelledby="infoTitle infoDesc">
+  <title id="infoTitle">Gateway pool info</title>
+  <desc id="infoDesc">Example of the mill pool-info card under the DATUM Gateway WebSocket URL. The published host is labeled DATUM Prime Pool.</desc>
+  <rect width="720" height="280" fill="#0a0a0a"/>
+  <rect x="40" y="24" width="640" height="232" rx="8" fill="#1a1204" stroke="#8a7318"/>
+  <text x="64" y="52" fill="#f4e9c8" font-family="sans-serif" font-size="13">DATUM Gateway WebSocket URL</text>
+  <rect x="64" y="64" width="520" height="36" rx="4" fill="#1a1204" stroke="#c9a227"/>
+  <text x="80" y="88" fill="#f4e9c8" font-family="sans-serif" font-size="13">ws://127.0.0.1:23335/stratum</text>
+  <rect x="64" y="116" width="592" height="120" rx="8" fill="#1a1204" stroke="#c9a227"/>
+  <text x="80" y="142" fill="#c9a227" font-family="sans-serif" font-size="14">Gateway published pool info</text>
+  <text x="80" y="166" fill="#d4c89a" font-family="sans-serif" font-size="12">DATUM Prime Pool</text>
+  <text x="280" y="166" fill="#f4e9c8" font-family="sans-serif" font-size="12">prime.example.org:28916</text>
+  <text x="80" y="186" fill="#d4c89a" font-family="sans-serif" font-size="12">Name</text>
+  <text x="280" y="186" fill="#f4e9c8" font-family="sans-serif" font-size="12">House</text>
+  <text x="80" y="206" fill="#d4c89a" font-family="sans-serif" font-size="12">as of local time</text>
+  <rect x="480" y="188" width="152" height="32" rx="4" fill="#1a1204" stroke="#c9a227"/>
+  <text x="556" y="209" text-anchor="middle" fill="#f4e9c8" font-family="sans-serif" font-size="13">Refresh</text>
+</svg>

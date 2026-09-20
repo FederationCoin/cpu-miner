@@ -32,7 +32,7 @@
         </button>
       </div>
       @if (!isDesktop()) {
-        <p class="hint">Mine this sits next to Stratum only. DATUM Prime is a side card for your personal gateway, not mill MineTo.</p>
+        <p class="hint">Mine this sits next to Stratum only. DATUM Prime Pool is a side card for your personal gateway, not mill MineTo.</p>
       }
 
       <ul class="finder-list">
@@ -110,7 +110,7 @@
               @if (primesOf(p).length > 0) {
                 <mat-card class="prime-card" [attr.id]="id('prime-' + p.poolId)">
                   <mat-card-header>
-                    <mat-card-title>DATUM Prime</mat-card-title>
+                    <mat-card-title>DATUM Prime Pool</mat-card-title>
                   </mat-card-header>
                   <mat-card-content>
                     @for (prime of primesOf(p); track prime.url) {
@@ -141,8 +141,9 @@
           <p class="hint">
             Brand and every advertised host share one domain so a listing cannot
             point your name at someone else's pool. Add connections (one to twelve;
-            at most three of each kind). DATUM Prime is what people point their
-            personal gateway at.
+            at most three of each kind). DATUM Prime Pool is TCP for your gateway;
+            the browser mill never connects to that pool. DATUM WSS belongs on the
+            gateway, not the DATUM Prime Pool.
           </p>
           <div
             class="hodl-pill"

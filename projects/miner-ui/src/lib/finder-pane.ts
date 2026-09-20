@@ -14,13 +14,13 @@ import type { MinerChain } from './chain';
 import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import { MiningService } from './mining.service';
-import { formatSats } from './miner-format';
+import { formatStakeGfCn } from './miner-format';
 import { applyDesktopStratumTarget, applyWebPoolWssTarget } from './mine-target';
 import { WorkspaceNav } from './workspace-nav';
 import {
   ConnectionKindLabel,
   ConnectionKindPlaceholder,
-  ConnectionKinds,
+  RegisterConnectionKinds,
   MaxPoolConnections,
   MaxPoolConnectionsPerKind,
   canAddPoolConnection,
@@ -71,14 +71,6 @@ function loadAttested(): AttestedMap {
   }
 }
 
-function trimSatsLabel(sats: string): string {
-  const raw = formatSats(sats);
-  if (!raw.includes('.')) {
-    return raw;
-  }
-  return raw.replace(/0+$/, '').replace(/\.$/, '');
-}
-
 @Component({
   selector: 'app-finder-pane',
   imports: [
@@ -120,7 +112,7 @@ export class FinderPane {
   protected readonly holdBlocks = signal(0);
   protected readonly identityWallet = signal(localStorage.getItem(IDENTITY_WALLET_KEY)?.trim() ?? '');
   protected readonly attested = signal<AttestedMap>(loadAttested());
-  protected readonly listingKinds = ConnectionKinds;
+  readonly listingKinds = RegisterConnectionKinds;
   protected readonly kindLabel = ConnectionKindLabel;
   protected readonly maxConnections = MaxPoolConnections;
   protected readonly form = new FormGroup({
@@ -209,11 +201,11 @@ export class FinderPane {
   }
 
   protected canAddConnection(): boolean {
-    return ConnectionKinds.some((k) => canAddPoolConnection(this.connectionValues(), k));
+    return RegisterConnectionKinds.some((k) => canAddPoolConnection(this.connectionValues(), k));
   }
 
   protected addConnection(): void {
-    const next = ConnectionKinds.find((k) => canAddPoolConnection(this.connectionValues(), k));
+    const next = RegisterConnectionKinds.find((k) => canAddPoolConnection(this.connectionValues(), k));
     if (!next) {
       return;
     }
@@ -355,7 +347,7 @@ export class FinderPane {
       }
       const hours = (body.mineSeconds ?? 0) / 3600;
       const hourLabel = hours === 1 ? '1 hour' : `${hours} hours`;
-      const shown = body.stakeRequiredSats ? trimSatsLabel(body.stakeRequiredSats) : '';
+      const shown = body.stakeRequiredSats ? formatStakeGfCn(body.stakeRequiredSats) : '';
       this.stakeGfCn.set(shown || '…');
       const hold = body.holdBlocks ?? 0;
       this.holdBlocks.set(hold);

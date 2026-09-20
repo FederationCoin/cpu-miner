@@ -303,6 +303,69 @@ describe('WebHasherHost reconnect', () => {
     }
   });
 
+  it('sends client.pool_info on gateway start and still mines if the extra errors', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
+    const infos: string[] = [];
+    host.onGatewayPoolInfo((info) => infos.push(info.kind));
+    try {
+      const r = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: { kind: 'datumGatewayWebsocket', url: 'ws://127.0.0.1:23335/stratum', worker: 'tgfcn1abc.cpu' },
+      });
+      expect(r.ok).toBe(true);
+      const mine = mineSocket(sockets);
+      mine.openNow();
+      expect(mine.sent.some((l) => l.includes('client.pool_info'))).toBe(true);
+      handshake(mine);
+      mine.pushLine({ id: 9, error: [24, 'pool info disabled', null], result: null });
+      expect(infos).toEqual(['notProvided']);
+      notify(mine);
+      await Promise.resolve();
+      expect(host.miningSocketOpen()).toBe(true);
+      const n = sockets.length;
+      expect(host.requestGatewayPoolInfo()).toBe(true);
+      expect(sockets.length).toBe(n);
+      await host.stop();
+    } finally {
+      host.stopWatch();
+    }
+  });
+
+  it('does not open a second socket for pool info while mining the gateway', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
+    try {
+      await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: { kind: 'datumGatewayWebsocket', url: 'ws://127.0.0.1:23335/stratum', worker: 'tgfcn1abc.cpu' },
+      });
+      const mine = mineSocket(sockets);
+      mine.openNow();
+      handshake(mine);
+      const n = sockets.length;
+      expect(host.miningSocketOpen()).toBe(true);
+      host.requestGatewayPoolInfo();
+      expect(sockets.length).toBe(n);
+    } finally {
+      host.stopWatch();
+    }
+  });
+
   it('pauses grind after the grace window while the outbox still retries', async () => {
     const sockets: FakeWebSocket[] = [];
     const clock = testClock();

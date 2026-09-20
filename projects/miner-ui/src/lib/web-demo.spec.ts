@@ -5,6 +5,7 @@ import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
 import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStats } from './miner-api';
+import { FinderPane } from './finder-pane';
 import { MINER_SHELL, webDemoShell } from './miner-shell';
 import { IDLE_STATS } from './mining.service';
 import { NetworkWorkspace } from './network-workspace';
@@ -85,6 +86,10 @@ function fakeWebHost(overrides: Partial<HasherHost> = {}): HasherHost {
       cb(hosted);
       return () => undefined;
     },
+    miningSocketOpen: () => false,
+    requestGatewayPoolInfo: () => false,
+    fetchGatewayPoolInfo: async () => ({ kind: 'notProvided' as const }),
+    onGatewayPoolInfo: () => () => undefined,
     ...overrides,
   };
 }
@@ -235,8 +240,62 @@ describe('web demo shell', () => {
     expect((f.nativeElement.querySelector('#testnet-datumGatewayWebsocketUrl') as HTMLInputElement).value).toBe(
       'ws://127.0.0.1:23335/stratum',
     );
-    expect(f.nativeElement.textContent).toMatch(/not Prime and not the pool/);
-    expect(f.nativeElement.textContent).toMatch(/Apps On Device/);
+    expect(f.nativeElement.textContent).toMatch(/not the DATUM Prime Pool/);
+    expect(has(f, '#testnet-gatewayLoopbackWarning')).toBe(true);
+    expect(has(f, '#testnet-pool-info-fetch')).toBe(true);
+    expect(f.nativeElement.textContent).toMatch(/Not yet requested/);
+    const url = f.nativeElement.querySelector('#testnet-datumGatewayWebsocketUrl') as HTMLInputElement;
+    url.value = 'wss://pool.example/stratum';
+    url.dispatchEvent(new Event('input', { bubbles: true }));
+    f.detectChanges();
+    expect(has(f, '#testnet-gatewayLoopbackWarning')).toBe(false);
+  });
+
+  it('shows notProvided then provided pool info from Fetch', async () => {
+    let n = 0;
+    const f = await render(
+      fakeWebHost({
+        fetchGatewayPoolInfo: async () => {
+          n += 1;
+          if (n === 1) {
+            return { kind: 'notProvided' };
+          }
+          return {
+            kind: 'provided',
+            fields: { prime: 'prime.example:28916', name: 'House', coinbaseTag: 'TAG', websiteUrl: '' },
+          };
+        },
+      }),
+    );
+    clickRadio(f, '#testnet-mineToDatumGatewayWebsocket');
+    f.detectChanges();
+    (f.nativeElement.querySelector('#testnet-pool-info-fetch') as HTMLButtonElement).click();
+    await f.whenStable();
+    f.detectChanges();
+    expect(f.nativeElement.textContent).toMatch(/Gateway is not providing pool info/);
+    expect(has(f, '#testnet-pool-info-refresh')).toBe(true);
+    expect(has(f, '#testnet-pool-info-fetch')).toBe(false);
+  });
+
+  it('shows provided pool info with DATUM Prime Pool host', async () => {
+    const f = await render(
+      fakeWebHost({
+        fetchGatewayPoolInfo: async () => ({
+          kind: 'provided',
+          fields: { prime: 'prime.example:28916', name: 'House', coinbaseTag: 'TAG', websiteUrl: 'https://ex.example' },
+        }),
+      }),
+    );
+    clickRadio(f, '#testnet-mineToDatumGatewayWebsocket');
+    f.detectChanges();
+    (f.nativeElement.querySelector('#testnet-pool-info-fetch') as HTMLButtonElement).click();
+    await f.whenStable();
+    f.detectChanges();
+    expect(f.nativeElement.textContent).toMatch(/Gateway published pool info/);
+    expect(f.nativeElement.textContent).toMatch(/DATUM Prime Pool/);
+    expect(f.nativeElement.textContent).toMatch(/prime.example:28916/);
+    expect(f.nativeElement.textContent).toMatch(/House/);
+    expect(has(f, '#testnet-pool-info-refresh')).toBe(true);
   });
 
   it('migrates a saved Stratum kind to pool WebSocket without a house URL', async () => {
@@ -295,6 +354,10 @@ describe('web demo shell', () => {
       expect(f.nativeElement.querySelector('[id^="testnet-finder-target-"]')).toBeNull();
       expect(f.nativeElement.textContent).toMatch(/Mine this sits next to Stratum only/);
       expect(f.nativeElement.textContent).not.toMatch(/House pool stays on Pool/);
+      const finder = f.debugElement.query(By.directive(FinderPane)).componentInstance as FinderPane;
+      expect([...finder.listingKinds]).toEqual(['stratum', 'stratumWs', 'datumPrime']);
+      expect(finder.listingKinds).not.toContain('datumPrimeWs');
+      expect(f.nativeElement.textContent).toMatch(/DATUM Prime Pool is TCP for your gateway/);
     } finally {
       vi.unstubAllGlobals();
     }
@@ -377,5 +440,20 @@ describe('web demo shell', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('How to mine lead has no hasher-never-DATUM or Apps On Device caption', async () => {
+    const f = await render();
+    (f.nativeElement.querySelector('#testnet-tab-docs') as HTMLButtonElement).click();
+    f.detectChanges();
+    const lead = f.nativeElement.querySelector('[data-how-to-mine]') as HTMLElement;
+    expect(lead).toBeTruthy();
+    expect(lead.textContent).not.toMatch(/hasher never speaks DATUM/i);
+    expect(lead.textContent).not.toMatch(/Apps On Device/);
+    expect(f.nativeElement.textContent).toMatch(/DATUM Prime Pool/);
+    expect(f.nativeElement.textContent).toMatch(/Pool registration, stake, and attestation/);
+    const img = f.nativeElement.querySelector('img[src="docs/mill-web.svg"]') as HTMLImageElement;
+    expect(img.alt).toMatch(/DATUM Prime Pool/);
+    expect(img.alt).not.toMatch(/hasher never/i);
   });
 });
