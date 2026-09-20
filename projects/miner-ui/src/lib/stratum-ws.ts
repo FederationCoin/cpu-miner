@@ -212,57 +212,95 @@ export function parsePoolStats(msg: unknown): PoolStats | null {
   };
 }
 
-export const POOL_INFO_RPC_ID = 9;
+export const GATEWAY_INFO_RPC_ID = 9;
 
-export type GatewayPoolInfoFields = {
-  prime: string;
+export type PeerStatus = 'healthy' | 'not-healthy';
+
+export type GatewayInfoFields = {
+  nodeStatus: PeerStatus;
   name: string;
   coinbaseTag: string;
   websiteUrl: string;
+  prime?: string;
+  poolStatus?: PeerStatus;
 };
 
-export type GatewayPoolInfoRpc =
-  | { kind: 'provided'; fields: GatewayPoolInfoFields }
-  | { kind: 'notProvided' };
+export type GatewayInfoRpc = { kind: 'provided'; fields: GatewayInfoFields } | { kind: 'notProvided' };
 
-export function poolInfoLine(id = POOL_INFO_RPC_ID): string {
-  return JSON.stringify({ id, method: 'client.pool_info', params: [] });
+export function gatewayInfoLine(id = GATEWAY_INFO_RPC_ID): string {
+  return JSON.stringify({ id, method: 'client.gateway_info', params: [] });
+}
+
+export function peerStatusLabel(status: PeerStatus): string {
+  return status === 'healthy' ? 'Healthy' : 'Not healthy';
 }
 
 function asInfoString(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
-export function parsePoolInfoObject(raw: unknown): GatewayPoolInfoFields | null {
+function parsePeerStatus(v: unknown): PeerStatus | null {
+  return v === 'healthy' || v === 'not-healthy' ? v : null;
+}
+
+export function parseGatewayInfoObject(raw: unknown): GatewayInfoFields | null {
   if (!raw || typeof raw !== 'object') {
     return null;
   }
-  const o = raw as {
-    prime?: unknown;
+  const o = raw as { node?: unknown; pool?: unknown };
+  if (!o.node || typeof o.node !== 'object' || !o.pool || typeof o.pool !== 'object') {
+    return null;
+  }
+  const node = o.node as { status?: unknown };
+  const pool = o.pool as {
     name?: unknown;
     coinbaseTag?: unknown;
     websiteUrl?: unknown;
+    prime?: unknown;
+    status?: unknown;
   };
+  const nodeStatus = parsePeerStatus(node.status);
+  if (!nodeStatus) {
+    return null;
+  }
+  const prime = typeof pool.prime === 'string' && pool.prime.length > 0 ? pool.prime : undefined;
+  const poolStatus = parsePeerStatus(pool.status);
+  if (prime) {
+    if (!poolStatus) {
+      return null;
+    }
+    return {
+      nodeStatus,
+      name: asInfoString(pool.name),
+      coinbaseTag: asInfoString(pool.coinbaseTag),
+      websiteUrl: asInfoString(pool.websiteUrl),
+      prime,
+      poolStatus,
+    };
+  }
+  if (pool.status != null) {
+    return null;
+  }
   return {
-    prime: asInfoString(o.prime),
-    name: asInfoString(o.name),
-    coinbaseTag: asInfoString(o.coinbaseTag),
-    websiteUrl: asInfoString(o.websiteUrl),
+    nodeStatus,
+    name: asInfoString(pool.name),
+    coinbaseTag: asInfoString(pool.coinbaseTag),
+    websiteUrl: asInfoString(pool.websiteUrl),
   };
 }
 
-export function parsePoolInfoNotify(msg: unknown): GatewayPoolInfoFields | null {
+export function parseGatewayInfoNotify(msg: unknown): GatewayInfoFields | null {
   if (!msg || typeof msg !== 'object') {
     return null;
   }
   const rec = msg as { method?: unknown; params?: unknown };
-  if (rec.method !== 'client.pool_info' || !Array.isArray(rec.params) || rec.params.length < 1) {
+  if (rec.method !== 'client.gateway_info' || !Array.isArray(rec.params) || rec.params.length < 1) {
     return null;
   }
-  return parsePoolInfoObject(rec.params[0]);
+  return parseGatewayInfoObject(rec.params[0]);
 }
 
-export function parsePoolInfoRpc(msg: unknown, id = POOL_INFO_RPC_ID): GatewayPoolInfoRpc | null {
+export function parseGatewayInfoRpc(msg: unknown, id = GATEWAY_INFO_RPC_ID): GatewayInfoRpc | null {
   if (!msg || typeof msg !== 'object') {
     return null;
   }
@@ -273,7 +311,7 @@ export function parsePoolInfoRpc(msg: unknown, id = POOL_INFO_RPC_ID): GatewayPo
   if (rec.error != null) {
     return { kind: 'notProvided' };
   }
-  const fields = parsePoolInfoObject(rec.result);
+  const fields = parseGatewayInfoObject(rec.result);
   if (!fields) {
     return { kind: 'notProvided' };
   }
@@ -337,7 +375,7 @@ export type StratumWsHandlers = {
   onJobIgnored: (reason: string) => void;
   onDisconnected?: (reason: string) => void;
   onPoolStats?: (stats: PoolStats) => void;
-  onPoolInfo?: (info: GatewayPoolInfoRpc) => void;
+  onGatewayInfo?: (info: GatewayInfoRpc) => void;
 };
 
 export type StratumWsClock = {
@@ -462,8 +500,8 @@ export class StratumWsClient {
       }
       this.write(subscribeLine(1, this.sessionId));
       this.write(authorizeLine(2, this.worker, this.password));
-      if (this.handlers.onPoolInfo) {
-        this.write(poolInfoLine());
+      if (this.handlers.onGatewayInfo) {
+        this.write(gatewayInfoLine());
       }
     });
     ws.addEventListener('message', (ev: MessageEvent<string>) => {
@@ -546,8 +584,8 @@ export class StratumWsClient {
     return socketOpen(this.ws);
   }
 
-  requestPoolInfo(): boolean {
-    return this.write(poolInfoLine());
+  requestGatewayInfo(): boolean {
+    return this.write(gatewayInfoLine());
   }
 
   private clock(): StratumWsClock {
@@ -654,10 +692,10 @@ export class StratumWsClient {
       }
       return;
     }
-    if (rec.method === 'client.pool_info') {
-      const fields = parsePoolInfoNotify(msg);
+    if (rec.method === 'client.gateway_info') {
+      const fields = parseGatewayInfoNotify(msg);
       if (fields) {
-        this.handlers.onPoolInfo?.({ kind: 'provided', fields });
+        this.handlers.onGatewayInfo?.({ kind: 'provided', fields });
       }
       return;
     }
@@ -693,10 +731,10 @@ export class StratumWsClient {
       this.flushOutbox();
       return;
     }
-    if (rec.id === POOL_INFO_RPC_ID) {
-      const info = parsePoolInfoRpc(msg);
+    if (rec.id === GATEWAY_INFO_RPC_ID) {
+      const info = parseGatewayInfoRpc(msg);
       if (info) {
-        this.handlers.onPoolInfo?.(info);
+        this.handlers.onGatewayInfo?.(info);
       }
       return;
     }
@@ -766,11 +804,11 @@ export class StratumWsClient {
 
 export const WATCH_STATS_LINE = JSON.stringify({ id: null, method: 'client.watch_stats', params: [] });
 
-export function fetchGatewayPoolInfo(
+export function fetchGatewayInfo(
   url: string,
   transport?: StratumWsTransport,
   timeoutMs = 8000,
-): Promise<GatewayPoolInfoRpc> {
+): Promise<GatewayInfoRpc> {
   return new Promise((resolve) => {
     let done = false;
     let buf = '';
@@ -783,7 +821,7 @@ export function fetchGatewayPoolInfo(
           clearTimeout(id);
         },
       } satisfies StratumWsClock);
-    const finish = (info: GatewayPoolInfoRpc) => {
+    const finish = (info: GatewayInfoRpc) => {
       if (done) {
         return;
       }
@@ -805,12 +843,12 @@ export function fetchGatewayPoolInfo(
       } catch {
         return;
       }
-      const notify = parsePoolInfoNotify(msg);
+      const notify = parseGatewayInfoNotify(msg);
       if (notify) {
         finish({ kind: 'provided', fields: notify });
         return;
       }
-      const rpc = parsePoolInfoRpc(msg);
+      const rpc = parseGatewayInfoRpc(msg);
       if (rpc) {
         finish(rpc);
       }
@@ -819,7 +857,7 @@ export function fetchGatewayPoolInfo(
       if (done || ws.readyState !== 1) {
         return;
       }
-      ws.send(`${poolInfoLine()}\n`);
+      ws.send(`${gatewayInfoLine()}\n`);
     });
     ws.addEventListener('message', (ev: MessageEvent<string>) => {
       if (done || typeof ev.data !== 'string') {

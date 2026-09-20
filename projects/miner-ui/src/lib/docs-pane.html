@@ -24,13 +24,13 @@
     Newline JSON-RPC. Password <code>x</code>. Path <code>/stratum</code>.
     Subscribe, authorize, notify, set difficulty, submit. Junk frames are closed.
     A pool may also send <code>client.pool_stats</code>; a gateway does not.
-    A DATUM Gateway may answer <code>client.pool_info</code> when the operator
+    A DATUM Gateway may answer <code>client.gateway_info</code> when the operator
     turns that extra on (default off). The mill only asks on DATUM Gateway WebSocket.
     At most six WebSocket connections per client IP; one accepted
-    <code>client.pool_info</code> per five seconds on that socket.
+    <code>client.gateway_info</code> per five seconds on that socket.
   </p>
   <figure class="docs-figure">
-    <img src="docs/mill-pool-info.svg" width="720" height="280" alt="Example of the mill pool-info card under the DATUM Gateway WebSocket URL, showing a published DATUM Prime Pool host" />
+    <img src="docs/mill-pool-info.svg" width="720" height="320" alt="Example of the mill gateway-info card under the DATUM Gateway WebSocket URL, showing node status and a published DATUM Prime Pool host" />
   </figure>
 
   <h3>If a connection drops or a message times out</h3>

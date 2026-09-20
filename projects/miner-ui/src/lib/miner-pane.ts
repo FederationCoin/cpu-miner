@@ -23,19 +23,28 @@ import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import { IDLE_STATS, MiningService } from './mining.service';
 import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
-import { isLoopbackWsHost, isTcpStratumEndpoint, stratumWsUrl, type GatewayPoolInfoRpc } from './stratum-ws';
+import { isLoopbackWsHost, isTcpStratumEndpoint, peerStatusLabel, stratumWsUrl, type GatewayInfoRpc, type PeerStatus } from './stratum-ws';
 import { DefaultsFold } from './defaults-fold';
 import { WebgpuHelp } from './webgpu-help';
 
-const POOL_INFO_DEBOUNCE_MS = 5000;
+const GATEWAY_INFO_DEBOUNCE_MS = 5000;
 
 const LOOPBACK_GATEWAY_TOOLTIP =
   'localhost gateway needs Apps On Device; if you rejected the prompt and still want to mine to a localhost DATUM Gateway, re-enable it in site settings';
 
-export type GatewayPoolInfoView =
+export type GatewayInfoView =
   | { kind: 'notRequested' }
   | { kind: 'notProvided'; asOf: number }
-  | { kind: 'provided'; asOf: number; prime: string; name: string; coinbaseTag: string; websiteUrl: string };
+  | {
+      kind: 'provided';
+      asOf: number;
+      nodeStatus: PeerStatus;
+      name: string;
+      coinbaseTag: string;
+      websiteUrl: string;
+      prime?: string;
+      poolStatus?: PeerStatus;
+    };
 
 const DROPPED_KINDS = new Set([
   'datum',
@@ -83,9 +92,9 @@ export class MinerPane implements OnInit {
   protected readonly gpuDetecting = signal(false);
   protected readonly webgpuHelpAutoOpen = signal(false);
   protected readonly formError = signal('');
-  protected readonly poolInfoView = signal<GatewayPoolInfoView>({ kind: 'notRequested' });
+  protected readonly gatewayInfoView = signal<GatewayInfoView>({ kind: 'notRequested' });
   protected readonly loopbackGatewayTooltip = LOOPBACK_GATEWAY_TOOLTIP;
-  private lastPoolInfoAt = 0;
+  private lastGatewayInfoAt = 0;
 
   protected readonly form = new FormGroup({
     kind: new FormControl<MineToKind>('node', { nonNullable: true }),
@@ -149,9 +158,9 @@ export class MinerPane implements OnInit {
     this.gpuPicks.set(this.loadGpuPicks());
     this.form.valueChanges.subscribe(() => this.persist());
     this.form.controls.gatewayWebsocket.controls.url.valueChanges.subscribe(() => {
-      this.poolInfoView.set({ kind: 'notRequested' });
+      this.gatewayInfoView.set({ kind: 'notRequested' });
     });
-    const unsubInfo = this.host.onGatewayPoolInfo?.((info) => this.applyPoolInfoRpc(info));
+    const unsubInfo = this.host.onGatewayInfo?.((info) => this.applyGatewayInfoRpc(info));
     this.destroyRef.onDestroy(() => unsubInfo?.());
     this.persist();
   }
@@ -220,38 +229,42 @@ export class MinerPane implements OnInit {
     return this.kind() === 'datumGatewayWebsocket' && isLoopbackWsHost(this.form.controls.gatewayWebsocket.controls.url.value);
   }
 
-  protected async fetchPoolInfo(): Promise<void> {
+  protected async fetchGatewayInfo(): Promise<void> {
     if (this.kind() !== 'datumGatewayWebsocket') {
       return;
     }
     const now = Date.now();
-    if (now - this.lastPoolInfoAt < POOL_INFO_DEBOUNCE_MS) {
+    if (now - this.lastGatewayInfoAt < GATEWAY_INFO_DEBOUNCE_MS) {
       return;
     }
-    this.lastPoolInfoAt = now;
+    this.lastGatewayInfoAt = now;
     if (this.host.miningSocketOpen?.()) {
-      this.host.requestGatewayPoolInfo?.();
+      this.host.requestGatewayInfo?.();
       return;
     }
     const url = this.form.controls.gatewayWebsocket.controls.url.value.trim();
-    if (!url || !this.host.fetchGatewayPoolInfo) {
+    if (!url || !this.host.fetchGatewayInfo) {
       return;
     }
-    const info = await this.host.fetchGatewayPoolInfo(url);
-    this.applyPoolInfoRpc(info);
+    const info = await this.host.fetchGatewayInfo(url);
+    this.applyGatewayInfoRpc(info);
   }
 
-  protected formatPoolInfoAsOf(asOf: number): string {
+  protected formatGatewayInfoAsOf(asOf: number): string {
     return new Date(asOf).toLocaleString();
   }
 
-  private applyPoolInfoRpc(info: GatewayPoolInfoRpc): void {
+  protected statusLabel(status: PeerStatus): string {
+    return peerStatusLabel(status);
+  }
+
+  private applyGatewayInfoRpc(info: GatewayInfoRpc): void {
     const asOf = Date.now();
     if (info.kind === 'provided') {
-      this.poolInfoView.set({ kind: 'provided', asOf, ...info.fields });
+      this.gatewayInfoView.set({ kind: 'provided', asOf, ...info.fields });
       return;
     }
-    this.poolInfoView.set({ kind: 'notProvided', asOf });
+    this.gatewayInfoView.set({ kind: 'notProvided', asOf });
   }
 
   protected async start(): Promise<void> {

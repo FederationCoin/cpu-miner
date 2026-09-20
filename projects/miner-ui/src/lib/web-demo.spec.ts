@@ -87,9 +87,9 @@ function fakeWebHost(overrides: Partial<HasherHost> = {}): HasherHost {
       return () => undefined;
     },
     miningSocketOpen: () => false,
-    requestGatewayPoolInfo: () => false,
-    fetchGatewayPoolInfo: async () => ({ kind: 'notProvided' as const }),
-    onGatewayPoolInfo: () => () => undefined,
+    requestGatewayInfo: () => false,
+    fetchGatewayInfo: async () => ({ kind: 'notProvided' as const }),
+    onGatewayInfo: () => () => undefined,
     ...overrides,
   };
 }
@@ -242,7 +242,7 @@ describe('web demo shell', () => {
     );
     expect(f.nativeElement.textContent).toMatch(/not the DATUM Prime Pool/);
     expect(has(f, '#testnet-gatewayLoopbackWarning')).toBe(true);
-    expect(has(f, '#testnet-pool-info-fetch')).toBe(true);
+    expect(has(f, '#testnet-gateway-info-fetch')).toBe(true);
     expect(f.nativeElement.textContent).toMatch(/Not yet requested/);
     const url = f.nativeElement.querySelector('#testnet-datumGatewayWebsocketUrl') as HTMLInputElement;
     url.value = 'wss://pool.example/stratum';
@@ -251,51 +251,93 @@ describe('web demo shell', () => {
     expect(has(f, '#testnet-gatewayLoopbackWarning')).toBe(false);
   });
 
-  it('shows notProvided then provided pool info from Fetch', async () => {
+  it('shows notProvided then provided gateway info from Fetch', async () => {
     let n = 0;
     const f = await render(
       fakeWebHost({
-        fetchGatewayPoolInfo: async () => {
+        fetchGatewayInfo: async () => {
           n += 1;
           if (n === 1) {
             return { kind: 'notProvided' };
           }
           return {
             kind: 'provided',
-            fields: { prime: 'prime.example:28916', name: 'House', coinbaseTag: 'TAG', websiteUrl: '' },
+            fields: {
+              nodeStatus: 'healthy',
+              name: 'House',
+              coinbaseTag: 'TAG',
+              websiteUrl: '',
+              prime: 'prime.example:28916',
+              poolStatus: 'healthy',
+            },
           };
         },
       }),
     );
     clickRadio(f, '#testnet-mineToDatumGatewayWebsocket');
     f.detectChanges();
-    (f.nativeElement.querySelector('#testnet-pool-info-fetch') as HTMLButtonElement).click();
+    (f.nativeElement.querySelector('#testnet-gateway-info-fetch') as HTMLButtonElement).click();
     await f.whenStable();
     f.detectChanges();
-    expect(f.nativeElement.textContent).toMatch(/Gateway is not providing pool info/);
-    expect(has(f, '#testnet-pool-info-refresh')).toBe(true);
-    expect(has(f, '#testnet-pool-info-fetch')).toBe(false);
+    expect(f.nativeElement.textContent).toMatch(/Gateway is not providing gateway info/);
+    expect(has(f, '#testnet-gateway-info-refresh')).toBe(true);
+    expect(has(f, '#testnet-gateway-info-fetch')).toBe(false);
   });
 
-  it('shows provided pool info with DATUM Prime Pool host', async () => {
+  it('shows provided gateway info with node status and without a pool status when Prime is omitted', async () => {
     const f = await render(
       fakeWebHost({
-        fetchGatewayPoolInfo: async () => ({
+        fetchGatewayInfo: async () => ({
           kind: 'provided',
-          fields: { prime: 'prime.example:28916', name: 'House', coinbaseTag: 'TAG', websiteUrl: 'https://ex.example' },
+          fields: {
+            nodeStatus: 'healthy',
+            name: 'Local WSS test',
+            coinbaseTag: 'DATUM Gateway',
+            websiteUrl: 'https://mine.federationcoin.org',
+          },
         }),
       }),
     );
     clickRadio(f, '#testnet-mineToDatumGatewayWebsocket');
     f.detectChanges();
-    (f.nativeElement.querySelector('#testnet-pool-info-fetch') as HTMLButtonElement).click();
+    (f.nativeElement.querySelector('#testnet-gateway-info-fetch') as HTMLButtonElement).click();
     await f.whenStable();
     f.detectChanges();
-    expect(f.nativeElement.textContent).toMatch(/Gateway published pool info/);
+    const card = f.nativeElement.querySelector('#testnet-gateway-info') as HTMLElement;
+    expect(card.textContent).toMatch(/Gateway published info/);
+    expect(card.textContent).toMatch(/Healthy/);
+    expect(card.textContent).toMatch(/Local WSS test/);
+    expect(card.textContent).not.toMatch(/DATUM Prime Pool/);
+    expect(has(f, '#testnet-gateway-info-refresh')).toBe(true);
+  });
+
+  it('shows provided gateway info with DATUM Prime Pool host and pool status', async () => {
+    const f = await render(
+      fakeWebHost({
+        fetchGatewayInfo: async () => ({
+          kind: 'provided',
+          fields: {
+            nodeStatus: 'healthy',
+            name: 'House',
+            coinbaseTag: 'TAG',
+            websiteUrl: 'https://ex.example',
+            prime: 'prime.example:28916',
+            poolStatus: 'not-healthy',
+          },
+        }),
+      }),
+    );
+    clickRadio(f, '#testnet-mineToDatumGatewayWebsocket');
+    f.detectChanges();
+    (f.nativeElement.querySelector('#testnet-gateway-info-fetch') as HTMLButtonElement).click();
+    await f.whenStable();
+    f.detectChanges();
+    expect(f.nativeElement.textContent).toMatch(/Gateway published info/);
     expect(f.nativeElement.textContent).toMatch(/DATUM Prime Pool/);
     expect(f.nativeElement.textContent).toMatch(/prime.example:28916/);
+    expect(f.nativeElement.textContent).toMatch(/Not healthy/);
     expect(f.nativeElement.textContent).toMatch(/House/);
-    expect(has(f, '#testnet-pool-info-refresh')).toBe(true);
+    expect(has(f, '#testnet-gateway-info-refresh')).toBe(true);
   });
 
   it('migrates a saved Stratum kind to pool WebSocket without a house URL', async () => {

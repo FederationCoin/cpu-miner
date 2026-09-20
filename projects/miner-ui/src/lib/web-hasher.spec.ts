@@ -303,7 +303,7 @@ describe('WebHasherHost reconnect', () => {
     }
   });
 
-  it('sends client.pool_info on gateway start and still mines if the extra errors', async () => {
+  it('sends client.gateway_info on gateway start and still mines if the extra errors', async () => {
     const sockets: FakeWebSocket[] = [];
     const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
       open: (url) => {
@@ -313,7 +313,7 @@ describe('WebHasherHost reconnect', () => {
       },
     });
     const infos: string[] = [];
-    host.onGatewayPoolInfo((info) => infos.push(info.kind));
+    host.onGatewayInfo((info) => infos.push(info.kind));
     try {
       const r = await host.start({
         chain: 'testnet',
@@ -323,15 +323,15 @@ describe('WebHasherHost reconnect', () => {
       expect(r.ok).toBe(true);
       const mine = mineSocket(sockets);
       mine.openNow();
-      expect(mine.sent.some((l) => l.includes('client.pool_info'))).toBe(true);
+      expect(mine.sent.some((l) => l.includes('client.gateway_info'))).toBe(true);
       handshake(mine);
-      mine.pushLine({ id: 9, error: [24, 'pool info disabled', null], result: null });
+      mine.pushLine({ id: 9, error: [24, 'gateway info disabled', null], result: null });
       expect(infos).toEqual(['notProvided']);
       notify(mine);
       await Promise.resolve();
       expect(host.miningSocketOpen()).toBe(true);
       const n = sockets.length;
-      expect(host.requestGatewayPoolInfo()).toBe(true);
+      expect(host.requestGatewayInfo()).toBe(true);
       expect(sockets.length).toBe(n);
       await host.stop();
     } finally {
@@ -339,7 +339,7 @@ describe('WebHasherHost reconnect', () => {
     }
   });
 
-  it('does not open a second socket for pool info while mining the gateway', async () => {
+  it('does not open a second socket for gateway info while mining the gateway', async () => {
     const sockets: FakeWebSocket[] = [];
     const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
       open: (url) => {
@@ -359,7 +359,7 @@ describe('WebHasherHost reconnect', () => {
       handshake(mine);
       const n = sockets.length;
       expect(host.miningSocketOpen()).toBe(true);
-      host.requestGatewayPoolInfo();
+      host.requestGatewayInfo();
       expect(sockets.length).toBe(n);
     } finally {
       host.stopWatch();

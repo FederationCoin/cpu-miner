@@ -24,8 +24,8 @@ import {
 import type { HostedEndpoints } from './miner-shell';
 import {
   StratumWsClient,
-  fetchGatewayPoolInfo,
-  type GatewayPoolInfoRpc,
+  fetchGatewayInfo,
+  type GatewayInfoRpc,
   type StratumNotify,
   type StratumWsTransport,
 } from './stratum-ws';
@@ -79,7 +79,7 @@ export class WebHasherHost implements HasherHost {
   private statsCbs: Array<(s: MinerStats) => void> = [];
   private toastCbs: Array<(t: MinerToast) => void> = [];
   private poolCbs: Array<(s: PoolStats) => void> = [];
-  private poolInfoCbs: Array<(info: GatewayPoolInfoRpc) => void> = [];
+  private gatewayInfoCbs: Array<(info: GatewayInfoRpc) => void> = [];
   private client: StratumWsClient | null = null;
   private hashes = 0;
   private lastRateAt = Date.now();
@@ -129,7 +129,7 @@ export class WebHasherHost implements HasherHost {
     let shareDiff = 1n;
     let lastJob: StratumNotify | null = null;
     const watchPoolStats = opts.mineTo.kind === 'stratumPoolWebsocket';
-    const watchPoolInfo = opts.mineTo.kind === 'datumGatewayWebsocket';
+    const watchGatewayInfo = opts.mineTo.kind === 'datumGatewayWebsocket';
     const client = new StratumWsClient(url, worker.trim(), STRATUM_PASSWORD, {
       onSubscribed: (sub) => {
         extraNonce1 = new Uint8Array(sub.extraNonce1);
@@ -210,9 +210,9 @@ export class WebHasherHost implements HasherHost {
             this.applyPoolStats(stats);
           }
         : undefined,
-      onPoolInfo: watchPoolInfo
+      onGatewayInfo: watchGatewayInfo
         ? (info) => {
-            this.emitPoolInfo(info);
+            this.emitGatewayInfo(info);
           }
         : undefined,
     }, this.wsTransport);
@@ -285,23 +285,23 @@ export class WebHasherHost implements HasherHost {
     return this.client?.isOpen() ?? false;
   }
 
-  requestGatewayPoolInfo(): boolean {
-    return this.client?.requestPoolInfo() ?? false;
+  requestGatewayInfo(): boolean {
+    return this.client?.requestGatewayInfo() ?? false;
   }
 
-  fetchGatewayPoolInfo(url: string): Promise<GatewayPoolInfoRpc> {
-    return fetchGatewayPoolInfo(url, this.wsTransport);
+  fetchGatewayInfo(url: string): Promise<GatewayInfoRpc> {
+    return fetchGatewayInfo(url, this.wsTransport);
   }
 
-  onGatewayPoolInfo(cb: (info: GatewayPoolInfoRpc) => void): () => void {
-    this.poolInfoCbs.push(cb);
+  onGatewayInfo(cb: (info: GatewayInfoRpc) => void): () => void {
+    this.gatewayInfoCbs.push(cb);
     return () => {
-      this.poolInfoCbs = this.poolInfoCbs.filter((c) => c !== cb);
+      this.gatewayInfoCbs = this.gatewayInfoCbs.filter((c) => c !== cb);
     };
   }
 
-  private emitPoolInfo(info: GatewayPoolInfoRpc): void {
-    for (const cb of this.poolInfoCbs) {
+  private emitGatewayInfo(info: GatewayInfoRpc): void {
+    for (const cb of this.gatewayInfoCbs) {
       cb(info);
     }
   }
