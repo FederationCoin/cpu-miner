@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { asicPowHash, blake2b32, parseHex, toHex } from './asic-pow';
+import { asicPowHash, blake2b32, grindTargetForShare, parseHex, POW_LIMIT, shareTargetFromDiff, targetFromCompact, targetToBig, toHex } from './asic-pow';
 import { ASIC_POW_WGSL } from './asic-pow.shader';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -39,5 +39,22 @@ describe('asicPowHash', () => {
     expect(ASIC_POW_WGSL).toContain('0xf3bcc908u');
     expect(ASIC_POW_WGSL).toContain('asic_pow_grind');
     expect(ASIC_POW_WGSL).toContain('asic_pow_hash_one');
+  });
+});
+
+describe('grindTargetForShare', () => {
+  it('hunts share difficulty even when nBits is easier than the share', () => {
+    const nBits = 0x1e00ffff;
+    const block = targetFromCompact(nBits);
+    expect(block).toBeTruthy();
+    const grind = grindTargetForShare(nBits, 2n);
+    expect(grind).toBeTruthy();
+    expect(targetToBig(grind!)).toBe(targetToBig(shareTargetFromDiff(2n)));
+    expect(targetToBig(grind!)).toBeLessThan(targetToBig(block!));
+  });
+
+  it('maps difficulty 1 to powLimit', () => {
+    expect(targetToBig(shareTargetFromDiff(1n))).toBe(POW_LIMIT);
+    expect(targetToBig(grindTargetForShare(0x1b095cae, 1n)!)).toBe(POW_LIMIT);
   });
 });

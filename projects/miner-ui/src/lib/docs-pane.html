@@ -1,4 +1,39 @@
 <div class="pane" [attr.id]="id('root')">
+  <h3>How to mine</h3>
+  @if (isWeb()) {
+    <p class="hint">
+      You loaded this page from CloudFront. The hasher in this tab speaks
+      <strong>Stratum v1 over WebSocket</strong> to a pool or to
+      <code>ws://127.0.0.1:23335/stratum</code>. Mining to a localhost gateway
+      requires Apps On Device permission. The hasher never speaks DATUM.
+    </p>
+    <figure class="docs-figure">
+      <img src="docs/mill-web.svg" width="720" height="280" alt="Web mill: browser loads the SPA, then WSS Stratum to a pool or local gateway" />
+    </figure>
+  } @else {
+    <p class="hint">
+      Desktop mill uses <strong>TCP Stratum</strong> or node RPC. No WebSocket
+      required. Host a pool stays Prime spawn for friends, family, LAN, and mesh.
+    </p>
+    <figure class="docs-figure">
+      <img src="docs/mill-desktop.svg" width="720" height="240" alt="Desktop mill: Electron speaks TCP Stratum or node RPC" />
+    </figure>
+  }
+
+  <h3>WebSocket protocol</h3>
+  <p class="hint">
+    Newline JSON-RPC. Password <code>x</code>. Path <code>/stratum</code>.
+    Subscribe, authorize, notify, set difficulty, submit. Junk frames are closed.
+    A pool may also send <code>client.pool_stats</code>; a gateway does not.
+  </p>
+
+  <h3>If a connection drops or a message times out</h3>
+  <p class="hint">
+    The mill reconnects with exponential backoff (1s, doubling to 60s). Hashing
+    continues for 3s, then pauses. Submits retry from an outbox every 8s. Status
+    and a short toast say what happened. Nothing stalls silently.
+  </p>
+
   <h3>Pool grades</h3>
   <p class="hint">
     The <strong>app-hosted</strong> pool (desktop child process, loopback, JSONL on disk) is for
@@ -8,50 +43,13 @@
   </p>
   <p class="hint">
     A <strong>pro pool</strong> needs a shared share store (Postgres), replicas only after that
-    store exists, and backups. Sticky sessions are not TIDES. Templates:
-    <code>infra/k8s/federationcoin/values-pool-ha.yaml</code> and
-    <code>infra/cloudformation/pool-rds.yaml</code>. Do not apply RDS onto the current demo cluster
-    unless you mean to.
-  </p>
-  <p class="hint">
-    Node and mempool databases can stay cheap. If other peers still hold the chain, a wiped node can
-    IBD. Mempool MariaDB is a cache. <strong>Pool shares cannot be recovered from P2P.</strong>
-  </p>
-
-  <h3>This house pool</h3>
-  <p class="hint">
-    The EKS testnet deploy is a demonstration piece, not the pool of record. MAIN is not served.
-    Config is in the image / ConfigMap, not edited here.
+    store exists, and backups. Sticky sessions are not TIDES.
   </p>
 
   <h3>DATUM is bring your own node</h3>
   <p class="hint">
-    Hashers speak Stratum v1 to a gateway or a Stratum pool. DATUM is the gateway talking to Prime
-    (the coinbaser in the job). Template construction stays on <em>your</em>
-    <code>federationcoind</code>. This cloud UI will not proxy our node (that would defeat DATUM).
-    Do not send mill hashers to pool <code>WSS /datum</code> (binary coinbaser wrap).
-  </p>
-
-  <h3>WebSocket Stratum</h3>
-  <p class="hint">
-    The web SPA is <code>mine.federationcoin.org</code> (network is the in-app dropdown). In-page
-    mining is Stratum v1 over WebSocket: newline JSON-RPC, password <code>x</code>, path
-    <code>/stratum</code>. Two MineTo kinds: Stratum pool via WebSocket, or DATUM Gateway via
-    WebSocket (reachable URL; CloudFront cannot use miner <code>127.0.0.1</code>). Find → Mine this
-    fills pool WSS. Prime is a side card for gateway config. No hosted house MineTo. Desktop mill
-    uses TCP; that host may be a pool or a reachable DATUM Gateway. Gateway WSS is on a dedicated
-    port, not the admin API.
-  </p>
-
-  @if (isWeb()) {
-    <p class="hint">You are on the web demo shell. Desktop <code>npm start</code> is the LAN/mesh product.</p>
-  } @else {
-    <p class="hint">You are on the desktop shell. Bind loopback unless you mean to share on a LAN.</p>
-  }
-
-  <h3>Standalone clustered pool (later)</h3>
-  <p class="hint">
-    eksctl + Helm overlay for two pool replicas only after Postgres. CloudFormation RDS for the
-    hardened option. Same pool binary as the app child; the store binding is what changes the grade.
+    Hashers speak Stratum v1 to a gateway or a Stratum pool. DATUM is the gateway talking to Prime.
+    Template construction stays on <em>your</em> <code>federationcoind</code>.
+    Do not send mill hashers to pool <code>WSS /datum</code>.
   </p>
 </div>

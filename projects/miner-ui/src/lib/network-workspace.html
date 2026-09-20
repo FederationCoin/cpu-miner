@@ -1,71 +1,72 @@
 <div class="workspace">
-  <nav class="tabs" role="tablist">
-    <button
-      type="button"
+  <nav mat-tab-nav-bar [tabPanel]="tabPanel" class="tabs" role="tablist">
+    <a
+      mat-tab-link
       role="tab"
       [id]="chain() + '-tab-mine'"
-      [class.active]="tab() === 'mine'"
+      [active]="tab() === 'mine'"
       [attr.aria-selected]="tab() === 'mine'"
-      (click)="selectTab('mine')"
+      (click)="$event.preventDefault(); selectTab('mine')"
     >
       Mine
-    </button>
+    </a>
     @if (showHostPool()) {
-    <button
-      type="button"
+    <a
+      mat-tab-link
       role="tab"
       [id]="chain() + '-tab-pool'"
-      [class.active]="tab() === 'pool'"
+      [active]="tab() === 'pool'"
       [attr.aria-selected]="tab() === 'pool'"
-      (click)="selectTab('pool')"
+      (click)="$event.preventDefault(); selectTab('pool')"
     >
       Host a pool
-    </button>
+    </a>
     }
-    <button
-      type="button"
+    <a
+      mat-tab-link
       role="tab"
       [id]="chain() + '-tab-docs'"
-      [class.active]="tab() === 'docs'"
+      [active]="tab() === 'docs'"
       [attr.aria-selected]="tab() === 'docs'"
-      (click)="selectTab('docs')"
+      (click)="$event.preventDefault(); selectTab('docs')"
     >
       Docs
-    </button>
-    <button
-      type="button"
+    </a>
+    <a
+      mat-tab-link
       role="tab"
       [id]="chain() + '-tab-finder'"
-      [class.active]="tab() === 'finder'"
+      [active]="tab() === 'finder'"
       [attr.aria-selected]="tab() === 'finder'"
-      (click)="selectTab('finder')"
+      (click)="$event.preventDefault(); selectTab('finder')"
     >
-      Finder
-    </button>
+      Pool Finder
+    </a>
   </nav>
-
-  @if (tab() === 'mine') {
-    <section class="pane-col" [attr.id]="chain() + '-mining'">
-      <h2>Mining</h2>
-      <app-miner-pane [chain]="chain()" />
-    </section>
-  }
-  @if (tab() === 'pool' && showHostPool()) {
-    <section class="pane-col" [attr.id]="chain() + '-pool'">
-      <h2>Host a pool</h2>
-      <app-pool-pane [chain]="chain()" />
-    </section>
-  }
-  @if (tab() === 'docs') {
-    <section class="pane-col" [attr.id]="chain() + '-docs'">
-      <h2>Docs</h2>
-      <app-docs-pane [chain]="chain()" />
-    </section>
-  }
-  @if (tab() === 'finder') {
-    <section class="pane-col" [attr.id]="chain() + '-finder'">
-      <h2>Pool finder</h2>
-      <app-finder-pane [chain]="chain()" />
-    </section>
-  }
+  <mat-tab-nav-panel #tabPanel>
+    @if (tab() === 'mine') {
+      <section class="pane-col" [attr.id]="chain() + '-mining'">
+        <h2>Mine</h2>
+        <app-miner-pane [chain]="chain()" />
+      </section>
+    }
+    @if (tab() === 'pool' && showHostPool()) {
+      <section class="pane-col" [attr.id]="chain() + '-pool'">
+        <h2>Host a pool</h2>
+        <app-pool-pane [chain]="chain()" />
+      </section>
+    }
+    @if (tab() === 'docs') {
+      <section class="pane-col" [attr.id]="chain() + '-docs'">
+        <h2>Docs</h2>
+        <app-docs-pane [chain]="chain()" />
+      </section>
+    }
+    @if (tab() === 'finder') {
+      <section class="pane-col" [attr.id]="chain() + '-finder'">
+        <h2>Pool Finder</h2>
+        <app-finder-pane [chain]="chain()" />
+      </section>
+    }
+  </mat-tab-nav-panel>
 </div>

@@ -4,6 +4,14 @@ import { bytesToHex } from '@noble/hashes/utils.js';
 import type { MinerChain } from './chain';
 import { CHAINS } from './chain';
 
+export const MaxPoolConnections = 12;
+export const MaxPoolConnectionsPerKind = 3;
+
+export const ConnectionKinds = ['stratum', 'stratumWs', 'datumPrime', 'datumPrimeWs'] as const;
+export type ConnectionKind = (typeof ConnectionKinds)[number];
+export type PoolConnection = { kind: ConnectionKind; url: string };
+
+/** Old listings until operators re-save. */
 export type RegistryConnect =
   | { kind: 'stratumOnly'; stratum: { host: string; port: number }; wss?: { host: string; path: string } }
   | { kind: 'datumOnly'; datum: { host: string; port: number }; wss?: { host: string; path: string } }
@@ -14,11 +22,7 @@ export type RegistryConnect =
       wss?: { host: string; path: string };
     };
 
-export type AttestConnect =
-  | { kind: 'stratum'; host: string; port: number }
-  | { kind: 'datum'; host: string; port: number };
-
-export type AttestKind = AttestConnect['kind'];
+export type AttestConnect = PoolConnection;
 
 export type ListingPublic = {
   poolId: string;
@@ -26,7 +30,8 @@ export type ListingPublic = {
   operatorWallet: string;
   name: string;
   websiteUrl: string;
-  connect: RegistryConnect;
+  connections?: PoolConnection[];
+  connect?: RegistryConnect;
   coinbaseTag: string;
   listingDomain: string;
   attestationCount: number;
@@ -34,6 +39,7 @@ export type ListingPublic = {
   reviewScore: number;
   hasHostileFlag: boolean;
   metrics?: { hashrate?: number; volatility?: number };
+  attestedByYou?: PoolConnection;
 };
 
 export type FindGroup = {
@@ -42,55 +48,81 @@ export type FindGroup = {
   multipleClaims: boolean;
 };
 
-export function advertisedAttestKinds(connect: RegistryConnect): AttestKind[] {
-  if (connect.kind === 'stratumOnly') {
-    return ['stratum'];
+export const ConnectionKindLabel: Record<ConnectionKind, string> = {
+  stratum: 'Stratum',
+  stratumWs: 'Stratum WS',
+  datumPrime: 'DATUM Prime',
+  datumPrimeWs: 'DATUM Prime WS',
+};
+
+export const ConnectionKindPlaceholder: Record<ConnectionKind, string> = {
+  stratum: 'stratum.example.org:3333',
+  stratumWs: 'wss://stratum.example.org/stratum',
+  datumPrime: 'prime.example.org:28916',
+  datumPrimeWs: 'wss://prime.example.org/datum',
+};
+
+export function connectionsFromLegacy(connect?: RegistryConnect): PoolConnection[] {
+  if (!connect) {
+    return [];
   }
-  if (connect.kind === 'datumOnly') {
-    return ['datum'];
+  const out: PoolConnection[] = [];
+  if (connect.kind === 'stratumOnly' || connect.kind === 'stratumAndDatum') {
+    out.push({ kind: 'stratum', url: `${connect.stratum.host}:${connect.stratum.port}` });
   }
-  return ['stratum', 'datum'];
+  if (connect.kind === 'datumOnly' || connect.kind === 'stratumAndDatum') {
+    out.push({ kind: 'datumPrime', url: `${connect.datum.host}:${connect.datum.port}` });
+  }
+  if (connect.wss) {
+    out.push({ kind: 'stratumWs', url: `wss://${connect.wss.host}${connect.wss.path}` });
+  }
+  return out;
 }
 
-export function listingHasStratumTcp(connect: RegistryConnect): boolean {
-  return connect.kind !== 'datumOnly';
+export function listingConnections(p: Pick<ListingPublic, 'connections' | 'connect'>): PoolConnection[] {
+  if (p.connections && p.connections.length > 0) {
+    return p.connections;
+  }
+  return connectionsFromLegacy(p.connect);
 }
 
-export function listingStratumWssUrl(connect: RegistryConnect): string | null {
-  const wss = connect.wss;
-  if (!wss) {
+export function listingCanMineThis(p: Pick<ListingPublic, 'connections' | 'connect'>, web: boolean): boolean {
+  const cs = listingConnections(p);
+  return web ? cs.some((c) => c.kind === 'stratumWs') : cs.some((c) => c.kind === 'stratum');
+}
+
+export function listingMineUrl(p: Pick<ListingPublic, 'connections' | 'connect'>, web: boolean): string | null {
+  const cs = listingConnections(p);
+  const hit = web ? cs.find((c) => c.kind === 'stratumWs') : cs.find((c) => c.kind === 'stratum');
+  return hit?.url ?? null;
+}
+
+export function listingPrimeConnections(p: Pick<ListingPublic, 'connections' | 'connect'>): PoolConnection[] {
+  return listingConnections(p).filter((c) => c.kind === 'datumPrime' || c.kind === 'datumPrimeWs');
+}
+
+export function connectionEquals(a: PoolConnection, b: PoolConnection): boolean {
+  return a.kind === b.kind && a.url.trim().toLowerCase() === b.url.trim().toLowerCase();
+}
+
+export function canAddPoolConnection(rows: PoolConnection[], kind: ConnectionKind): boolean {
+  if (rows.length >= MaxPoolConnections) {
+    return false;
+  }
+  return rows.filter((r) => r.kind === kind).length < MaxPoolConnectionsPerKind;
+}
+
+export function splitHostPort(url: string): { host: string; port: number } | null {
+  const i = url.lastIndexOf(':');
+  if (i <= 0) {
     return null;
   }
-  const host = wss.host.trim();
-  const path = wss.path.trim();
-  if (!host || !path.startsWith('/')) {
+  const host = url.slice(0, i).trim();
+  const port = Number(url.slice(i + 1));
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
     return null;
   }
-  return `wss://${host}${path}`;
-}
-
-export function listingCanMineThis(connect: RegistryConnect, web: boolean): boolean {
-  return web ? listingStratumWssUrl(connect) != null : listingHasStratumTcp(connect);
-}
-
-export function listingPrimeAdvertise(connect: RegistryConnect): { host: string; port: number } | null {
-  if (connect.kind === 'stratumOnly') {
-    return null;
-  }
-  return connect.datum;
-}
-
-export function attestConnectFromListing(connect: RegistryConnect, kind: AttestKind): AttestConnect | undefined {
-  if (kind === 'stratum') {
-    if (connect.kind === 'datumOnly') {
-      return undefined;
-    }
-    return { kind: 'stratum', host: connect.stratum.host, port: connect.stratum.port };
-  }
-  if (connect.kind === 'stratumOnly') {
-    return undefined;
-  }
-  return { kind: 'datum', host: connect.datum.host, port: connect.datum.port };
+  return { host, port };
 }
 
 export type RegistryRequest = {

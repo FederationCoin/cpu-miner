@@ -1,0 +1,20 @@
+@startuml mill-web
+title Web mill
+left to right direction
+actor Browser
+cloud "CloudFront SPA" as CF
+rectangle "Pool or local gateway" as Pool
+rectangle "DATUM Gateway" as Gw
+rectangle "federationcoind" as Node
+rectangle "DATUM Prime" as Prime
+Browser --> CF : loads app
+Browser --> Pool : WSS Stratum /stratum
+Pool ..> Gw
+Gw --> Node : GBT submitblock
+Gw --> Prime : DATUM only
+note bottom of Browser
+  Hasher never speaks DATUM.
+  Localhost needs Apps On Device.
+  Prefill ws://127.0.0.1:23335/stratum
+end note
+@enduml

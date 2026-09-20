@@ -289,6 +289,7 @@ describe('StratumWsClient outbox', () => {
     sockets[0]!.pushLine({ id: 12, error: [23, 'high-hash', null], result: false });
     expect(results).toHaveLength(2);
     expect(results[1]!.ok).toBe(false);
+    expect(results[1]!.err).toBe('Share was not hard enough');
     client.close();
   });
 

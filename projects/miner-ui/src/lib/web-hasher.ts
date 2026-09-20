@@ -4,6 +4,7 @@ import {
   datumWorkRoot,
   grindTargetForShare,
   hashMeetsTarget,
+  targetFromCompact,
   toHex,
   writeLe32,
 } from './asic-pow';
@@ -122,6 +123,7 @@ export class WebHasherHost implements HasherHost {
     const threads = Math.max(1, Math.min(16, opts.threads | 0));
     let extraNonce1 = new Uint8Array(4);
     let shareDiff = 1n;
+    let lastJob: StratumNotify | null = null;
     const watchPoolStats = opts.mineTo.kind === 'stratumPoolWebsocket';
     const client = new StratumWsClient(url, worker.trim(), STRATUM_PASSWORD, {
       onSubscribed: (sub) => {
@@ -139,6 +141,7 @@ export class WebHasherHost implements HasherHost {
         this.emitStats();
       },
       onNotify: (job) => {
+        lastJob = job;
         this.socketLive = true;
         this.cancelGrace();
         this.statsState.link = 'up';
@@ -160,9 +163,15 @@ export class WebHasherHost implements HasherHost {
           this.statsState.accepted++;
           this.statsState.status = 'share accepted';
           this.statsState.lastError = '';
+          if (lastJob) {
+            const block = targetFromCompact(lastJob.nBits);
+            if (block) {
+              this.beginGrind(client, lastJob, extraNonce1, block, threads);
+            }
+          }
         } else {
           this.statsState.rejected++;
-          this.statsState.lastError = error ?? 'share rejected';
+          this.statsState.lastError = error ?? 'Share rejected';
           this.toast(this.statsState.lastError);
         }
         this.emitStats();

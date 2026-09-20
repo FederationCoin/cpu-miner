@@ -1,5 +1,6 @@
 import { parseHex, toHex } from './asic-pow';
 import { tidesSatsField, type MinerChain, type PoolStats, type TidesPayout } from './miner-api';
+import { formatStratumReject } from './stratum-reject';
 
 export const STRATUM_UA = 'federationcoin-web-miner/0.1';
 
@@ -604,8 +605,7 @@ export class StratumWsClient {
       this.cancelRetry(item);
       this.outbox.delete(key);
       const ok = rec.result === true && rec.error == null;
-      const err =
-        rec.error == null ? undefined : typeof rec.error === 'string' ? rec.error : JSON.stringify(rec.error);
+      const err = rec.error == null ? undefined : formatStratumReject(rec.error);
       this.handlers.onSubmitResult(ok, err);
     }
   }

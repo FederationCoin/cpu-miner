@@ -557,7 +557,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
             }
           } else {
             rejected++;
-            lastError = error ?? 'share rejected';
+            lastError = error ?? 'Share rejected';
             emitLog('stratum', lastError, true);
           }
           emitStats();

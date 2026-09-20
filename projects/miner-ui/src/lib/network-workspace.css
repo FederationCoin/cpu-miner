@@ -18,6 +18,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
+  border-bottom: 1px solid #8a7318;
 }
 
 .tabs button {

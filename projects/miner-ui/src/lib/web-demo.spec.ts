@@ -227,13 +227,16 @@ describe('web demo shell', () => {
     expect(pill.textContent).toContain('Stratum idle');
   });
 
-  it('shows gateway WebSocket fields without a house URL', async () => {
+  it('shows gateway WebSocket fields with a localhost prefill, not a house pool', async () => {
     const f = await render();
     clickRadio(f, '#testnet-mineToDatumGatewayWebsocket');
     f.detectChanges();
     expect(has(f, '#testnet-datumGatewayWebsocketUrl')).toBe(true);
-    expect((f.nativeElement.querySelector('#testnet-datumGatewayWebsocketUrl') as HTMLInputElement).value).toBe('');
-    expect(f.nativeElement.textContent).toMatch(/not Prime and not the pool connect/);
+    expect((f.nativeElement.querySelector('#testnet-datumGatewayWebsocketUrl') as HTMLInputElement).value).toBe(
+      'ws://127.0.0.1:23335/stratum',
+    );
+    expect(f.nativeElement.textContent).toMatch(/not Prime and not the pool/);
+    expect(f.nativeElement.textContent).toMatch(/Apps On Device/);
   });
 
   it('migrates a saved Stratum kind to pool WebSocket without a house URL', async () => {

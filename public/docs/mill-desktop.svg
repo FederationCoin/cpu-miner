@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 240" role="img" aria-labelledby="deskTitle deskDesc">
+  <title id="deskTitle">Desktop mill</title>
+  <desc id="deskDesc">Electron mill speaks TCP Stratum or node RPC. Host a pool stays Prime spawn. No WSS required.</desc>
+  <rect width="720" height="240" fill="#0a0a0a"/>
+  <rect x="24" y="48" width="160" height="56" rx="8" fill="#1a1204" stroke="#c9a227"/>
+  <text x="104" y="82" text-anchor="middle" fill="#f4e9c8" font-family="sans-serif" font-size="14">Electron mill</text>
+  <rect x="280" y="48" width="220" height="56" rx="8" fill="#1a1204" stroke="#c9a227"/>
+  <text x="390" y="82" text-anchor="middle" fill="#f4e9c8" font-family="sans-serif" font-size="14">Pool, gateway, or node</text>
+  <path d="M184 76 H280" stroke="#c9a227" marker-end="url(#a)"/>
+  <text x="232" y="68" fill="#d4c89a" font-family="sans-serif" font-size="11">TCP / RPC</text>
+  <rect x="280" y="148" width="160" height="48" rx="8" fill="#1a1204" stroke="#b71c2c"/>
+  <text x="360" y="178" text-anchor="middle" fill="#f4e9c8" font-family="sans-serif" font-size="13">DATUM Gateway</text>
+  <rect x="500" y="148" width="90" height="48" rx="8" fill="#1a1204" stroke="#c9a227"/>
+  <text x="545" y="178" text-anchor="middle" fill="#f4e9c8" font-family="sans-serif" font-size="13">Node</text>
+  <rect x="610" y="148" width="90" height="48" rx="8" fill="#1a1204" stroke="#b71c2c"/>
+  <text x="655" y="178" text-anchor="middle" fill="#f4e9c8" font-family="sans-serif" font-size="13">Prime</text>
+  <path d="M390 104 V148" stroke="#8a7318" stroke-dasharray="4 3"/>
+  <path d="M440 172 H500" stroke="#c9a227" marker-end="url(#a)"/>
+  <path d="M590 172 H610" stroke="#b71c2c" marker-end="url(#a)"/>
+  <text x="24" y="224" fill="#d4c89a" font-family="sans-serif" font-size="12">No WSS required. Host a pool stays Prime spawn.</text>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#c9a227"/>
+    </marker>
+  </defs>
+</svg>

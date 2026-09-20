@@ -1,0 +1,17 @@
+@startuml mill-desktop
+title Desktop mill
+left to right direction
+actor Electron
+rectangle "Pool, gateway, or node" as Target
+rectangle "DATUM Gateway" as Gw
+rectangle "federationcoind" as Node
+rectangle "DATUM Prime" as Prime
+Electron --> Target : TCP Stratum or node RPC
+Target ..> Gw
+Gw --> Node : GBT submitblock
+Gw --> Prime : DATUM only
+note bottom of Electron
+  No WSS required.
+  Host a pool stays Prime spawn.
+end note
+@enduml

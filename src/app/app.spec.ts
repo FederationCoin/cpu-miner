@@ -230,7 +230,7 @@ describe('App', () => {
     it('creates and shows the heading', async () => {
       const f = await render();
       expect(f.componentInstance).toBeTruthy();
-      expect(queryEl(f, 'h1').textContent).toContain('FederationCoin CPU miner');
+      expect(queryEl(f, 'h1').textContent).toContain('FederationCoin mill');
     });
 
     it('links GitHub and X below the fold', async () => {
@@ -653,7 +653,7 @@ describe('App', () => {
       expect(has(f, '#testnet-finder-register-pane')).toBe(true);
       expect(has(f, '#testnet-finder-refresh-tip')).toBe(true);
       expect(has(f, '#testnet-finder-attest-dialog')).toBe(true);
-      expect(queryEl<HTMLButtonElement>(f, '#testnet-finder-register').disabled).toBe(false);
+      expect(queryEl<HTMLButtonElement>(f, '#testnet-finder-register').disabled).toBe(true);
       expect(queryEl<HTMLInputElement>(f, '#testnet-finder-name').disabled).toBe(false);
       expect(has(f, '#testnet-finder-compose')).toBe(true);
       expect(has(f, '#testnet-finder-inactive')).toBe(true);
@@ -715,7 +715,6 @@ describe('App', () => {
       });
       setInput(f, '#testnet-finder-name', 'Example');
       setInput(f, '#testnet-finder-stratum', 'stratum.example.com:23334');
-      setInput(f, '#testnet-finder-datum', 'datum.example.com:28916');
       queryEl<HTMLButtonElement>(f, '#testnet-finder-compose').click();
       f.detectChanges();
       expect(queryEl<HTMLTextAreaElement>(f, '#testnet-finder-sparrow').value).toMatch(/^[0-9a-f]{64}$/);

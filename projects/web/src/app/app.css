@@ -4,54 +4,74 @@
   width: 100%;
   max-width: 90rem;
   margin: 0 auto;
-  padding: 1.5rem 1.75rem 2rem;
-  font-family: system-ui, sans-serif;
-  color: #e8eaed;
+  padding: 0 1.75rem 2rem;
+  font-family: Roboto, system-ui, sans-serif;
+  color: #f4e9c8;
 }
 
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1.5rem;
-  margin-bottom: 1.25rem;
+.mill-bar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  gap: 0.75rem;
+  margin: 0 -1.75rem 1rem;
+  padding: 0 1.75rem;
+  background: #0a0a0a;
+  color: #c9a227;
 }
 
-h1 {
-  margin: 0 0 0.5rem;
-  font-size: 1.4rem;
+.seal {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.mill-bar h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #f4e9c8;
+}
+
+.spacer {
+  flex: 1 1 auto;
 }
 
 .lead {
-  margin: 0;
+  margin: 0 0 1.25rem;
   max-width: 46rem;
-  color: #b8bcc4;
+  color: #d4c89a;
   line-height: 1.45;
 }
 
 .network-toggle {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.2rem;
   flex-shrink: 0;
-  font-size: 0.82rem;
-  color: #9aa0aa;
+  font-size: 0.75rem;
+  color: #d4c89a;
 }
 
 .network-toggle select {
   min-width: 10rem;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid #3a3f4b;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #8a7318;
   border-radius: 4px;
-  background: #1a1d24;
-  color: #e8eaed;
+  background: #0a0a0a;
+  color: #f4e9c8;
   font: inherit;
 }
 
 .warn {
   padding: 0.6rem 0.7rem;
   border-radius: 4px;
-  background: #3a3418;
+  background: #3a1818;
   color: #f0d48a;
 }
 

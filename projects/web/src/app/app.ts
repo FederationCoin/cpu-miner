@@ -1,9 +1,10 @@
 import { Component, inject } from '@angular/core';
+import { MatToolbarModule } from '@angular/material/toolbar';
 import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, type MinerChain } from '@federationcoin/miner-ui';
 
 @Component({
   selector: 'app-root',
-  imports: [NetworkWorkspace, MinerFooter],
+  imports: [NetworkWorkspace, MinerFooter, MatToolbarModule],
   styleUrl: './app.css',
   templateUrl: './app.html',
 })

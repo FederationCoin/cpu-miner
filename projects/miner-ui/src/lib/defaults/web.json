@@ -12,12 +12,12 @@
     "testnet": {
       "mineToKind": "stratumPoolWebsocket",
       "stratumPoolWebsocket": { "url": "" },
-      "datumGatewayWebsocket": { "url": "" }
+      "datumGatewayWebsocket": { "url": "ws://127.0.0.1:23335/stratum" }
     },
     "main": {
       "mineToKind": "stratumPoolWebsocket",
       "stratumPoolWebsocket": { "url": "" },
-      "datumGatewayWebsocket": { "url": "" }
+      "datumGatewayWebsocket": { "url": "ws://127.0.0.1:23335/stratum" }
     }
   }
 }

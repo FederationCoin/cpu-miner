@@ -42,16 +42,15 @@
         </mat-radio-group>
         @if (kind() === 'stratumPoolWebsocket') {
           <p class="hint">
-            Hasher-to-pool is Stratum v1 over WebSocket (newline JSON-RPC, password <code>x</code>).
-            Find → Mine this fills this. CloudFront cannot reach miner localhost.
+            Mine over Stratum v1 on WebSocket (newline JSON-RPC, password <code>x</code>).
+            Pool Finder → Mine this fills this URL.
           </p>
         }
         @if (kind() === 'datumGatewayWebsocket') {
           <p class="hint">
-            This is your local gateway’s Stratum listener, not Prime and not the pool connect.
-            Then set Prime on the gateway from Find. More complicated, more decentralized.
-            Needs a URL the browser can open (<code>ng serve</code> / LAN). CloudFront cannot use miner
-            <code>127.0.0.1</code>.
+            This is your local gateway’s Stratum listener, not Prime and not the pool.
+            Point the gateway at a DATUM Prime listing from Pool Finder.
+            Mining to localhost gateway requires 'Apps On Device' permission.
           </p>
         }
       }
@@ -157,7 +156,7 @@
             type="text"
             autocomplete="off"
             spellcheck="false"
-            placeholder="ws://127.0.0.1:port/stratum"
+            placeholder="ws://127.0.0.1:23335/stratum"
             formControlName="url"
           />
         </mat-form-field>
@@ -194,10 +193,13 @@
   }
 
   <app-defaults-fold [foldId]="id('gpus-fold')" title="GPUs" [summary]="gpuSummary()">
-    <fieldset class="gpus" [attr.id]="id('gpus')">
-      <legend>GPUs</legend>
+    <mat-card class="gpus" [attr.id]="id('gpus')">
+      <mat-card-header>
+        <mat-card-title>GPUs</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
       <div class="row">
-        <button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
+        <button mat-stroked-button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
           {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
         </button>
         @if (webGpuHelpVisible()) {
@@ -206,8 +208,11 @@
       </div>
       @if (gpuList().length > 0) {
         @for (dev of gpuList(); track dev.key) {
-          <fieldset class="gpu-adapter" [attr.id]="id('gpu-adapter-' + gpuDomId(dev.key))">
-            <legend>{{ dev.label }}</legend>
+          <mat-card class="gpu-adapter" [attr.id]="id('gpu-adapter-' + gpuDomId(dev.key))">
+            <mat-card-header>
+              <mat-card-title>{{ dev.label }}</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
             <span class="hint-inline">{{ gpuAdapterHint(dev) }}</span>
             <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.key) + '-off')">
               <input
@@ -233,11 +238,13 @@
                 {{ strategyKindLabel(strat.kind) }}
               </label>
             }
-          </fieldset>
+            </mat-card-content>
+          </mat-card>
         }
       }
       <p class="hint">{{ gpuHint() }}</p>
-    </fieldset>
+      </mat-card-content>
+    </mat-card>
   </app-defaults-fold>
 
   <dl>
@@ -262,4 +269,5 @@
     <dt>Endpoint</dt>
     <dd class="mono">{{ endpointHint() }}</dd>
   </dl>
+  <p class="hint">Hashrate is your computer, not a pool or gateway limit.</p>
 </div>

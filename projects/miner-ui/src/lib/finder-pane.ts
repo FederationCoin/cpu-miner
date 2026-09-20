@@ -1,8 +1,14 @@
 import { Component, DestroyRef, ElementRef, NgZone, effect, inject, input, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { debounceTime } from 'rxjs';
 import type { MinerChain } from './chain';
 import { HASHER_HOST } from './hasher-host';
@@ -12,27 +18,80 @@ import { formatSats } from './miner-format';
 import { applyDesktopStratumTarget, applyWebPoolWssTarget } from './mine-target';
 import { WorkspaceNav } from './workspace-nav';
 import {
-  advertisedAttestKinds,
-  attestConnectFromListing,
+  ConnectionKindLabel,
+  ConnectionKindPlaceholder,
+  ConnectionKinds,
+  MaxPoolConnections,
+  MaxPoolConnectionsPerKind,
+  canAddPoolConnection,
+  connectionEquals,
   envelopeAuthorization,
   listingCanMineThis,
-  listingPrimeAdvertise,
-  listingStratumWssUrl,
+  listingConnections,
+  listingMineUrl,
+  listingPrimeConnections,
   mainFinderLive,
   registryFetch,
   signedPayloadHash,
   sparrowSignatureToBase64Url,
-  type AttestConnect,
-  type AttestKind,
+  splitHostPort,
+  type ConnectionKind,
   type FindGroup,
   type ListingPublic,
-  type RegistryConnect,
+  type PoolConnection,
   type RegistryRequest,
 } from './registry';
 
+const IDENTITY_WALLET_KEY = 'fc.identity.wallet';
+const IDENTITY_ENVELOPE_KEY = 'fc.identity.envelope';
+const ATTESTED_KEY = 'fc.attested';
+
+type AttestedMap = Record<string, PoolConnection>;
+
+function connectionGroup(kind: ConnectionKind = 'stratum', url = ''): FormGroup<{
+  kind: FormControl<ConnectionKind>;
+  url: FormControl<string>;
+}> {
+  return new FormGroup({
+    kind: new FormControl<ConnectionKind>(kind, { nonNullable: true }),
+    url: new FormControl(url, { nonNullable: true }),
+  });
+}
+
+function loadAttested(): AttestedMap {
+  try {
+    const raw = localStorage.getItem(ATTESTED_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as AttestedMap;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function trimSatsLabel(sats: string): string {
+  const raw = formatSats(sats);
+  if (!raw.includes('.')) {
+    return raw;
+  }
+  return raw.replace(/0+$/, '').replace(/\.$/, '');
+}
+
 @Component({
   selector: 'app-finder-pane',
-  imports: [ReactiveFormsModule, MatButtonModule, MatCardModule],
+  imports: [
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatCardModule,
+    MatCheckboxModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatSelectModule,
+    MatTooltipModule,
+  ],
   styleUrl: './miner-pane.css',
   templateUrl: './finder-pane.html',
 })
@@ -56,15 +115,20 @@ export class FinderPane {
   protected readonly attestSparrowMessage = signal('');
   protected readonly stakeKind = signal('');
   protected readonly stakeLine = signal('');
+  protected readonly stakeGfCn = signal('…');
+  protected readonly stakeTooltip = signal('Load a tip to see the HODL amount.');
+  protected readonly holdBlocks = signal(0);
+  protected readonly identityWallet = signal(localStorage.getItem(IDENTITY_WALLET_KEY)?.trim() ?? '');
+  protected readonly attested = signal<AttestedMap>(loadAttested());
+  protected readonly listingKinds = ConnectionKinds;
+  protected readonly kindLabel = ConnectionKindLabel;
+  protected readonly maxConnections = MaxPoolConnections;
   protected readonly form = new FormGroup({
     name: new FormControl('', { nonNullable: true }),
     websiteUrl: new FormControl('', { nonNullable: true }),
     coinbaseTag: new FormControl('', { nonNullable: true }),
-    connectKind: new FormControl<'stratumOnly' | 'datumOnly' | 'stratumAndDatum'>('stratumAndDatum', {
-      nonNullable: true,
-    }),
-    stratum: new FormControl('', { nonNullable: true }),
-    datum: new FormControl('', { nonNullable: true }),
+    connections: new FormArray([connectionGroup()]),
+    confirmPayee: new FormControl(false, { nonNullable: true }),
     wallet: new FormControl('', { nonNullable: true }),
     signature: new FormControl('', { nonNullable: true }),
     signingBlockHash: new FormControl('', { nonNullable: true }),
@@ -78,9 +142,7 @@ export class FinderPane {
     signingBlockHeight: new FormControl('', { nonNullable: true }),
   });
   private pendingRegister: unknown;
-  private pendingAttest:
-    | { poolId: string; connect: AttestConnect }
-    | undefined;
+  private pendingAttest: { poolId: string; connect: PoolConnection } | undefined;
 
   constructor() {
     effect(() => {
@@ -112,21 +174,84 @@ export class FinderPane {
     return this.shell.defaults.registryBaseUrl.replace(/\/$/, '');
   }
 
-  protected advertisedKinds(p: ListingPublic): AttestKind[] {
-    return advertisedAttestKinds(p.connect);
+  protected connectionArray(): FormArray {
+    return this.form.controls.connections;
+  }
+
+  protected connectionValues(): PoolConnection[] {
+    return this.connectionArray().controls.map((c) => {
+      const g = c as FormGroup;
+      return {
+        kind: g.controls['kind'].value as ConnectionKind,
+        url: String(g.controls['url'].value ?? '').trim(),
+      };
+    });
+  }
+
+  protected placeholderFor(row: { get: (n: string) => { value: unknown } | null }): string {
+    const kind = row.get('kind')?.value;
+    if (kind === 'stratum' || kind === 'stratumWs' || kind === 'datumPrime' || kind === 'datumPrimeWs') {
+      return ConnectionKindPlaceholder[kind];
+    }
+    return ConnectionKindPlaceholder.stratum;
+  }
+
+  protected kindCount(kind: ConnectionKind): number {
+    return this.connectionValues().filter((c) => c.kind === kind).length;
+  }
+
+  protected kindOptionDisabled(kind: ConnectionKind, index: number): boolean {
+    const current = this.connectionValues()[index]?.kind;
+    if (current === kind) {
+      return false;
+    }
+    return this.kindCount(kind) >= MaxPoolConnectionsPerKind;
+  }
+
+  protected canAddConnection(): boolean {
+    return ConnectionKinds.some((k) => canAddPoolConnection(this.connectionValues(), k));
+  }
+
+  protected addConnection(): void {
+    const next = ConnectionKinds.find((k) => canAddPoolConnection(this.connectionValues(), k));
+    if (!next) {
+      return;
+    }
+    this.connectionArray().push(connectionGroup(next));
+  }
+
+  protected removeConnection(i: number): void {
+    if (this.connectionArray().length <= 1) {
+      return;
+    }
+    this.connectionArray().removeAt(i);
+  }
+
+  protected connectionsOf(p: ListingPublic): PoolConnection[] {
+    return listingConnections(p);
+  }
+
+  protected primesOf(p: ListingPublic): PoolConnection[] {
+    return listingPrimeConnections(p);
   }
 
   protected canMineThis(p: ListingPublic): boolean {
-    return listingCanMineThis(p.connect, this.shell.kind === 'webDemo');
+    return listingCanMineThis(p, this.shell.kind === 'webDemo');
   }
 
-  protected primeAdvertise(p: ListingPublic): { host: string; port: number } | null {
-    return listingPrimeAdvertise(p.connect);
+  protected stampState(p: ListingPublic, c: PoolConnection): 'login' | 'done' | 'attest' | 'hidden' {
+    if (!this.identityWallet()) {
+      return 'login';
+    }
+    const hit = this.attested()[p.poolId] ?? p.attestedByYou;
+    if (hit) {
+      return connectionEquals(hit, c) ? 'done' : 'hidden';
+    }
+    return 'attest';
   }
 
-  protected attestHostPort(p: ListingPublic, kind: AttestKind): string {
-    const c = attestConnectFromListing(p.connect, kind);
-    return c ? `${c.host}:${c.port}` : '';
+  protected stampId(p: ListingPublic, c: PoolConnection): string {
+    return this.id(`attest-${c.kind}-${p.poolId}`);
   }
 
   private async transport(req: RegistryRequest) {
@@ -139,6 +264,10 @@ export class FinderPane {
     return registryFetch(req, this.baseUrl());
   }
 
+  private identityAuth(): string | undefined {
+    return localStorage.getItem(IDENTITY_ENVELOPE_KEY) || undefined;
+  }
+
   protected async reloadListings(): Promise<void> {
     this.error.set('');
     if (!mainFinderLive(this.chain())) {
@@ -149,7 +278,12 @@ export class FinderPane {
     }
     const path = this.inactive() ? '/v1/listings/inactive' : '/v1/listings';
     try {
-      const res = await this.transport({ method: 'GET', path, chain: this.chain() });
+      const res = await this.transport({
+        method: 'GET',
+        path,
+        chain: this.chain(),
+        authorization: this.identityAuth(),
+      });
       const body = res.json as { items?: ListingPublic[]; groups?: FindGroup[]; title?: string };
       if (res.status >= 400) {
         this.error.set(body.title ?? 'Find failed');
@@ -164,10 +298,26 @@ export class FinderPane {
       } else {
         this.groups.set([]);
       }
+      this.mergeRemoteAttestations(items.length ? items : (body.groups ?? []).flatMap((g) => g.listings));
       this.notice.set('');
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : 'Find failed');
       this.groups.set([]);
+    }
+  }
+
+  private mergeRemoteAttestations(items: ListingPublic[]): void {
+    const next = { ...this.attested() };
+    let changed = false;
+    for (const p of items) {
+      if (p.attestedByYou) {
+        next[p.poolId] = p.attestedByYou;
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem(ATTESTED_KEY, JSON.stringify(next));
+      this.attested.set(next);
     }
   }
 
@@ -186,6 +336,7 @@ export class FinderPane {
         signingBlockHash?: string;
         stakeRequiredSats?: string;
         mineSeconds?: number;
+        holdBlocks?: number;
         title?: string;
       };
       if (res.status >= 400) {
@@ -204,7 +355,19 @@ export class FinderPane {
       }
       const hours = (body.mineSeconds ?? 0) / 3600;
       const hourLabel = hours === 1 ? '1 hour' : `${hours} hours`;
-      const shown = body.stakeRequiredSats ? formatSats(body.stakeRequiredSats) : '';
+      const shown = body.stakeRequiredSats ? trimSatsLabel(body.stakeRequiredSats) : '';
+      this.stakeGfCn.set(shown || '…');
+      const hold = body.holdBlocks ?? 0;
+      this.holdBlocks.set(hold);
+      if (hold > 0) {
+        this.stakeTooltip.set(
+          `You are not sending coin. ${shown || 'This'} GFCN must sit in the wallet for ${hold} blocks before the signing block, without dipping.`,
+        );
+      } else {
+        this.stakeTooltip.set(
+          `You are not sending coin. ${shown || 'This'} GFCN must be in the wallet at sign time (anti-spam). Open season: balance only.`,
+        );
+      }
       this.stakeLine.set(
         shown
           ? `Listing stake is ${hourLabel} of RTX 3090 Ti work (${shown} GFCN).`
@@ -221,29 +384,9 @@ export class FinderPane {
   }
 
   protected connectHint(p: ListingPublic): string {
-    const c = p.connect;
-    if (c.kind === 'stratumOnly') {
-      return `stratum ${c.stratum.host}:${c.stratum.port}`;
-    }
-    if (c.kind === 'datumOnly') {
-      return `datum ${c.datum.host}:${c.datum.port}`;
-    }
-    return `stratum ${c.stratum.host}:${c.stratum.port} · datum ${c.datum.host}:${c.datum.port}`;
-  }
-
-  private connectFromForm(): RegistryConnect {
-    const v = this.form.getRawValue();
-    const parseHp = (raw: string) => {
-      const [host, port] = raw.split(':');
-      return { host: host.trim(), port: Number(port) };
-    };
-    if (v.connectKind === 'stratumOnly') {
-      return { kind: 'stratumOnly', stratum: parseHp(v.stratum) };
-    }
-    if (v.connectKind === 'datumOnly') {
-      return { kind: 'datumOnly', datum: parseHp(v.datum) };
-    }
-    return { kind: 'stratumAndDatum', stratum: parseHp(v.stratum), datum: parseHp(v.datum) };
+    return listingConnections(p)
+      .map((c) => `${ConnectionKindLabel[c.kind]} ${c.url}`)
+      .join(' · ');
   }
 
   private tipFrom(form: { signingBlockHeight: string; signingBlockHash: string }): {
@@ -256,6 +399,18 @@ export class FinderPane {
     };
   }
 
+  protected canSubmitListing(): boolean {
+    const v = this.form.getRawValue();
+    return (
+      this.liveTenant() &&
+      !!this.sparrowMessage() &&
+      v.signature.trim().length > 0 &&
+      v.wallet.trim().length > 0 &&
+      this.stakeKind() === 'stakeReady' &&
+      this.connectionValues().some((c) => c.url.length > 0)
+    );
+  }
+
   protected composeRegister(): void {
     if (!this.liveTenant()) {
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
@@ -263,12 +418,18 @@ export class FinderPane {
     }
     this.error.set('');
     const v = this.form.getRawValue();
+    const connections = this.connectionValues().filter((c) => c.url.length > 0);
+    if (connections.length < 1) {
+      this.notice.set('Add at least one connection.');
+      return;
+    }
     const command = {
       commandKind: 'registerListing',
       name: v.name.trim(),
       websiteUrl: v.websiteUrl.trim(),
       coinbaseTag: v.coinbaseTag.trim(),
-      connect: this.connectFromForm(),
+      connections,
+      listerConfirmedCoinbasePayee: v.confirmPayee,
     };
     const tip = this.tipFrom(v);
     const hash = signedPayloadHash(command, tip.signingBlockHeight, tip.signingBlockHash);
@@ -276,21 +437,23 @@ export class FinderPane {
     this.commandJson.set(JSON.stringify({ command, ...tip }, null, 2));
     this.sparrowMessage.set(hash);
     this.notice.set(
-      'Copy the 64-hex message below into federation-sparrow Sign/Verify Format Standard (Electrum). Sign with the listing P2WPKH wallet, then paste the signature.',
+      'Copy the 64-hex message below into federation-sparrow Sign/Verify. Format is Electrum Format. Sign with the listing P2WPKH wallet, then paste the signature.',
     );
   }
 
-  protected async openAttest(p: ListingPublic, kind: AttestKind): Promise<void> {
-    const connect = attestConnectFromListing(p.connect, kind);
-    if (!connect) {
+  protected openAttest(p: ListingPublic, c: PoolConnection): void {
+    if (this.stampState(p, c) !== 'attest') {
       return;
     }
-    this.pendingAttest = { poolId: p.poolId, connect };
-    this.attestSummary.set(`Attest ${kind === 'stratum' ? 'stratum' : 'DATUM'} ${connect.host}:${connect.port} on ${p.name}`);
+    this.pendingAttest = { poolId: p.poolId, connect: c };
+    this.attestSummary.set(`Attest ${ConnectionKindLabel[c.kind]} ${c.url} on ${p.name}`);
     this.attestCommandJson.set('');
     this.attestSparrowMessage.set('');
     this.attestForm.controls.signature.setValue('');
-    await this.fillSignContext();
+    if (this.identityWallet()) {
+      this.attestForm.controls.wallet.setValue(this.identityWallet());
+    }
+    void this.fillSignContext();
     this.attestDialog()?.nativeElement.showModal();
   }
 
@@ -304,7 +467,7 @@ export class FinderPane {
       return;
     }
     if (!this.pendingAttest) {
-      this.notice.set('Pick Attest stratum or Attest DATUM on a listing card first.');
+      this.notice.set('Pick a stamp on a listing connection first.');
       return;
     }
     this.error.set('');
@@ -321,7 +484,7 @@ export class FinderPane {
     this.attestCommandJson.set(JSON.stringify({ command, ...tip }, null, 2));
     this.attestSparrowMessage.set(hash);
     this.notice.set(
-      'Copy the attest 64-hex message into federation-sparrow Sign/Verify Format Standard (Electrum). Sign with the attester P2WPKH wallet, then paste the signature.',
+      'Copy the attest 64-hex message into federation-sparrow Sign/Verify. Format is Electrum Format. Sign with the attester P2WPKH wallet, then paste the signature.',
     );
   }
 
@@ -348,12 +511,28 @@ export class FinderPane {
     }
   }
 
+  private rememberIdentity(wallet: string, authorization: string): void {
+    localStorage.setItem(IDENTITY_WALLET_KEY, wallet);
+    localStorage.setItem(IDENTITY_ENVELOPE_KEY, authorization);
+    this.identityWallet.set(wallet);
+  }
+
+  private rememberAttest(poolId: string, connect: PoolConnection): void {
+    const next = { ...this.attested(), [poolId]: connect };
+    localStorage.setItem(ATTESTED_KEY, JSON.stringify(next));
+    this.attested.set(next);
+  }
+
   protected async submitRegister(): Promise<void> {
     if (!this.liveTenant()) {
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
       return;
     }
     this.error.set('');
+    if (!this.canSubmitListing()) {
+      this.notice.set('Need a qualifying tip, stake preview, and Electrum Format signature.');
+      return;
+    }
     const v = this.form.getRawValue();
     if (!this.pendingRegister || !this.sparrowMessage()) {
       this.composeRegister();
@@ -370,18 +549,20 @@ export class FinderPane {
       signingBlockHash: tip.signingBlockHash,
       signingBlockHeight: tip.signingBlockHeight,
     };
+    const authorization = envelopeAuthorization(env);
     const res = await this.transport({
       method: 'POST',
       path: '/v1/listings',
       chain: this.chain(),
       body: this.pendingRegister,
-      authorization: envelopeAuthorization(env),
+      authorization,
     });
     if (res.status >= 400) {
       const body = res.json as { title?: string };
       this.error.set(body.title ?? 'Register failed');
       return;
     }
+    this.rememberIdentity(env.wallet, authorization);
     this.notice.set('Listing registered.');
     await this.reloadListings();
   }
@@ -415,18 +596,21 @@ export class FinderPane {
       signingBlockHash: tip.signingBlockHash,
       signingBlockHeight: tip.signingBlockHeight,
     };
+    const authorization = envelopeAuthorization(env);
     const res = await this.transport({
       method: 'POST',
       path: `/v1/listings/${this.pendingAttest.poolId}/attestations`,
       chain: this.chain(),
       body: command,
-      authorization: envelopeAuthorization(env),
+      authorization,
     });
     if (res.status >= 400) {
       const body = res.json as { title?: string };
       this.error.set(body.title ?? 'Attest failed');
       return;
     }
+    this.rememberIdentity(env.wallet, authorization);
+    this.rememberAttest(command.poolId, command.connect);
     this.notice.set('Attestation recorded.');
     this.closeAttest();
     await this.reloadListings();
@@ -438,20 +622,20 @@ export class FinderPane {
       return;
     }
     const chain = this.chain();
-    if (this.shell.kind === 'desktop') {
-      const c = p.connect;
-      if (c.kind === 'datumOnly') {
-        this.notice.set('Prime is set on your DATUM Gateway, not mill MineTo.');
-        return;
-      }
-      applyDesktopStratumTarget(chain, c.stratum.host, c.stratum.port);
-      this.nav.goMine();
-      this.mining.warn(`Mine target set to ${c.stratum.host}:${c.stratum.port}. Open Mine and Start.`);
+    const url = listingMineUrl(p, this.shell.kind === 'webDemo');
+    if (!url) {
+      this.notice.set('This listing has no Stratum advertise the mill can mine to.');
       return;
     }
-    const url = listingStratumWssUrl(p.connect);
-    if (!url) {
-      this.notice.set('In-page mining needs a listing WSS advertise.');
+    if (this.shell.kind === 'desktop') {
+      const hp = splitHostPort(url);
+      if (!hp) {
+        this.notice.set('Stratum host is not host:port.');
+        return;
+      }
+      applyDesktopStratumTarget(chain, hp.host, hp.port);
+      this.nav.goMine();
+      this.mining.warn(`Mine target set to ${hp.host}:${hp.port}. Open Mine and Start.`);
       return;
     }
     applyWebPoolWssTarget(chain, url);
@@ -460,11 +644,11 @@ export class FinderPane {
   }
 
   protected async testCpuShares(p: ListingPublic): Promise<void> {
-    const wss = p.connect.wss;
+    const wss = listingConnections(p).find((c) => c.kind === 'stratumWs');
     if (!wss) {
       this.notice.set('This listing has no WSS extra for a CPU share test.');
       return;
     }
-    this.notice.set(`Share test WSS ${wss.host}${wss.path} is client-side only. The registry does not open it.`);
+    this.notice.set(`Share test WSS ${wss.url} is client-side only. The registry does not open it.`);
   }
 }

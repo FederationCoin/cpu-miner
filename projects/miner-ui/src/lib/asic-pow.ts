@@ -113,7 +113,7 @@ export function targetFromCompact(nBits: number): Uint8Array | null {
   return nWord !== 0 ? target : null;
 }
 
-const POW_LIMIT = 0xffffn << 216n;
+export const POW_LIMIT = 0xffffn << 216n;
 
 export function targetToBig(target: Uint8Array): bigint {
   let n = 0n;
@@ -140,11 +140,10 @@ export function shareTargetFromDiff(diff: bigint): Uint8Array {
   return bigToTarget(POW_LIMIT / diff);
 }
 
+/** Share hunt uses set_difficulty only. After accept, hunt block nBits. */
 export function grindTargetForShare(nBits: number, shareDiff: bigint): Uint8Array | null {
-  const block = targetFromCompact(nBits);
-  if (!block) {
+  if (!targetFromCompact(nBits)) {
     return null;
   }
-  const share = shareTargetFromDiff(shareDiff);
-  return targetToBig(block) >= targetToBig(share) ? block : share;
+  return shareTargetFromDiff(shareDiff);
 }

@@ -1,4 +1,5 @@
 import { Component, inject, input } from '@angular/core';
+import { MatTabsModule } from '@angular/material/tabs';
 import type { MinerChain } from './chain';
 import { DocsPane } from './docs-pane';
 import { FinderPane } from './finder-pane';
@@ -9,7 +10,7 @@ import { WorkspaceNav } from './workspace-nav';
 
 @Component({
   selector: 'app-network-workspace',
-  imports: [MinerPane, PoolPane, DocsPane, FinderPane],
+  imports: [MinerPane, PoolPane, DocsPane, FinderPane, MatTabsModule],
   templateUrl: './network-workspace.html',
   styleUrl: './network-workspace.css',
   host: { '[attr.data-chain]': 'chain()' },

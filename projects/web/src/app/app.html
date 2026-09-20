@@ -1,13 +1,9 @@
 <main>
-  <header class="header">
-    <div>
-      <h1>FederationCoin miner</h1>
-      <p class="lead">
-        Web demo. Network is the tenant. In-page mining is Stratum v1 over WebSocket
-        (WebGPU or CPU). Find Mine this when a listing advertises WSS. Node RPC stays
-        on the desktop app. MAIN house pool is off.
-      </p>
-    </div>
+  <mat-toolbar class="mill-bar">
+    <img class="seal" src="federation-seal.png" width="40" height="40" alt="" />
+    <span class="brand">GFCN</span>
+    <h1>FederationCoin mill</h1>
+    <span class="spacer"></span>
     <label class="network-toggle" for="network-toggle">
       Network
       <select
@@ -19,7 +15,12 @@
         <option value="main">Main</option>
       </select>
     </label>
-  </header>
+  </mat-toolbar>
+  <p class="lead">
+    Mine in this tab. The hasher speaks Stratum over WebSocket to a pool or your local
+    gateway. Pool Finder fills a pool URL. Hashrate is your computer. Localhost gateway
+    needs Apps On Device.
+  </p>
 
   <app-network-workspace chain="testnet" [hidden]="network.chain() !== 'testnet'" />
   <app-network-workspace chain="main" [hidden]="network.chain() !== 'main'" />

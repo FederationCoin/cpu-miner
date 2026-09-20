@@ -1,13 +1,9 @@
 <main>
-  <header class="header">
-    <div>
-      <h1>FederationCoin CPU miner</h1>
-      <p class="lead">
-        Network is the tenant. Mine, pool, docs, and finder sit under the toggle.
-        Mine to a node or Stratum v1 (TCP). Host a pool is Prime spawn; Mine this
-        fills Stratum. Unsigned; no Developer account.
-      </p>
-    </div>
+  <mat-toolbar class="mill-bar">
+    <img class="seal" src="federation-seal.png" width="40" height="40" alt="" />
+    <span class="brand">GFCN</span>
+    <h1>FederationCoin mill</h1>
+    <span class="spacer"></span>
     <label class="network-toggle" for="network-toggle">
       Network
       <select
@@ -19,7 +15,12 @@
         <option value="main">Main</option>
       </select>
     </label>
-  </header>
+  </mat-toolbar>
+  <p class="lead">
+    Mine on your computer. Point the mill at a node, a Stratum pool, or your DATUM Gateway.
+    Pool Finder lists pools that posted a listing stake. Hashrate is your machine, not a cap.
+    Unsigned builds; no Developer account yet.
+  </p>
 
   @if (!mining.canMine()) {
     <p class="warn">

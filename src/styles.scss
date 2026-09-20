@@ -5,8 +5,8 @@ html {
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$orange-palette,
+        primary: mat.$yellow-palette,
+        tertiary: mat.$red-palette,
         theme-type: dark,
       ),
       typography: Roboto,
@@ -16,17 +16,20 @@ html {
 }
 
 :root {
-  --mat-sys-surface: #111318;
-  --mat-sys-on-surface: #e8eaed;
-  --mat-sys-primary: #7eb6ff;
-  --mat-sys-on-primary: #111318;
-  --mat-sys-error: #ff6b6b;
+  --mat-sys-surface: #0a0a0a;
+  --mat-sys-on-surface: #f4e9c8;
+  --mat-sys-primary: #c9a227;
+  --mat-sys-on-primary: #0a0a0a;
+  --mat-sys-tertiary: #b71c2c;
+  --mat-sys-on-tertiary: #f4e9c8;
+  --mat-sys-error: #e53935;
+  --mat-sys-outline: #8a7318;
 }
 
 html,
 body {
   margin: 0;
-  background: #111318;
-  color: #e8eaed;
-  font-family: system-ui, sans-serif;
+  background: #0a0a0a;
+  color: #f4e9c8;
+  font-family: Roboto, system-ui, sans-serif;
 }

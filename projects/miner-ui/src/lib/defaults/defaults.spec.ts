@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { APP_DEFAULTS, WEB_DEFAULTS } from './defaults';
 
 describe('miner defaults JSON', () => {
-  it('web testnet MineTo is pool WebSocket with an empty URL', () => {
+  it('web testnet MineTo is pool WebSocket; gateway URL is local WSS', () => {
     expect(WEB_DEFAULTS.chains.testnet.mineToKind).toBe('stratumPoolWebsocket');
     expect(WEB_DEFAULTS.chains.testnet.stratumPoolWebsocket).toEqual({ url: '' });
-    expect(WEB_DEFAULTS.chains.testnet.datumGatewayWebsocket).toEqual({ url: '' });
+    expect(WEB_DEFAULTS.chains.testnet.datumGatewayWebsocket).toEqual({
+      url: 'ws://127.0.0.1:23335/stratum',
+    });
     expect(WEB_DEFAULTS.hosted.stratumWss).toBe('wss://pool.testnet.federationcoin.org/stratum');
     expect(WEB_DEFAULTS.registryBaseUrl).toBe('https://pools.federationcoin.org');
   });
