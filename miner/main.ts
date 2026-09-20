@@ -12,7 +12,7 @@ import { serializeBlock } from './coinbase.js';
 import { buildJobFromGbt, fillFromSubmit, jobKey, type GbtResult, type Job } from './gbt.js';
 import { logHistory, pushLog, redactSecret, type LogLine } from './log.js';
 import { datumWorkHeader, datumWorkRoot, headerHash, hashMeetsTarget, targetFromCompact, xorKeyMaskBytes } from './pow.js';
-import { grindTargetForShare, shareWorkFromTargetByte, specAfterShareAccept } from './difficulty.js';
+import { grindTargetForShare, specAfterShareAccept } from './difficulty.js';
 import {
   cookiePath,
   cookiePathForDatadir,
@@ -33,10 +33,7 @@ import {
   type PoolStartOpts,
   type PoolStats,
 } from './pool.js';
-import { loadDatumClient } from './datum-load.js';
 import {
-  connectHost,
-  isAppPoolKind,
   parseMineTo,
   type MineTo,
   type MineToKind,
@@ -153,22 +150,6 @@ function stopPoolChild(): void {
   lastPoolOpts = null;
   poolStatsState = { ...IDLE_POOL_STATS, status: 'stopped' };
   emitPoolStats();
-  stopHasherBecauseAppPoolStopped();
-}
-
-function stopHasherBecauseAppPoolStopped(): void {
-  if (!running || !isAppPoolKind(activeKind)) {
-    return;
-  }
-  stopRequested = true;
-  running = false;
-  protocolClient?.close();
-  cancelSleep();
-  killWorkers();
-  status = 'stopped';
-  lastError = 'app pool stopped; mining stopped';
-  emitLog(activeKind, lastError, true);
-  emitStats();
 }
 
 function killWorkers(): void {
@@ -616,135 +597,6 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
   });
 }
 
-async function mineDatumLoop(opts: { host: string; port: number; worker: string; threads: number }): Promise<void> {
-  const DatumClient = await loadDatumClient(here, process.resourcesPath);
-  return new Promise((resolve) => {
-    let delay = 0;
-    let finished = false;
-
-    const done = (): void => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      protocolClient?.close();
-      protocolClient = null;
-      resolve();
-    };
-
-    const connect = (): void => {
-      if (!running || stopRequested) {
-        done();
-        return;
-      }
-      extraNonce1 = new Uint8Array(4);
-      let lastSpec: GrindSpec | null = null;
-      let lastNBits = 0;
-      const client = new DatumClient(opts.host, opts.port, opts.worker, {
-        onNotify: (job) => {
-          delay = 0;
-          lastError = '';
-          extraNonce1 = new Uint8Array(job.extraNonce1);
-          const target = grindTargetForShare(job.nBits, shareWorkFromTargetByte(job.targetByte));
-          if (!target) {
-            lastError = 'bad nBits';
-            emitLog('datum', lastError, true);
-            emitStats();
-            return;
-          }
-          const spec: GrindSpec = {
-            coinb1: job.coinb1,
-            prevHidden: job.prevHidden,
-            ntime8: job.ntime8,
-            target,
-            xorKey: job.xorKey,
-            xorClear: job.xorClear,
-            extraNonce1,
-            height: job.height > 0 ? job.height - 1 : 0,
-            onFound: (msg: Extract<WorkerMsg, { type: 'found' }>, en12: Uint8Array) => {
-              const nonce8 = new Uint8Array(8);
-              writeLe32(nonce8, 0, msg.nonce);
-              writeLe32(nonce8, 4, msg.nonce2);
-              lastHash = toHex(nonce8);
-              client.submitPow({
-                jobId: job.jobId,
-                coinbaseId: job.coinbaseId,
-                flags: 0,
-                targetByte: job.targetByte,
-                ntime8: msg.ntime8,
-                nonce8,
-                version: job.version,
-                extranonce: en12,
-                username: opts.worker,
-              });
-            },
-          };
-          lastSpec = spec;
-          lastNBits = job.nBits;
-          spawnWorkers(spec, opts.threads);
-          spawnGpu(spec, spec.target);
-        },
-        onShareResult: (ok, reason) => {
-          if (ok) {
-            accepted++;
-            lastError = '';
-            status = 'share accepted';
-            const next = huntBlockAfterShare(lastSpec, lastNBits, opts.threads);
-            if (next) {
-              lastSpec = next;
-            }
-          } else {
-            rejected++;
-            lastError = `share rejected ${reason}`;
-            emitLog('datum', lastError, true);
-          }
-          emitStats();
-        },
-        onClose: (reason) => {
-          if (protocolClient !== client) {
-            return;
-          }
-          protocolClient = null;
-          killWorkers();
-          if (!running || stopRequested || finished) {
-            done();
-            return;
-          }
-          lastError = reason;
-          delay = nextBackoff(delay);
-          const waitSec = Math.round(delay / 1000);
-          status = `reconnecting in ${waitSec}s`;
-          emitLog('datum', `${reason}; retry in ${waitSec}s`, true);
-          emitStats();
-          void sleep(delay).then(() => {
-            if (!running || stopRequested || finished) {
-              done();
-              return;
-            }
-            connect();
-          });
-        },
-      });
-      protocolClient = client;
-      status = `connecting ${opts.host}:${opts.port}`;
-      emitStats();
-      client.connect();
-    };
-
-    connect();
-  });
-}
-
-function appPoolEndpoint(kind: 'stratum' | 'datum'): { host: string; port: number } {
-  if (!poolChild || !lastPoolOpts || lastPoolOpts.chain !== activeChain) {
-    throw new Error('app pool is not running on this network');
-  }
-  if (kind === 'stratum') {
-    return { host: connectHost(lastPoolOpts.stratumHost), port: lastPoolOpts.stratumPort };
-  }
-  return { host: connectHost(lastPoolOpts.datumHost), port: lastPoolOpts.datumPort };
-}
-
 let parsedMineTo: MineTo | null = null;
 
 function bindNodeRpc(rpc: RpcConnect, chain: MinerChain): void {
@@ -783,20 +635,6 @@ function prepareStart(opts: MinerStartOpts): void {
   }
   if (mineTo.kind === 'stratum') {
     stratumSecret = mineTo.stratum.password;
-    return;
-  }
-  if (mineTo.kind === 'appPoolStratum') {
-    stratumSecret = mineTo.password;
-    appPoolEndpoint('stratum');
-    return;
-  }
-  if (mineTo.kind === 'datum') {
-    bindNodeRpc(mineTo.datum.rpc, activeChain);
-    return;
-  }
-  if (mineTo.kind === 'appPoolDatum') {
-    appPoolEndpoint('datum');
-    bindNodeRpc(mineTo.rpc, activeChain);
   }
 }
 
@@ -811,29 +649,6 @@ async function runMiner(opts: MinerStartOpts): Promise<void> {
     case 'stratum':
       await mineStratumLoop({ ...mineTo.stratum, threads: opts.threads });
       return;
-    case 'datum':
-      await mineDatumLoop({
-        host: mineTo.datum.host,
-        port: mineTo.datum.port,
-        worker: mineTo.datum.worker,
-        threads: opts.threads,
-      });
-      return;
-    case 'appPoolStratum': {
-      const ep = appPoolEndpoint('stratum');
-      await mineStratumLoop({
-        host: ep.host,
-        port: ep.port,
-        worker: mineTo.worker,
-        password: mineTo.password,
-        threads: opts.threads,
-      });
-      return;
-    }
-    case 'appPoolDatum': {
-      const ep = appPoolEndpoint('datum');
-      await mineDatumLoop({ host: ep.host, port: ep.port, worker: mineTo.worker, threads: opts.threads });
-    }
   }
 }
 
@@ -1026,7 +841,6 @@ ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
       };
       emitPoolStats();
       emitLog('pool', `stopped${code ? ` (${code})` : ''}`);
-      stopHasherBecauseAppPoolStopped();
     });
     return { ok: true as const };
   } catch (e) {

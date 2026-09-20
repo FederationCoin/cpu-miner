@@ -152,9 +152,22 @@ function selectNetwork(fixture: ComponentFixture<App>, id: 'main' | 'testnet'): 
   fixture.detectChanges();
 }
 
+function radioInput(el: HTMLElement): HTMLInputElement {
+  if (el instanceof HTMLInputElement) {
+    return el;
+  }
+  const input = el.querySelector('input[type="radio"]');
+  expect(input, 'expected a native radio inside ' + el.id).toBeTruthy();
+  return input as HTMLInputElement;
+}
+
+function radioOn(el: HTMLElement): boolean {
+  return radioInput(el).checked || el.classList.contains('mat-mdc-radio-checked');
+}
+
 function selectKind(fixture: ComponentFixture<App>, chain: 'main' | 'testnet', kind: string): void {
-  const el = queryEl<HTMLInputElement>(fixture, `#${chain}-mineTo${kind}`);
-  el.click();
+  const el = queryEl<HTMLElement>(fixture, `#${chain}-mineTo${kind}`);
+  radioInput(el).click();
   fixture.detectChanges();
 }
 
@@ -323,58 +336,14 @@ describe('App', () => {
       expect(has(second, '#testnet-datadir')).toBe(false);
     });
 
-    it('shows DATUM Node RPC beside DATUM host and worker, without a password field', async () => {
+    it('does not offer DATUM as mill MineTo', async () => {
       const f = await render(stubMiner());
-      selectKind(f, 'testnet', 'Datum');
-      expect(has(f, '#testnet-datumWorker')).toBe(true);
-      expect(has(f, '#testnet-datumHost')).toBe(true);
-      expect(has(f, '#testnet-datum-rpcHost')).toBe(true);
-      expect(has(f, '#testnet-rpcHost')).toBe(false);
-      expect(has(f, '#testnet-stratumPassword')).toBe(false);
-      expect(queryEl<HTMLInputElement>(f, '#testnet-datumPort').value).toBe('28916');
-      expect(queryEl<HTMLInputElement>(f, '#testnet-datum-rpcPort').value).toBe('35332');
-      expect(queryEl(f, 'label[for="testnet-datum-rpcHost"]').textContent).toContain('RPC host');
-    });
-
-    it('Start in Testnet DATUM Prime sends node RPC plus DATUM host', async () => {
-      const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
-      const f = await render(stubMiner({ start }));
-      selectKind(f, 'testnet', 'Datum');
-      setInput(f, '#testnet-datumHost', '10.0.0.8');
-      setInput(f, '#testnet-datum-rpcHost', '192.168.1.4');
-      setInput(f, '#testnet-datumWorker', 'tgfcn1abc.cpu');
-      queryDe(f, '#testnet-start').triggerEventHandler('click');
-      await f.whenStable();
-      expect(start).toHaveBeenCalledWith({
-        chain: 'testnet',
-        threads: 4,
-        gpus: [],
-        mineTo: {
-          kind: 'datum',
-          datum: {
-            host: '10.0.0.8',
-            port: 28916,
-            worker: 'tgfcn1abc.cpu',
-            rpc: cookieRpc('/tmp/x', '192.168.1.4'),
-          },
-        },
-      });
-    });
-
-    it('keeps DATUM Node RPC distinct from Node mine-to RPC across a remount', async () => {
-      const miner = stubMiner();
-      const first = await render(miner);
-      setInput(first, '#testnet-rpcHost', '10.0.0.1');
-      selectKind(first, 'testnet', 'Datum');
-      setInput(first, '#testnet-datum-rpcHost', '10.0.0.2');
-      setInput(first, '#testnet-datumHost', '10.0.0.8');
-      first.destroy();
-      const second = await render(miner);
-      expect(queryEl<HTMLInputElement>(second, '#testnet-mineToDatum').checked).toBe(true);
-      expect(queryEl<HTMLInputElement>(second, '#testnet-datum-rpcHost').value).toBe('10.0.0.2');
-      expect(queryEl<HTMLInputElement>(second, '#testnet-datumHost').value).toBe('10.0.0.8');
-      selectKind(second, 'testnet', 'Node');
-      expect(queryEl<HTMLInputElement>(second, '#testnet-rpcHost').value).toBe('10.0.0.1');
+      expect(has(f, '#testnet-mineToDatum')).toBe(false);
+      expect(has(f, '#testnet-datumWorker')).toBe(false);
+      expect(has(f, '#testnet-datumHost')).toBe(false);
+      expect(has(f, '#testnet-mineToDatumWebsocket')).toBe(false);
+      expect(has(f, '#testnet-mineToNode')).toBe(true);
+      expect(has(f, '#testnet-mineToStratum')).toBe(true);
     });
 
     it('persists Testnet Stratum kind across a remount', async () => {
@@ -383,7 +352,7 @@ describe('App', () => {
       selectKind(first, 'testnet', 'Stratum');
       first.destroy();
       const second = await render(miner);
-      expect(queryEl<HTMLInputElement>(second, '#testnet-mineToStratum').checked).toBe(true);
+      expect(radioOn(queryEl(second, '#testnet-mineToStratum'))).toBe(true);
       expect(has(second, '#testnet-stratumWorker')).toBe(true);
     });
 
@@ -406,12 +375,11 @@ describe('App', () => {
       });
     });
 
-    it('DATUM Prime (Websocket) is present and disabled', async () => {
+    it('does not show mill WebSocket kinds on desktop', async () => {
       const f = await render(stubMiner());
-      const ws = queryEl<HTMLInputElement>(f, '#testnet-mineToDatumWebsocket');
-      expect(ws.disabled).toBe(true);
+      expect(has(f, '#testnet-mineToStratumPoolWebsocket')).toBe(false);
+      expect(has(f, '#testnet-mineToDatumGatewayWebsocket')).toBe(false);
       expect(has(f, '#testnet-mineToStratum')).toBe(true);
-      expect(has(f, '#testnet-mineToStratumWebsocket')).toBe(false);
     });
 
     it('shows a GPUs fieldset on Testnet', async () => {
@@ -457,17 +425,6 @@ describe('App', () => {
           expect(details.contains(worker)).toBe(false);
         }
       }
-    });
-
-    it('folds DATUM cookie Node RPC and leaves worker outside the fold', async () => {
-      const f = await render(stubMiner());
-      selectKind(f, 'testnet', 'Datum');
-      const rpc = queryEl<HTMLDetailsElement>(f, '#testnet-datum-rpc-fold');
-      expect(rpc.open).toBe(false);
-      expect(rpc.querySelector('summary')?.textContent).toContain('127.0.0.1:35332');
-      expect(rpc.contains(queryEl(f, '#testnet-datumWorker'))).toBe(false);
-      setInput(f, '#testnet-datum-rpcHost', '192.168.1.4');
-      expect(queryEl<HTMLInputElement>(f, '#testnet-datum-rpcHost').value).toBe('192.168.1.4');
     });
 
     it('folds pool cookie RPC and bind partitions; operator stays outside', async () => {
@@ -776,6 +733,94 @@ describe('App', () => {
       expect(registryRequest.mock.calls.some((c) => c[0].chain === 'main')).toBe(false);
     });
 
+    it('Find Mine this fills desktop Stratum and shows Prime as a side card', async () => {
+      const listings = [
+        {
+          poolId: 'stratum-1',
+          chain: 'testnet' as const,
+          operatorWallet: 'tgfcn1qw508d6qejxtdg4y5r3zarvary0c5xw7k',
+          name: 'Stratum mill',
+          websiteUrl: 'https://s.example.com',
+          connect: { kind: 'stratumOnly' as const, stratum: { host: 's.example.com', port: 23334 } },
+          coinbaseTag: 's',
+          listingDomain: 's.example.com',
+          attestationCount: 0,
+          listerConfirmedCoinbasePayee: false,
+          reviewScore: 1,
+          hasHostileFlag: false,
+        },
+        {
+          poolId: 'prime-1',
+          chain: 'testnet' as const,
+          operatorWallet: 'tgfcn1qw508d6qejxtdg4y5r3zarvary0c5xw7k',
+          name: 'Prime only',
+          websiteUrl: 'https://d.example.com',
+          connect: { kind: 'datumOnly' as const, datum: { host: 'd.example.com', port: 28916 } },
+          coinbaseTag: 'd',
+          listingDomain: 'd.example.com',
+          attestationCount: 0,
+          listerConfirmedCoinbasePayee: false,
+          reviewScore: 0,
+          hasHostileFlag: false,
+        },
+        {
+          poolId: 'both-1',
+          chain: 'testnet' as const,
+          operatorWallet: 'tgfcn1qw508d6qejxtdg4y5r3zarvary0c5xw7k',
+          name: 'Both kinds',
+          websiteUrl: 'https://both.example.com',
+          connect: {
+            kind: 'stratumAndDatum' as const,
+            stratum: { host: 'both-s.example.com', port: 23334 },
+            datum: { host: 'both-d.example.com', port: 28916 },
+          },
+          coinbaseTag: 'b',
+          listingDomain: 'both.example.com',
+          attestationCount: 0,
+          listerConfirmedCoinbasePayee: false,
+          reviewScore: 0,
+          hasHostileFlag: false,
+        },
+      ];
+      const registryRequest = vi.fn(async (req: { method: string; path: string; chain: string }) => {
+        if (req.path === '/v1/listings') {
+          return { status: 200, json: { items: listings } };
+        }
+        if (req.path === '/v1/sign-context') {
+          return {
+            status: 200,
+            json: {
+              signingBlockHeight: 10,
+              signingBlockHash: 'ab'.repeat(32),
+              stakeRequiredSats: '1',
+              mineSeconds: 3600,
+            },
+          };
+        }
+        return { status: 200, json: { items: [] } };
+      });
+      const f = await render(stubMiner({ registryRequest }));
+      selectTab(f, 'testnet', 'finder');
+      await f.whenStable();
+      await vi.waitFor(() => {
+        f.detectChanges();
+        expect(queryEl(f, '#testnet-finder-root').textContent).toContain('Both kinds');
+      });
+      expect(has(f, '#testnet-finder-target-stratum-1')).toBe(true);
+      expect(has(f, '#testnet-finder-prime-stratum-1')).toBe(false);
+      expect(has(f, '#testnet-finder-target-prime-1')).toBe(false);
+      expect(has(f, '#testnet-finder-prime-prime-1')).toBe(true);
+      expect(queryEl(f, '#testnet-finder-prime-prime-1').textContent).toMatch(/not what you mine to/i);
+      expect(has(f, '#testnet-finder-target-both-1')).toBe(true);
+      expect(has(f, '#testnet-finder-prime-both-1')).toBe(true);
+      queryEl<HTMLButtonElement>(f, '#testnet-finder-target-both-1').click();
+      await f.whenStable();
+      f.detectChanges();
+      expect(radioOn(queryEl(f, '#testnet-mineToStratum'))).toBe(true);
+      expect(queryEl<HTMLInputElement>(f, '#testnet-stratumHost').value).toBe('both-s.example.com');
+      expect(queryEl<HTMLInputElement>(f, '#testnet-stratumPort').value).toBe('23334');
+    });
+
     it('Start on pool sends spawn IPC without a cookie', async () => {
       const poolStart = vi.fn<(opts: PoolStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ poolStart }));
@@ -810,7 +855,7 @@ describe('App', () => {
       expect(miner.poolStop).toHaveBeenCalled();
     });
 
-    it('app-pool mine-to appears only while the pool is running', async () => {
+    it('does not add mill app-pool radios while Host a pool is running', async () => {
       const f = await render(stubMiner());
       expect(has(f, '#testnet-mineToAppPoolStratum')).toBe(false);
       selectTab(f, 'testnet', 'pool');
@@ -819,16 +864,12 @@ describe('App', () => {
       await f.whenStable();
       f.detectChanges();
       selectTab(f, 'testnet', 'mine');
-      expect(has(f, '#testnet-mineToAppPoolStratum')).toBe(true);
-      expect(has(f, '#testnet-mineToAppPoolDatum')).toBe(true);
-      selectKind(f, 'testnet', 'AppPoolStratum');
-      expect(queryEl(f, '.frozen').textContent).toContain('127.0.0.1:23334');
-      selectKind(f, 'testnet', 'AppPoolDatum');
-      expect(has(f, '#testnet-appPoolDatum-rpcHost')).toBe(true);
-      expect(queryEl(f, '.frozen').textContent).toContain('127.0.0.1:28916');
+      expect(has(f, '#testnet-mineToAppPoolStratum')).toBe(false);
+      expect(has(f, '#testnet-mineToAppPoolDatum')).toBe(false);
+      expect(has(f, '#testnet-mineToStratum')).toBe(true);
     });
 
-    it('Start app-pool Stratum omits host and port', async () => {
+    it('Start Stratum after Host a pool still sends TCP host and port', async () => {
       const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
       const f = await render(stubMiner({ start }));
       selectTab(f, 'testnet', 'pool');
@@ -837,30 +878,8 @@ describe('App', () => {
       await f.whenStable();
       f.detectChanges();
       selectTab(f, 'testnet', 'mine');
-      selectKind(f, 'testnet', 'AppPoolStratum');
-      setInput(f, '#testnet-appPoolStratumWorker', 'tgfcn1abc.cpu');
-      queryDe(f, '#testnet-start').triggerEventHandler('click');
-      await f.whenStable();
-      expect(start).toHaveBeenCalledWith({
-        chain: 'testnet',
-        threads: 4,
-        gpus: [],
-        mineTo: { kind: 'appPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
-      });
-    });
-
-    it('Start app-pool DATUM sends hasher Node RPC without DATUM host or port', async () => {
-      const start = vi.fn<(opts: MinerStartOpts) => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true });
-      const f = await render(stubMiner({ start }));
-      selectTab(f, 'testnet', 'pool');
-      setInput(f, '#testnet-pool-operator', 'tgfcn1abc');
-      queryDe(f, '#testnet-pool-start').triggerEventHandler('click');
-      await f.whenStable();
-      f.detectChanges();
-      selectTab(f, 'testnet', 'mine');
-      selectKind(f, 'testnet', 'AppPoolDatum');
-      setInput(f, '#testnet-appPoolDatum-rpcHost', '10.0.0.9');
-      setInput(f, '#testnet-appPoolDatumWorker', 'tgfcn1abc.cpu');
+      selectKind(f, 'testnet', 'Stratum');
+      setInput(f, '#testnet-stratumWorker', 'tgfcn1abc.cpu');
       queryDe(f, '#testnet-start').triggerEventHandler('click');
       await f.whenStable();
       expect(start).toHaveBeenCalledWith({
@@ -868,9 +887,8 @@ describe('App', () => {
         threads: 4,
         gpus: [],
         mineTo: {
-          kind: 'appPoolDatum',
-          worker: 'tgfcn1abc.cpu',
-          rpc: cookieRpc('/tmp/x', '10.0.0.9'),
+          kind: 'stratum',
+          stratum: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' },
         },
       });
     });

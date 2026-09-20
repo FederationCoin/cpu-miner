@@ -90,9 +90,22 @@ export type StratumConnect = {
 export type MineTo =
   | { kind: 'node'; rpc: RpcConnect; payout: string }
   | { kind: 'stratum'; stratum: StratumConnect }
-  | { kind: 'stratumWebsocket'; url: string; worker: string };
+  | { kind: 'stratumPoolWebsocket'; url: string; worker: string }
+  | { kind: 'datumGatewayWebsocket'; url: string; worker: string };
 
 export type MineToKind = MineTo['kind'];
+
+export type WebStratumKind = 'stratumPoolWebsocket' | 'datumGatewayWebsocket';
+
+export function isWebStratumKind(kind: MineToKind): kind is WebStratumKind {
+  return kind === 'stratumPoolWebsocket' || kind === 'datumGatewayWebsocket';
+}
+
+export function isWebStratumMineTo(
+  mineTo: MineTo,
+): mineTo is Extract<MineTo, { kind: WebStratumKind }> {
+  return isWebStratumKind(mineTo.kind);
+}
 
 export type MinerStartOpts = {
   chain: MinerChain;

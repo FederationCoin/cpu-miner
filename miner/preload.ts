@@ -3,7 +3,7 @@ import type { LogLine } from './log.js';
 import type { MinerStartOpts } from './mine-to.js';
 
 export type { MinerChain } from './chain.js';
-export type { MineTo, MineToKind, MinerStartOpts, RpcConnect, RpcAuthConnect, RpcAuthKind, StratumConnect, DatumConnect } from './mine-to.js';
+export type { MineTo, MineToKind, MinerStartOpts, RpcConnect, RpcAuthConnect, RpcAuthKind, StratumConnect } from './mine-to.js';
 
 export type MinerLink = 'idle' | 'up' | 'down';
 

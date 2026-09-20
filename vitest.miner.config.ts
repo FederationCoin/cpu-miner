@@ -9,6 +9,7 @@ export default defineConfig({
       'projects/miner-ui/src/lib/web-hasher.spec.ts',
       'projects/miner-ui/src/lib/defaults/defaults.spec.ts',
       'projects/miner-ui/src/lib/registry.spec.ts',
+      'projects/miner-ui/src/lib/mine-target.spec.ts',
     ],
     environment: 'node',
   },

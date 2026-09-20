@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { advertisedAttestKinds, attestConnectFromListing, envelopeAuthorization, mainFinderLive, payloadHashHex, signedPayloadHash } from './registry';
+import {
+  advertisedAttestKinds,
+  attestConnectFromListing,
+  envelopeAuthorization,
+  listingCanMineThis,
+  listingPrimeAdvertise,
+  listingStratumWssUrl,
+  mainFinderLive,
+  payloadHashHex,
+  signedPayloadHash,
+} from './registry';
 
 describe('registry helpers', () => {
   it('hashes RFC 8785 JCS of the command', () => {
@@ -55,5 +65,26 @@ describe('registry helpers', () => {
     expect(
       attestConnectFromListing({ kind: 'stratumOnly', stratum: { host: 's.example.com', port: 23334 } }, 'stratum'),
     ).toEqual({ kind: 'stratum', host: 's.example.com', port: 23334 });
+  });
+
+  it('Mine this is Stratum TCP or listing WSS; Prime advertise is DATUM host', () => {
+    const tcp = { kind: 'stratumOnly' as const, stratum: { host: 's.example.com', port: 23334 } };
+    const wss = {
+      kind: 'stratumAndDatum' as const,
+      stratum: { host: 's.example.com', port: 23334 },
+      datum: { host: 'd.example.com', port: 28916 },
+      wss: { host: 'pool.example.com', path: '/stratum' },
+    };
+    const prime = { kind: 'datumOnly' as const, datum: { host: 'd.example.com', port: 28916 } };
+    expect(listingCanMineThis(tcp, false)).toBe(true);
+    expect(listingCanMineThis(tcp, true)).toBe(false);
+    expect(listingCanMineThis(wss, true)).toBe(true);
+    expect(listingCanMineThis(prime, false)).toBe(false);
+    expect(listingCanMineThis(prime, true)).toBe(false);
+    expect(listingStratumWssUrl(wss)).toBe('wss://pool.example.com/stratum');
+    expect(listingStratumWssUrl(tcp)).toBeNull();
+    expect(listingPrimeAdvertise(tcp)).toBeNull();
+    expect(listingPrimeAdvertise(wss)).toEqual({ host: 'd.example.com', port: 28916 });
+    expect(listingPrimeAdvertise(prime)).toEqual({ host: 'd.example.com', port: 28916 });
   });
 });

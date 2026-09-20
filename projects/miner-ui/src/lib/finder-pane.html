@@ -30,7 +30,10 @@
         </button>
       </div>
       @if (!isDesktop()) {
-        <p class="hint">In-page mining needs a listing WSS advertise. Mine this stays on the desktop mill (TCP).</p>
+        <p class="hint">
+          Mine this sits next to Stratum only (WSS on this page, TCP on desktop). Prime is a side card
+          for gateway config, not mill MineTo. CloudFront cannot open miner localhost.
+        </p>
       }
 
       <ul class="finder-list">
@@ -54,11 +57,27 @@
               @if (p.hasHostileFlag) { · hostile }
             </p>
             <div class="row">
-              @if (isDesktop()) {
-                <button type="button" [id]="id('target-' + p.poolId)" (click)="setDesktopMinerTarget(p)">Mine this</button>
+              @if (canMineThis(p)) {
+                <button mat-stroked-button type="button" [id]="id('target-' + p.poolId)" (click)="mineThis(p)">
+                  Mine this
+                </button>
               }
               <button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">CPU share test</button>
             </div>
+            @if (primeAdvertise(p); as prime) {
+              <mat-card class="prime-card" [attr.id]="id('prime-' + p.poolId)">
+                <mat-card-header>
+                  <mat-card-title>DATUM Prime</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  <p class="mono">{{ prime.host }}:{{ prime.port }}</p>
+                  <p class="hint">
+                    This value is set on your DATUM Gateway. It is not what you mine to. You mine to the
+                    gateway to use this config.
+                  </p>
+                </mat-card-content>
+              </mat-card>
+            }
             <div class="row">
               @for (kind of advertisedKinds(p); track kind) {
               <button type="button" [id]="id('attest-' + kind + '-' + p.poolId)" (click)="openAttest(p, kind)">

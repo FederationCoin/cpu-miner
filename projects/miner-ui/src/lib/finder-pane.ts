@@ -1,16 +1,23 @@
 import { Component, DestroyRef, ElementRef, NgZone, effect, inject, input, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
 import { debounceTime } from 'rxjs';
 import type { MinerChain } from './chain';
 import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import { MiningService } from './mining.service';
 import { formatSats } from './miner-format';
+import { applyDesktopStratumTarget, applyWebPoolWssTarget } from './mine-target';
+import { WorkspaceNav } from './workspace-nav';
 import {
   advertisedAttestKinds,
   attestConnectFromListing,
   envelopeAuthorization,
+  listingCanMineThis,
+  listingPrimeAdvertise,
+  listingStratumWssUrl,
   mainFinderLive,
   registryFetch,
   signedPayloadHash,
@@ -25,7 +32,7 @@ import {
 
 @Component({
   selector: 'app-finder-pane',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MatButtonModule, MatCardModule],
   styleUrl: './miner-pane.css',
   templateUrl: './finder-pane.html',
 })
@@ -33,6 +40,7 @@ export class FinderPane {
   readonly chain = input.required<MinerChain>();
   protected readonly shell = inject(MINER_SHELL);
   protected readonly mining = inject(MiningService);
+  private readonly nav = inject(WorkspaceNav);
   private readonly host = inject(HASHER_HOST);
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
@@ -106,6 +114,14 @@ export class FinderPane {
 
   protected advertisedKinds(p: ListingPublic): AttestKind[] {
     return advertisedAttestKinds(p.connect);
+  }
+
+  protected canMineThis(p: ListingPublic): boolean {
+    return listingCanMineThis(p.connect, this.shell.kind === 'webDemo');
+  }
+
+  protected primeAdvertise(p: ListingPublic): { host: string; port: number } | null {
+    return listingPrimeAdvertise(p.connect);
   }
 
   protected attestHostPort(p: ListingPublic, kind: AttestKind): string {
@@ -416,28 +432,31 @@ export class FinderPane {
     await this.reloadListings();
   }
 
-  protected setDesktopMinerTarget(p: ListingPublic): void {
-    if (this.shell.kind !== 'desktop') {
-      this.notice.set('In-page mining needs a listing WSS advertise.');
+  protected mineThis(p: ListingPublic): void {
+    if (!this.canMineThis(p)) {
+      this.notice.set('This listing has no Stratum advertise the mill can mine to.');
       return;
     }
     const chain = this.chain();
-    const c = p.connect;
-    if (c.kind === 'datumOnly') {
-      localStorage.setItem(`fc.${chain}.kind`, 'datum');
-      localStorage.setItem(`fc.${chain}.datum.host`, c.datum.host);
-      localStorage.setItem(`fc.${chain}.datum.port`, String(c.datum.port));
-      this.mining.warn(`Mine target set to DATUM ${c.datum.host}:${c.datum.port}. Open Mine and Start.`);
+    if (this.shell.kind === 'desktop') {
+      const c = p.connect;
+      if (c.kind === 'datumOnly') {
+        this.notice.set('Prime is set on your DATUM Gateway, not mill MineTo.');
+        return;
+      }
+      applyDesktopStratumTarget(chain, c.stratum.host, c.stratum.port);
+      this.nav.goMine();
+      this.mining.warn(`Mine target set to ${c.stratum.host}:${c.stratum.port}. Open Mine and Start.`);
       return;
     }
-    localStorage.setItem(`fc.${chain}.kind`, 'stratum');
-    localStorage.setItem(`fc.${chain}.stratum.host`, c.stratum.host);
-    localStorage.setItem(`fc.${chain}.stratum.port`, String(c.stratum.port));
-    if (c.kind === 'stratumAndDatum') {
-      localStorage.setItem(`fc.${chain}.datum.host`, c.datum.host);
-      localStorage.setItem(`fc.${chain}.datum.port`, String(c.datum.port));
+    const url = listingStratumWssUrl(p.connect);
+    if (!url) {
+      this.notice.set('In-page mining needs a listing WSS advertise.');
+      return;
     }
-    this.mining.warn(`Mine target set to ${c.stratum.host}:${c.stratum.port}. Open Mine and Start.`);
+    applyWebPoolWssTarget(chain, url);
+    this.nav.goMine();
+    this.mining.warn(`Mine target set to ${url}. Open Mine and Start.`);
   }
 
   protected async testCpuShares(p: ListingPublic): Promise<void> {

@@ -73,6 +73,13 @@ export function listingCanMineThis(connect: RegistryConnect, web: boolean): bool
   return web ? listingStratumWssUrl(connect) != null : listingHasStratumTcp(connect);
 }
 
+export function listingPrimeAdvertise(connect: RegistryConnect): { host: string; port: number } | null {
+  if (connect.kind === 'stratumOnly') {
+    return null;
+  }
+  return connect.datum;
+}
+
 export function attestConnectFromListing(connect: RegistryConnect, kind: AttestKind): AttestConnect | undefined {
   if (kind === 'stratum') {
     if (connect.kind === 'datumOnly') {

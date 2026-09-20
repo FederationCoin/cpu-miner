@@ -26,19 +26,21 @@
 
   <h3>DATUM is bring your own node</h3>
   <p class="hint">
-    Hashers speak Stratum v1. DATUM is the gateway talking to Prime (the coinbaser in the job).
-    Template construction stays on <em>your</em> <code>federationcoind</code>. This cloud UI will
-    not proxy our node (that would defeat DATUM). Do not send mill hashers to pool
-    <code>WSS /datum</code> (binary coinbaser wrap).
+    Hashers speak Stratum v1 to a gateway or a Stratum pool. DATUM is the gateway talking to Prime
+    (the coinbaser in the job). Template construction stays on <em>your</em>
+    <code>federationcoind</code>. This cloud UI will not proxy our node (that would defeat DATUM).
+    Do not send mill hashers to pool <code>WSS /datum</code> (binary coinbaser wrap).
   </p>
 
   <h3>WebSocket Stratum</h3>
   <p class="hint">
     The web SPA is <code>mine.federationcoin.org</code> (network is the in-app dropdown). In-page
     mining is Stratum v1 over WebSocket: newline JSON-RPC, password <code>x</code>, path
-    <code>/stratum</code>. CloudFront cannot reach miner localhost; Find → Mine this uses a listing
-    that advertises WSS (house pool included). Desktop mill uses TCP; that host may be a pool or a
-    reachable DATUM Gateway. Gateway WSS is loopback on a dedicated port, not the admin API.
+    <code>/stratum</code>. Two MineTo kinds: Stratum pool via WebSocket, or DATUM Gateway via
+    WebSocket (reachable URL; CloudFront cannot use miner <code>127.0.0.1</code>). Find → Mine this
+    fills pool WSS. Prime is a side card for gateway config. No hosted house MineTo. Desktop mill
+    uses TCP; that host may be a pool or a reachable DATUM Gateway. Gateway WSS is on a dedicated
+    port, not the admin API.
   </p>
 
   @if (isWeb()) {

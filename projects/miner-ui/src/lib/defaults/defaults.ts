@@ -19,7 +19,8 @@ export type StratumFormDefaults = {
 
 export type WebChainDefaults = {
   mineToKind: MineToKind;
-  stratumWebsocket: { url: string };
+  stratumPoolWebsocket: { url: string };
+  datumGatewayWebsocket: { url: string };
 };
 
 export type WebDefaults = {

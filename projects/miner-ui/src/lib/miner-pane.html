@@ -32,10 +32,28 @@
           </p>
         }
       } @else {
-        <p class="hint">
-          Hasher-to-pool is Stratum v1 over WebSocket (newline JSON-RPC, password <code>x</code>).
-          CloudFront cannot reach miner localhost. Find → Mine this uses a listing that advertises WSS.
-        </p>
+        <mat-radio-group formControlName="kind" [attr.aria-label]="'Mine to'">
+          <mat-radio-button [id]="id('mineToStratumPoolWebsocket')" value="stratumPoolWebsocket" [disabled]="kindLocked()">
+            Stratum pool via WebSocket
+          </mat-radio-button>
+          <mat-radio-button [id]="id('mineToDatumGatewayWebsocket')" value="datumGatewayWebsocket" [disabled]="kindLocked()">
+            DATUM Gateway via WebSocket
+          </mat-radio-button>
+        </mat-radio-group>
+        @if (kind() === 'stratumPoolWebsocket') {
+          <p class="hint">
+            Hasher-to-pool is Stratum v1 over WebSocket (newline JSON-RPC, password <code>x</code>).
+            Find → Mine this fills this. CloudFront cannot reach miner localhost.
+          </p>
+        }
+        @if (kind() === 'datumGatewayWebsocket') {
+          <p class="hint">
+            This is your local gateway’s Stratum listener, not Prime and not the pool connect.
+            Then set Prime on the gateway from Find. More complicated, more decentralized.
+            Needs a URL the browser can open (<code>ng serve</code> / LAN). CloudFront cannot use miner
+            <code>127.0.0.1</code>.
+          </p>
+        }
       }
     </mat-card-content>
   </mat-card>
@@ -101,13 +119,13 @@
         </mat-form-field>
       </div>
     }
-    @case ('stratumWebsocket') {
-      <div class="mine-fields" formGroupName="stratumWebsocket">
+    @case ('stratumPoolWebsocket') {
+      <div class="mine-fields" formGroupName="poolWebsocket">
         <mat-form-field appearance="outline">
-          <mat-label>Stratum WSS URL</mat-label>
+          <mat-label>Stratum pool WebSocket URL</mat-label>
           <input
             matInput
-            [id]="id('stratumWebsocketUrl')"
+            [id]="id('stratumPoolWebsocketUrl')"
             type="text"
             autocomplete="off"
             spellcheck="false"
@@ -119,7 +137,35 @@
           <mat-label>Worker</mat-label>
           <input
             matInput
-            [id]="id('stratumWebsocketWorker')"
+            [id]="id('stratumPoolWebsocketWorker')"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            [placeholder]="config().hrp + '1….cpu'"
+            formControlName="worker"
+          />
+        </mat-form-field>
+      </div>
+    }
+    @case ('datumGatewayWebsocket') {
+      <div class="mine-fields" formGroupName="gatewayWebsocket">
+        <mat-form-field appearance="outline">
+          <mat-label>DATUM Gateway WebSocket URL</mat-label>
+          <input
+            matInput
+            [id]="id('datumGatewayWebsocketUrl')"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="ws://127.0.0.1:port/stratum"
+            formControlName="url"
+          />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Worker</mat-label>
+          <input
+            matInput
+            [id]="id('datumGatewayWebsocketWorker')"
             type="text"
             autocomplete="off"
             spellcheck="false"

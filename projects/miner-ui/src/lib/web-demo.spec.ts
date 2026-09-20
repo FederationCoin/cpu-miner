@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideAnimations } from '@angular/platform-browser/animations';
 import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
@@ -113,6 +114,7 @@ describe('web demo shell', () => {
     await TestBed.configureTestingModule({
       imports: [WebDemoHost],
       providers: [
+        provideAnimations(),
         { provide: MINER_SHELL, useValue: webDemoShell() },
         { provide: HASHER_HOST, useValue: host },
       ],
@@ -128,11 +130,36 @@ describe('web demo shell', () => {
     return f.debugElement.query(By.css(selector)) != null;
   }
 
-  it('does not show App pool radios when hosted pool stats are running', async () => {
+  function clickRadio(f: ComponentFixture<WebDemoHost>, selector: string): void {
+    const host = f.nativeElement.querySelector(selector) as HTMLElement | null;
+    expect(host).toBeTruthy();
+    const input =
+      host instanceof HTMLInputElement ? host : (host!.querySelector('input[type="radio"]') as HTMLInputElement | null);
+    expect(input).toBeTruthy();
+    input!.click();
+    f.detectChanges();
+  }
+
+  function radioOn(selector: string, f: ComponentFixture<WebDemoHost>): boolean {
+    const host = f.nativeElement.querySelector(selector) as HTMLElement | null;
+    if (!host) {
+      return false;
+    }
+    const input =
+      host instanceof HTMLInputElement ? host : (host.querySelector('input[type="radio"]') as HTMLInputElement | null);
+    return !!input?.checked || host.classList.contains('mat-mdc-radio-checked');
+  }
+
+  it('offers two web Stratum WebSocket kinds and no house pool shortcut', async () => {
     const f = await render();
-    expect(has(f, '#testnet-mineToHostedPoolStratum')).toBe(true);
+    expect(has(f, '#testnet-mineToStratumPoolWebsocket')).toBe(true);
+    expect(has(f, '#testnet-mineToDatumGatewayWebsocket')).toBe(true);
+    expect(has(f, '#testnet-mineToHostedPoolStratum')).toBe(false);
     expect(has(f, '#testnet-mineToAppPoolStratum')).toBe(false);
     expect(has(f, '#testnet-mineToAppPoolDatum')).toBe(false);
+    expect(has(f, '#testnet-mineToNode')).toBe(false);
+    expect(has(f, '#testnet-mineToStratum')).toBe(false);
+    expect((f.nativeElement.querySelector('#testnet-stratumPoolWebsocketUrl') as HTMLInputElement).value).toBe('');
   });
 
   it('shows WebGPU Help when no adapters are listed', async () => {
@@ -200,45 +227,37 @@ describe('web demo shell', () => {
     expect(pill.textContent).toContain('Stratum idle');
   });
 
-  it('defaults Stratum Websocket to the WSS host on 443', async () => {
+  it('shows gateway WebSocket fields without a house URL', async () => {
     const f = await render();
-    expect(has(f, '#testnet-mineToStratum')).toBe(false);
-    (f.nativeElement.querySelector('#testnet-mineToStratumWebsocket') as HTMLInputElement).click();
+    clickRadio(f, '#testnet-mineToDatumGatewayWebsocket');
     f.detectChanges();
-    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketHost') as HTMLInputElement).value).toBe(
-      'pool.testnet.federationcoin.org',
-    );
-    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketPort') as HTMLInputElement).value).toBe('443');
+    expect(has(f, '#testnet-datumGatewayWebsocketUrl')).toBe(true);
+    expect((f.nativeElement.querySelector('#testnet-datumGatewayWebsocketUrl') as HTMLInputElement).value).toBe('');
+    expect(f.nativeElement.textContent).toMatch(/not Prime and not the pool connect/);
   });
 
-  it('relabels the hosted pool as Stratum Websocket', async () => {
-    const f = await render();
-    const label = f.nativeElement.querySelector('label[for="testnet-mineToHostedPoolStratum"]') as HTMLLabelElement;
-    expect(label.textContent).toMatch(/Stratum Websocket/);
-  });
-
-  it('shows DATUM Prime (Websocket) disabled', async () => {
-    const f = await render();
-    const el = f.nativeElement.querySelector('#testnet-mineToDatumWebsocket') as HTMLInputElement;
-    expect(el).toBeTruthy();
-    expect(el.disabled).toBe(true);
-    expect(f.nativeElement.querySelector('#testnet-datumWebsocketDisabledHint')).toBeTruthy();
-  });
-
-  it('migrates a saved Stratum kind to Stratum Websocket and rewrites TCP NLB', async () => {
+  it('migrates a saved Stratum kind to pool WebSocket without a house URL', async () => {
     localStorage.setItem('fc.testnet.kind', 'stratum');
     localStorage.setItem('fc.testnet.stratum.host', 'stratum.testnet.federationcoin.org');
     localStorage.setItem('fc.testnet.stratum.port', '23334');
     const f = await render();
     expect(has(f, '#testnet-mineToStratum')).toBe(false);
-    expect((f.nativeElement.querySelector('#testnet-mineToStratumWebsocket') as HTMLInputElement).checked).toBe(true);
-    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketHost') as HTMLInputElement).value).toBe(
-      'pool.testnet.federationcoin.org',
+    expect(radioOn('#testnet-mineToStratumPoolWebsocket', f)).toBe(true);
+    expect((f.nativeElement.querySelector('#testnet-stratumPoolWebsocketUrl') as HTMLInputElement).value).toBe('');
+    expect(localStorage.getItem('fc.testnet.kind')).toBe('stratumPoolWebsocket');
+  });
+
+  it('migrates a saved nested Stratum Websocket URL onto the pool kind', async () => {
+    localStorage.setItem('fc.testnet.kind', 'stratumWebsocket');
+    localStorage.setItem('fc.testnet.stratumWebsocket.url', 'wss://legacy.example/stratum');
+    localStorage.setItem('fc.testnet.stratumWebsocket.worker', 'tgfcn1legacy.cpu');
+    const f = await render();
+    expect((f.nativeElement.querySelector('#testnet-stratumPoolWebsocketUrl') as HTMLInputElement).value).toBe(
+      'wss://legacy.example/stratum',
     );
-    expect((f.nativeElement.querySelector('#testnet-stratumWebsocketPort') as HTMLInputElement).value).toBe('443');
-    expect(localStorage.getItem('fc.testnet.kind')).toBe('stratumWebsocket');
-    expect(localStorage.getItem('fc.testnet.stratumWebsocket.host')).toBe('pool.testnet.federationcoin.org');
-    expect(localStorage.getItem('fc.testnet.stratum.host')).toBe('stratum.testnet.federationcoin.org');
+    expect((f.nativeElement.querySelector('#testnet-stratumPoolWebsocketWorker') as HTMLInputElement).value).toBe(
+      'tgfcn1legacy.cpu',
+    );
   });
 
   it('hides Host a pool on the web mill and splits Finder', async () => {
@@ -271,8 +290,87 @@ describe('web demo shell', () => {
       expect(has(f, '#testnet-finder-refresh-tip')).toBe(true);
       expect(has(f, '#testnet-finder-attest-dialog')).toBe(true);
       expect(f.nativeElement.querySelector('[id^="testnet-finder-target-"]')).toBeNull();
-      expect(f.nativeElement.textContent).toMatch(/listing WSS advertise/);
+      expect(f.nativeElement.textContent).toMatch(/Mine this sits next to Stratum only/);
       expect(f.nativeElement.textContent).not.toMatch(/House pool stays on Pool/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('Find Mine this fills pool WebSocket and shows Prime as a side card', async () => {
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+      const u = String(input);
+      if (u.includes('/v1/sign-context')) {
+        return new Response(
+          JSON.stringify({
+            signingBlockHeight: 10,
+            signingBlockHash: 'ab'.repeat(32),
+            stakeRequiredSats: '1',
+            mineSeconds: 3600,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          items: [
+            {
+              poolId: 'web-both',
+              chain: 'testnet',
+              operatorWallet: 'tgfcn1qw508d6qejxtdg4y5r3zarvary0c5xw7k',
+              name: 'WSS mill',
+              websiteUrl: 'https://pool.example.com',
+              connect: {
+                kind: 'stratumAndDatum',
+                stratum: { host: 's.example.com', port: 23334 },
+                datum: { host: 'd.example.com', port: 28916 },
+                wss: { host: 'pool.example.com', path: '/stratum' },
+              },
+              coinbaseTag: 'w',
+              listingDomain: 'pool.example.com',
+              attestationCount: 0,
+              listerConfirmedCoinbasePayee: false,
+              reviewScore: 0,
+              hasHostileFlag: false,
+            },
+            {
+              poolId: 'web-prime',
+              chain: 'testnet',
+              operatorWallet: 'tgfcn1qw508d6qejxtdg4y5r3zarvary0c5xw7k',
+              name: 'Prime listing',
+              websiteUrl: 'https://prime.example.com',
+              connect: { kind: 'datumOnly', datum: { host: 'prime.example.com', port: 28916 } },
+              coinbaseTag: 'p',
+              listingDomain: 'prime.example.com',
+              attestationCount: 0,
+              listerConfirmedCoinbasePayee: false,
+              reviewScore: 0,
+              hasHostileFlag: false,
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+    try {
+      const f = await render();
+      (f.nativeElement.querySelector('#testnet-tab-finder') as HTMLButtonElement).click();
+      await f.whenStable();
+      f.detectChanges();
+      await vi.waitFor(() => {
+        f.detectChanges();
+        expect(f.nativeElement.textContent).toContain('WSS mill');
+      });
+      expect(has(f, '#testnet-finder-target-web-both')).toBe(true);
+      expect(has(f, '#testnet-finder-prime-web-both')).toBe(true);
+      expect(has(f, '#testnet-finder-target-web-prime')).toBe(false);
+      expect(has(f, '#testnet-finder-prime-web-prime')).toBe(true);
+      (f.nativeElement.querySelector('#testnet-finder-target-web-both') as HTMLButtonElement).click();
+      await f.whenStable();
+      f.detectChanges();
+      expect((f.nativeElement.querySelector('#testnet-stratumPoolWebsocketUrl') as HTMLInputElement).value).toBe(
+        'wss://pool.example.com/stratum',
+      );
     } finally {
       vi.unstubAllGlobals();
     }

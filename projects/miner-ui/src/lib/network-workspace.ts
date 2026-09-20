@@ -1,10 +1,11 @@
-import { Component, inject, input, signal } from '@angular/core';
+import { Component, inject, input } from '@angular/core';
 import type { MinerChain } from './chain';
 import { DocsPane } from './docs-pane';
 import { FinderPane } from './finder-pane';
 import { MinerPane } from './miner-pane';
 import { MINER_SHELL, type WorkspaceTab } from './miner-shell';
 import { PoolPane } from './pool-pane';
+import { WorkspaceNav } from './workspace-nav';
 
 @Component({
   selector: 'app-network-workspace',
@@ -16,16 +17,17 @@ import { PoolPane } from './pool-pane';
 export class NetworkWorkspace {
   readonly chain = input.required<MinerChain>();
   protected readonly shell = inject(MINER_SHELL);
-  protected readonly tab = signal<WorkspaceTab>('mine');
+  private readonly nav = inject(WorkspaceNav);
+
+  protected tab(): WorkspaceTab {
+    return this.nav.tab();
+  }
 
   protected showHostPool(): boolean {
     return this.shell.kind === 'desktop';
   }
 
   protected selectTab(id: WorkspaceTab): void {
-    if (id === 'pool' && !this.showHostPool()) {
-      return;
-    }
-    this.tab.set(id);
+    this.nav.selectTab(id, this.showHostPool());
   }
 }

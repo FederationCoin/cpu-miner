@@ -10,16 +10,14 @@
   },
   "chains": {
     "testnet": {
-      "mineToKind": "stratumWebsocket",
-      "stratumWebsocket": {
-        "url": "wss://pool.testnet.federationcoin.org/stratum"
-      }
+      "mineToKind": "stratumPoolWebsocket",
+      "stratumPoolWebsocket": { "url": "" },
+      "datumGatewayWebsocket": { "url": "" }
     },
     "main": {
-      "mineToKind": "stratumWebsocket",
-      "stratumWebsocket": {
-        "url": ""
-      }
+      "mineToKind": "stratumPoolWebsocket",
+      "stratumPoolWebsocket": { "url": "" },
+      "datumGatewayWebsocket": { "url": "" }
     }
   }
 }

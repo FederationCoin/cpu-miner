@@ -122,7 +122,7 @@ describe('WebHasherHost reconnect', () => {
       const r = await host.start({
         chain: 'testnet',
         threads: 1,
-        mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
+        mineTo: { kind: 'stratumPoolWebsocket', url: 'wss://pool.testnet.federationcoin.org/stratum', worker: 'tgfcn1abc.cpu' },
       });
       expect(r.ok).toBe(true);
       const mine = mineSocket(sockets);
@@ -159,7 +159,7 @@ describe('WebHasherHost reconnect', () => {
       const r = await host.start({
         chain: 'testnet',
         threads: 1,
-        mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
+        mineTo: { kind: 'stratumPoolWebsocket', url: 'wss://pool.testnet.federationcoin.org/stratum', worker: 'tgfcn1abc.cpu' },
       });
       expect(r.ok).toBe(true);
       const mine = mineSocket(sockets);
@@ -176,7 +176,7 @@ describe('WebHasherHost reconnect', () => {
     }
   });
 
-  it('starts stratumWebsocket at wss://host/stratum', async () => {
+  it('starts stratumPoolWebsocket at wss://host/stratum', async () => {
     const sockets: FakeWebSocket[] = [];
     const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
       open: (url) => {
@@ -190,13 +190,9 @@ describe('WebHasherHost reconnect', () => {
         chain: 'testnet',
         threads: 1,
         mineTo: {
-          kind: 'stratumWebsocket',
-          stratumWebsocket: {
-            host: 'pool.testnet.federationcoin.org',
-            port: 443,
-            worker: 'tgfcn1abc.cpu',
-            password: 'x',
-          },
+          kind: 'stratumPoolWebsocket',
+          url: 'wss://pool.testnet.federationcoin.org/stratum',
+          worker: 'tgfcn1abc.cpu',
         },
       });
       expect(r.ok).toBe(true);
@@ -207,8 +203,15 @@ describe('WebHasherHost reconnect', () => {
     }
   });
 
-  it('refuses TCP Stratum and DATUM Websocket kinds', async () => {
-    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET);
+  it('starts pool and gateway WebSocket URLs and refuses TCP Stratum', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
     try {
       const tcp = await host.start({
         chain: 'testnet',
@@ -225,17 +228,76 @@ describe('WebHasherHost reconnect', () => {
       });
       expect(tcp.ok).toBe(false);
       expect(tcp.error).toMatch(/TCP Stratum/);
-      const datumWs = await host.start({
+      const gw = await host.start({
         chain: 'testnet',
         threads: 1,
         mineTo: {
-          kind: 'datumWebsocket',
-          datumWebsocket: { url: 'wss://pool.testnet.federationcoin.org/datum' },
+          kind: 'datumGatewayWebsocket',
+          url: 'ws://127.0.0.1:23335/stratum',
+          worker: 'tgfcn1abc.cpu',
         },
       });
-      expect(datumWs.ok).toBe(false);
-      expect(datumWs.error).toMatch(/websocket proxy/);
+      expect(gw.ok).toBe(true);
+      expect(sockets.at(-1)!.url).toBe('ws://127.0.0.1:23335/stratum');
       expect((host as unknown as { pollTimer?: unknown }).pollTimer).toBeUndefined();
+    } finally {
+      host.stopWatch();
+    }
+  });
+
+  it('refuses an empty pool WebSocket URL', async () => {
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET);
+    try {
+      const r = await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: { kind: 'stratumPoolWebsocket', url: '  ', worker: 'tgfcn1abc.cpu' },
+      });
+      expect(r.ok).toBe(false);
+      expect(r.error).toMatch(/WebSocket Stratum/);
+    } finally {
+      host.stopWatch();
+    }
+  });
+
+  it('applies pool_stats only while mining stratumPoolWebsocket', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET, {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
+    const poolSnap: number[] = [];
+    host.onPoolStats((s) => poolSnap.push(s.height));
+    const stats = {
+      method: 'client.pool_stats',
+      params: [{ running: true, chain: 'testnet', height: 42, status: 'hosted' }],
+    };
+    try {
+      await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: { kind: 'datumGatewayWebsocket', url: 'ws://127.0.0.1:23335/stratum', worker: 'tgfcn1abc.cpu' },
+      });
+      const gw = sockets.at(-1)!;
+      gw.openNow();
+      gw.pushLine(stats);
+      expect(poolSnap.at(-1)).toBe(0);
+      await host.start({
+        chain: 'testnet',
+        threads: 1,
+        mineTo: {
+          kind: 'stratumPoolWebsocket',
+          url: 'wss://pool.testnet.federationcoin.org/stratum',
+          worker: 'tgfcn1abc.cpu',
+        },
+      });
+      const pool = sockets.at(-1)!;
+      pool.openNow();
+      pool.pushLine(stats);
+      expect(poolSnap.at(-1)).toBe(42);
     } finally {
       host.stopWatch();
     }
@@ -263,7 +325,7 @@ describe('WebHasherHost reconnect', () => {
       const r = await host.start({
         chain: 'testnet',
         threads: 1,
-        mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
+        mineTo: { kind: 'stratumPoolWebsocket', url: 'wss://pool.testnet.federationcoin.org/stratum', worker: 'tgfcn1abc.cpu' },
       });
       expect(r.ok).toBe(true);
       const mine = mineSocket(sockets);
@@ -325,7 +387,7 @@ describe('WebHasherHost reconnect', () => {
       const r = await host.start({
         chain: 'testnet',
         threads: 1,
-        mineTo: { kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' },
+        mineTo: { kind: 'stratumPoolWebsocket', url: 'wss://pool.testnet.federationcoin.org/stratum', worker: 'tgfcn1abc.cpu' },
       });
       expect(r.ok).toBe(true);
       const mine = mineSocket(sockets);

@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import type { GpuAdapter, GpuPick, GpuStrategy, MineTo, MineToKind, MinerStartOpts, MinerStats } from './miner-api';
-import { STRATUM_PASSWORD } from './miner-api';
+import { isWebStratumKind, STRATUM_PASSWORD } from './miner-api';
 import { CHAINS, type ChainConfig, type MinerChain } from './chain';
 import { formatHashRate, gpuStatusHint, gpuStatusHintWeb, mainIsNotLive } from './miner-format';
 import {
@@ -30,7 +30,15 @@ const DROPPED_KINDS = new Set([
   'appPoolStratum',
   'appPoolDatum',
   'hostedPoolStratum',
+  'stratumWebsocket',
 ]);
+
+function emptyWsGroup(): FormGroup<{ url: FormControl<string>; worker: FormControl<string> }> {
+  return new FormGroup({
+    url: new FormControl('', { nonNullable: true }),
+    worker: new FormControl('', { nonNullable: true }),
+  });
+}
 
 @Component({
   selector: 'app-miner-pane',
@@ -69,10 +77,8 @@ export class MinerPane implements OnInit {
       worker: new FormControl('', { nonNullable: true }),
       password: new FormControl(STRATUM_PASSWORD, { nonNullable: true }),
     }),
-    stratumWebsocket: new FormGroup({
-      url: new FormControl('', { nonNullable: true }),
-      worker: new FormControl('', { nonNullable: true }),
-    }),
+    poolWebsocket: emptyWsGroup(),
+    gatewayWebsocket: emptyWsGroup(),
     threads: new FormControl(4, { nonNullable: true }),
   });
 
@@ -92,10 +98,17 @@ export class MinerPane implements OnInit {
   ngOnInit(): void {
     const d = this.shell.defaults.chains[this.chain()];
     if (this.isWebDemo()) {
-      const web = d as { stratumWebsocket: { url: string } };
-      this.form.controls.stratumWebsocket.patchValue({
-        url: this.loadWebsocketUrl(web.stratumWebsocket.url),
-        worker: this.loadWebsocketWorker(),
+      const web = d as {
+        stratumPoolWebsocket: { url: string };
+        datumGatewayWebsocket: { url: string };
+      };
+      this.form.controls.poolWebsocket.patchValue({
+        url: this.loadWebsocketUrl('stratumPoolWebsocket', web.stratumPoolWebsocket.url),
+        worker: this.loadWebsocketWorker('stratumPoolWebsocket'),
+      });
+      this.form.controls.gatewayWebsocket.patchValue({
+        url: this.loadWebsocketUrl('datumGatewayWebsocket', web.datumGatewayWebsocket.url),
+        worker: this.loadWebsocketWorker('datumGatewayWebsocket'),
       });
     } else {
       const desk = d as { stratum: { host: string; port: number; password: string }; rpc: { host: string; port: number } };
@@ -167,7 +180,7 @@ export class MinerPane implements OnInit {
   }
 
   protected allowedKinds(): MineToKind[] {
-    return this.isWebDemo() ? ['stratumWebsocket'] : ['node', 'stratum'];
+    return this.isWebDemo() ? ['stratumPoolWebsocket', 'datumGatewayWebsocket'] : ['node', 'stratum'];
   }
 
   protected kindLocked(): boolean {
@@ -207,8 +220,12 @@ export class MinerPane implements OnInit {
     if (kind === 'stratum') {
       return { kind: 'stratum', stratum: this.form.controls.stratum.getRawValue() };
     }
-    const ws = this.form.controls.stratumWebsocket.getRawValue();
-    return { kind: 'stratumWebsocket', url: ws.url.trim(), worker: ws.worker };
+    if (kind === 'datumGatewayWebsocket') {
+      const ws = this.form.controls.gatewayWebsocket.getRawValue();
+      return { kind: 'datumGatewayWebsocket', url: ws.url.trim(), worker: ws.worker };
+    }
+    const ws = this.form.controls.poolWebsocket.getRawValue();
+    return { kind: 'stratumPoolWebsocket', url: ws.url.trim(), worker: ws.worker };
   }
 
   private persist(): void {
@@ -217,8 +234,10 @@ export class MinerPane implements OnInit {
     localStorage.setItem(this.key('payout'), v.payout);
     localStorage.setItem(this.key('threads'), String(v.threads));
     if (this.isWebDemo()) {
-      localStorage.setItem(this.key('stratumWebsocket.url'), v.stratumWebsocket.url);
-      localStorage.setItem(this.key('stratumWebsocket.worker'), v.stratumWebsocket.worker);
+      localStorage.setItem(this.key('stratumPoolWebsocket.url'), v.poolWebsocket.url);
+      localStorage.setItem(this.key('stratumPoolWebsocket.worker'), v.poolWebsocket.worker);
+      localStorage.setItem(this.key('datumGatewayWebsocket.url'), v.gatewayWebsocket.url);
+      localStorage.setItem(this.key('datumGatewayWebsocket.worker'), v.gatewayWebsocket.worker);
       return;
     }
     this.persistRpc('rpc', v.rpc);
@@ -243,18 +262,18 @@ export class MinerPane implements OnInit {
       return null;
     }
     if (this.isWebDemo()) {
-      if (saved === 'stratumWebsocket') {
-        return 'stratumWebsocket';
+      if (isWebStratumKind(saved as MineToKind)) {
+        return saved as MineToKind;
       }
       if (saved === 'stratum' || DROPPED_KINDS.has(saved)) {
-        return 'stratumWebsocket';
+        return 'stratumPoolWebsocket';
       }
       return null;
     }
     if (saved === 'node' || saved === 'stratum') {
       return saved;
     }
-    if (saved === 'stratumWebsocket' || DROPPED_KINDS.has(saved)) {
+    if (isWebStratumKind(saved as MineToKind) || DROPPED_KINDS.has(saved)) {
       return 'stratum';
     }
     return null;
@@ -273,31 +292,29 @@ export class MinerPane implements OnInit {
     };
   }
 
-  private loadWebsocketUrl(fallback: string): string {
-    const saved = localStorage.getItem(this.key('stratumWebsocket.url'))?.trim();
+  private loadWebsocketUrl(kind: 'stratumPoolWebsocket' | 'datumGatewayWebsocket', fallback: string): string {
+    const saved = localStorage.getItem(this.key(`${kind}.url`))?.trim();
     if (saved) {
       return saved;
     }
-    const wsHost = localStorage.getItem(this.key('stratumWebsocket.host'))?.trim() ?? '';
-    const wsPortRaw = localStorage.getItem(this.key('stratumWebsocket.port'));
-    const wsPort = wsPortRaw ? Number.parseInt(wsPortRaw, 10) : 0;
-    if (wsHost && wsPort) {
-      return stratumWsUrl(wsHost, wsPort);
-    }
-    const oldHost = localStorage.getItem(this.key('stratum.host'))?.trim() ?? '';
-    const oldPortRaw = localStorage.getItem(this.key('stratum.port'));
-    const oldPort = oldPortRaw ? Number.parseInt(oldPortRaw, 10) : 0;
-    if (oldHost && oldPort) {
-      if (isTcpStratumEndpoint(oldHost, oldPort)) {
-        return fallback;
+    if (kind === 'stratumPoolWebsocket') {
+      const legacyUrl = localStorage.getItem(this.key('stratumWebsocket.url'))?.trim();
+      if (legacyUrl) {
+        return legacyUrl;
       }
-      return stratumWsUrl(oldHost, oldPort);
+      const wsHost = localStorage.getItem(this.key('stratumWebsocket.host'))?.trim() ?? '';
+      const wsPortRaw = localStorage.getItem(this.key('stratumWebsocket.port'));
+      const wsPort = wsPortRaw ? Number.parseInt(wsPortRaw, 10) : 0;
+      if (wsHost && wsPort && !isTcpStratumEndpoint(wsHost, wsPort)) {
+        return stratumWsUrl(wsHost, wsPort);
+      }
     }
     return fallback;
   }
 
-  private loadWebsocketWorker(): string {
+  private loadWebsocketWorker(kind: 'stratumPoolWebsocket' | 'datumGatewayWebsocket'): string {
     return (
+      localStorage.getItem(this.key(`${kind}.worker`)) ??
       localStorage.getItem(this.key('stratumWebsocket.worker')) ??
       localStorage.getItem(this.key('hostedPoolStratum.worker')) ??
       localStorage.getItem(this.key('stratum.worker')) ??
@@ -476,7 +493,10 @@ export class MinerPane implements OnInit {
       const s = this.form.controls.stratum.getRawValue();
       return `${s.host}:${s.port} (stratum)`;
     }
-    return `${this.form.controls.stratumWebsocket.getRawValue().url} (stratum websocket)`;
+    if (kind === 'datumGatewayWebsocket') {
+      return `${this.form.controls.gatewayWebsocket.getRawValue().url} (gateway websocket)`;
+    }
+    return `${this.form.controls.poolWebsocket.getRawValue().url} (pool websocket)`;
   }
 
   protected formatRate(n: number): string {
