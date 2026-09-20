@@ -1,0 +1,32 @@
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: dark;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$orange-palette,
+        theme-type: dark,
+      ),
+      typography: Roboto,
+      density: -1,
+    )
+  );
+}
+
+:root {
+  --mat-sys-surface: #111318;
+  --mat-sys-on-surface: #e8eaed;
+  --mat-sys-primary: #7eb6ff;
+  --mat-sys-on-primary: #111318;
+  --mat-sys-error: #ff6b6b;
+}
+
+html,
+body {
+  margin: 0;
+  background: #111318;
+  color: #e8eaed;
+  font-family: system-ui, sans-serif;
+}

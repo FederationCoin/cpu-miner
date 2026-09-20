@@ -52,6 +52,27 @@ export function advertisedAttestKinds(connect: RegistryConnect): AttestKind[] {
   return ['stratum', 'datum'];
 }
 
+export function listingHasStratumTcp(connect: RegistryConnect): boolean {
+  return connect.kind !== 'datumOnly';
+}
+
+export function listingStratumWssUrl(connect: RegistryConnect): string | null {
+  const wss = connect.wss;
+  if (!wss) {
+    return null;
+  }
+  const host = wss.host.trim();
+  const path = wss.path.trim();
+  if (!host || !path.startsWith('/')) {
+    return null;
+  }
+  return `wss://${host}${path}`;
+}
+
+export function listingCanMineThis(connect: RegistryConnect, web: boolean): boolean {
+  return web ? listingStratumWssUrl(connect) != null : listingHasStratumTcp(connect);
+}
+
 export function attestConnectFromListing(connect: RegistryConnect, kind: AttestKind): AttestConnect | undefined {
   if (kind === 'stratum') {
     if (connect.kind === 'datumOnly') {

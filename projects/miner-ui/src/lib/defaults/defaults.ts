@@ -17,14 +17,9 @@ export type StratumFormDefaults = {
   password: string;
 };
 
-export type DatumWebsocketFormDefaults = {
-  url: string;
-};
-
 export type WebChainDefaults = {
   mineToKind: MineToKind;
-  stratumWebsocket: StratumFormDefaults;
-  datumWebsocket: DatumWebsocketFormDefaults;
+  stratumWebsocket: { url: string };
 };
 
 export type WebDefaults = {
@@ -40,8 +35,6 @@ export type AppChainDefaults = {
   mineToKind: MineToKind;
   rpc: { host: string; port: number };
   stratum: StratumFormDefaults;
-  datum: { host: string; port: number };
-  datumWebsocket: DatumWebsocketFormDefaults;
   pool: {
     stratumHost: string;
     stratumPort: number;

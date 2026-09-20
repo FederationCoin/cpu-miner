@@ -1,5 +1,5 @@
-import { Component, effect, inject } from '@angular/core';
-import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, type MinerChain } from '@federationcoin/miner-ui';
+import { Component, inject } from '@angular/core';
+import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, type MinerChain } from '@federationcoin/miner-ui';
 
 @Component({
   selector: 'app-root',
@@ -9,19 +9,7 @@ import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, P
 })
 export class App {
   protected readonly mining = inject(MiningService);
-  protected readonly pool = inject(PoolService);
   protected readonly network = inject(NetworkContext);
-
-  constructor() {
-    effect(() => {
-      const s = this.pool.stats();
-      const kind = this.mining.sessionKind();
-      if (!s.running && (kind === 'appPoolStratum' || kind === 'appPoolDatum')) {
-        void this.mining.stop();
-        this.mining.warn('App pool stopped; mining stopped.');
-      }
-    });
-  }
 
   protected selectNetwork(id: MinerChain): void {
     const current = this.network.chain();

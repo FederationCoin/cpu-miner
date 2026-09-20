@@ -36,10 +36,13 @@
     "dist:mac": "npm run build:app && npm run build:gpu && electron-builder --mac --publish never"
   },
   "dependencies": {
+    "@angular/animations": "^22.1.6",
+    "@angular/cdk": "^22.1.6",
     "@angular/common": "^22.1.0",
     "@angular/compiler": "^22.1.0",
     "@angular/core": "^22.1.0",
     "@angular/forms": "^22.1.0",
+    "@angular/material": "^22.1.6",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
     "@noble/hashes": "^2.4.0",

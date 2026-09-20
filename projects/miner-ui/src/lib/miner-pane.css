@@ -38,6 +38,22 @@ textarea {
   resize: vertical;
 }
 
+.mine-to-card,
+.mine-fields {
+  margin: 0.85rem 0;
+}
+
+mat-radio-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
 .row {
   display: flex;
   gap: 0.6rem;

@@ -65,6 +65,8 @@ export type WebGpuIpcProgress = {
   hashes: number;
 };
 
+export const STRATUM_PASSWORD = 'x';
+
 export type RpcAuthKind = 'cookie' | 'userpass';
 
 export type RpcAuthConnect =
@@ -84,26 +86,11 @@ export type StratumConnect = {
   password: string;
 };
 
-export type DatumConnect = {
-  host: string;
-  port: number;
-  worker: string;
-  rpc: RpcConnect;
-};
-
-export type DatumWebsocketConnect = {
-  url: string;
-};
-
+/** Web mill: WSS URL is the endpoint. Authorize password is always `x`. */
 export type MineTo =
   | { kind: 'node'; rpc: RpcConnect; payout: string }
   | { kind: 'stratum'; stratum: StratumConnect }
-  | { kind: 'stratumWebsocket'; stratumWebsocket: StratumConnect }
-  | { kind: 'datum'; datum: DatumConnect }
-  | { kind: 'datumWebsocket'; datumWebsocket: DatumWebsocketConnect }
-  | { kind: 'appPoolStratum'; worker: string; password: string }
-  | { kind: 'appPoolDatum'; worker: string; rpc: RpcConnect }
-  | { kind: 'hostedPoolStratum'; worker: string; password: string };
+  | { kind: 'stratumWebsocket'; url: string; worker: string };
 
 export type MineToKind = MineTo['kind'];
 
