@@ -27,12 +27,12 @@
           <legend>Node RPC {{ $index + 1 }}</legend>
           <app-rpc-connect [form]="rpc" [idPrefix]="rpcIdPrefix($index)" [chain]="chain()" />
           @if (form.controls.rpc.length > 1) {
-            <button type="button" [id]="id('remove-rpc-' + $index)" (click)="removeRpc($index)">Remove</button>
+            <button mat-stroked-button type="button" [id]="id('remove-rpc-' + $index)" (click)="removeRpc($index)">Remove</button>
           }
         </fieldset>
       }
     }
-    <button type="button" [id]="id('add-rpc')" (click)="addRpc()">Add node</button>
+    <button mat-stroked-button type="button" [id]="id('add-rpc')" (click)="addRpc()">Add node</button>
 
     <label [attr.for]="id('operator')">Operator payout ({{ config().hrp }}1)</label>
     <input
@@ -71,8 +71,8 @@
     }
 
     <div class="row">
-      <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
-      <button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+      <button mat-flat-button color="primary" type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
+      <button mat-stroked-button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
     </div>
 
   <dl>

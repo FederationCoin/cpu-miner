@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { LogLine } from './log.js';
 import type { MinerStartOpts } from './mine-to.js';
+import type { MinerToast } from './toast.js';
 
 export type { MinerChain } from './chain.js';
 export type { MineTo, MineToKind, MinerStartOpts, RpcConnect, RpcAuthConnect, RpcAuthKind, StratumConnect } from './mine-to.js';
@@ -93,7 +94,7 @@ contextBridge.exposeInMainWorld('miner', {
   logHistory: () => ipcRenderer.invoke('miner:logHistory') as Promise<LogLine[]>,
   onStats: (cb: (s: MinerStats) => void) => listen('miner:stats', cb),
   onLog: (cb: (line: LogLine) => void) => listen('miner:log', cb),
-  onToast: (cb: (message: string) => void) => listen('miner:toast', cb),
+  onToast: (cb: (toast: MinerToast) => void) => listen('miner:toast', cb),
   onWebGpuJob: (cb: (job: unknown) => void) => listen('miner:webgpu-job', cb),
   onWebGpuStop: (cb: (msg: { gen: number }) => void) => listen('miner:webgpu-stop', cb),
   webGpuFound: (msg: unknown) => ipcRenderer.invoke('miner:webgpu-found', msg),

@@ -5,7 +5,7 @@ import {
   groupGpuAdapters,
   type GpuAdapter,
 } from './gpu-catalog';
-import type { GpuScan, GpuScanReason, MinerChain, MinerInfo, MinerStartOpts, MinerStats, MineToKind } from './miner-api';
+import type { GpuScan, GpuScanReason, MinerChain, MinerInfo, MinerStartOpts, MinerStats, MinerToast, MineToKind, ToastKind } from './miner-api';
 import { diagnoseWebGpu } from './webgpu';
 
 export const IDLE_STATS: MinerStats = {
@@ -35,6 +35,7 @@ export class MiningService {
   readonly gpuScanned = signal(false);
   readonly gpuReason = signal<GpuScanReason | undefined>(undefined);
   readonly toast = signal('');
+  readonly toastKind = signal<ToastKind>('error');
   readonly sessionKind = signal<MineToKind | null>(null);
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private unsub: (() => void)[] = [];
@@ -61,12 +62,8 @@ export class MiningService {
       }),
     );
     this.unsub.push(
-      this.host.onToast((message) => {
-        this.toast.set(message);
-        if (this.toastTimer) {
-          clearTimeout(this.toastTimer);
-        }
-        this.toastTimer = setTimeout(() => this.toast.set(''), 5000);
+      this.host.onToast((toast: MinerToast) => {
+        this.showToast(toast.message, toast.kind);
       }),
     );
   }
@@ -97,7 +94,16 @@ export class MiningService {
   }
 
   warn(message: string): void {
+    this.showToast(message, 'error');
+  }
+
+  ok(message: string): void {
+    this.showToast(message, 'ok');
+  }
+
+  private showToast(message: string, kind: ToastKind): void {
     this.toast.set(message);
+    this.toastKind.set(kind);
     if (this.toastTimer) {
       clearTimeout(this.toastTimer);
     }

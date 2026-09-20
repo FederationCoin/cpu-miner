@@ -50,22 +50,34 @@
 }
 
 .network-toggle {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  width: 10.5rem;
   flex-shrink: 0;
   font-size: 0.75rem;
-  color: #d4c89a;
 }
 
-.network-toggle select {
-  min-width: 10rem;
-  padding: 0.35rem 0.55rem;
-  border: 1px solid #8a7318;
+.mill-bar .network-toggle {
+  --mat-form-field-container-height: 40px;
+}
+
+.toast {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  max-width: 28rem;
+  padding: 0.65rem 0.85rem;
   border-radius: 4px;
-  background: #0a0a0a;
-  color: #f4e9c8;
-  font: inherit;
+  box-shadow: 0 4px 16px #0008;
+  z-index: 20;
+}
+
+.toast-error {
+  background: #3a1d1d;
+  color: #ffb4b4;
+}
+
+.toast-ok {
+  background: #0d2137;
+  color: #8ec8ff;
 }
 
 .warn {
@@ -78,17 +90,4 @@
 code {
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
-}
-
-.toast {
-  position: fixed;
-  right: 1rem;
-  bottom: 1rem;
-  max-width: 28rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: 4px;
-  background: #3a1d1d;
-  color: #ffb4b4;
-  box-shadow: 0 4px 16px #0008;
-  z-index: 20;
 }

@@ -1,5 +1,6 @@
 import { Component, OnInit, effect, inject, input, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import type { PoolStartOpts } from './miner-api';
 import { CHAINS, type MinerChain } from './chain';
 import { formatSats, mainIsNotLive } from './miner-format';
@@ -11,7 +12,7 @@ import { DefaultsFold } from './defaults-fold';
 
 @Component({
   selector: 'app-pool-pane',
-  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold],
+  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold, MatButtonModule],
   styleUrl: './miner-pane.css',
   templateUrl: './pool-pane.html',
 })

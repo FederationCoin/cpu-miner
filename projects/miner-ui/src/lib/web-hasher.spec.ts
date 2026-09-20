@@ -155,7 +155,7 @@ describe('WebHasherHost reconnect', () => {
     });
     try {
       const toasts: string[] = [];
-      host.onToast((m) => toasts.push(m));
+      host.onToast((m) => toasts.push(m.message));
       const r = await host.start({
         chain: 'testnet',
         threads: 1,
@@ -321,7 +321,7 @@ describe('WebHasherHost reconnect', () => {
       const snap: Array<{ hashes: number; hashrate: number; lastError: string; link: string }> = [];
       host.onStats((s) => snap.push({ hashes: s.hashes, hashrate: s.hashrate, lastError: s.lastError, link: s.link }));
       const toasts: string[] = [];
-      host.onToast((m) => toasts.push(m));
+      host.onToast((m) => toasts.push(m.message));
       const r = await host.start({
         chain: 'testnet',
         threads: 1,

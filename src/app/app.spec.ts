@@ -4,7 +4,7 @@ import { By } from '@angular/platform-browser';
 import { App } from './app';
 import { appConfig } from './app.config';
 import { IDLE_STATS } from '@federationcoin/miner-ui';
-import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from '@federationcoin/miner-ui';
+import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats, MinerToast, PoolStartOpts, PoolStats } from '@federationcoin/miner-ui';
 
 const electronInfo: MinerInfo = {
   cookiePath: '/tmp/x/testnet3/.cookie',
@@ -146,9 +146,7 @@ function setInput(fixture: ComponentFixture<App>, selector: string, value: strin
 }
 
 function selectNetwork(fixture: ComponentFixture<App>, id: 'main' | 'testnet'): void {
-  const el = queryEl<HTMLSelectElement>(fixture, '#network-toggle');
-  el.value = id;
-  el.dispatchEvent(new Event('change', { bubbles: true }));
+  queryDe(fixture, '#network-toggle').triggerEventHandler('selectionChange', { value: id });
   fixture.detectChanges();
 }
 
@@ -246,7 +244,7 @@ describe('App', () => {
 
     it('defaults to Testnet with both mining and pool panes', async () => {
       const f = await render();
-      expect(queryEl<HTMLSelectElement>(f, '#network-toggle').value).toBe('testnet');
+      expect(queryEl(f, '#network-toggle').textContent).toMatch(/Testnet/i);
       expect(queryEl(f, '[data-chain="testnet"]').hidden).toBe(false);
       expect(queryEl(f, '[data-chain="main"]').hidden).toBe(true);
       expect(has(f, '[data-chain="testnet"] [data-main-warning]')).toBe(false);
@@ -540,6 +538,7 @@ describe('App', () => {
       f.detectChanges();
       expect(miner.stop).toHaveBeenCalled();
       expect(queryEl(f, '[role="status"]').textContent).toMatch(/switched to Main/i);
+      expect(queryEl(f, '[role="status"]').classList.contains('toast-error')).toBe(true);
       expect(queryEl<HTMLButtonElement>(f, '#main-stop').disabled).toBe(true);
     });
 
@@ -569,8 +568,8 @@ describe('App', () => {
       expect(queryEl(f, '.err').textContent).toContain('worker is empty');
     });
 
-    it('shows a toast from the main process', async () => {
-      let sendToast: ((message: string) => void) | undefined;
+    it('shows an error toast from the main process', async () => {
+      let sendToast: ((toast: MinerToast) => void) | undefined;
       const f = await render(
         stubMiner({
           onToast: (cb) => {
@@ -579,9 +578,29 @@ describe('App', () => {
           },
         }),
       );
-      sendToast?.('ECONNREFUSED 127.0.0.1:35332');
+      sendToast?.({ message: 'ECONNREFUSED 127.0.0.1:35332', kind: 'error' });
       f.detectChanges();
-      expect(queryEl(f, '[role="status"]').textContent).toContain('ECONNREFUSED');
+      const el = queryEl(f, '[role="status"]');
+      expect(el.textContent).toContain('ECONNREFUSED');
+      expect(el.classList.contains('toast-error')).toBe(true);
+      expect(el.classList.contains('toast-ok')).toBe(false);
+    });
+
+    it('shows a success toast in blue', async () => {
+      let sendToast: ((toast: MinerToast) => void) | undefined;
+      const f = await render(
+        stubMiner({
+          onToast: (cb) => {
+            sendToast = cb;
+            return () => undefined;
+          },
+        }),
+      );
+      sendToast?.({ message: 'start testnet stratum', kind: 'ok' });
+      f.detectChanges();
+      const el = queryEl(f, '[role="status"]');
+      expect(el.textContent).toContain('start testnet stratum');
+      expect(el.classList.contains('toast-ok')).toBe(true);
     });
 
     it('shows a persistent link pill and no error bar after a flap plus authorize', async () => {
@@ -657,6 +676,7 @@ describe('App', () => {
       expect(queryEl<HTMLInputElement>(f, '#testnet-finder-name').disabled).toBe(false);
       expect(has(f, '#testnet-finder-compose')).toBe(true);
       expect(has(f, '#testnet-finder-inactive')).toBe(true);
+      expect(has(f, '#testnet-finder-remove-conn-0')).toBe(false);
     });
 
     it('Finder lists live registry order and does not call MAIN', async () => {

@@ -5,10 +5,10 @@
 dialog {
   max-width: 36rem;
   padding: 1.1rem 1.2rem 1rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 6px;
-  background: #151821;
-  color: #e8eaed;
+  background: #0a0a0a;
+  color: #f4e9c8;
 }
 
 dialog::backdrop {
@@ -22,7 +22,7 @@ h2 {
 
 p,
 li {
-  color: #c5c9d1;
+  color: #d4c89a;
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -38,7 +38,7 @@ code {
 }
 
 a {
-  color: #8ab4f8;
+  color: #c9a227;
 }
 
 .row {
@@ -49,10 +49,10 @@ a {
 
 button {
   padding: 0.45rem 0.9rem;
-  border: 0;
+  border: 1px solid #c9a227;
   border-radius: 4px;
-  background: #3d6ea8;
-  color: #fff;
+  background: #0a0a0a;
+  color: #f4e9c8;
   font: inherit;
   cursor: pointer;
 }

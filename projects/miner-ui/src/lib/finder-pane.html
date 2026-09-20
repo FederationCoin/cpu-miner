@@ -22,15 +22,10 @@
   <div class="finder-split">
     <section class="finder-subpane" [attr.id]="id('listings')">
       <h3>Listings</h3>
-      <div class="row">
-        <button
-          mat-icon-button
-          type="button"
-          [id]="id('reload')"
-          aria-label="Refresh listings"
-          (click)="reloadListings()"
-        >
+      <div class="row toolbar-row">
+        <button mat-stroked-button type="button" [id]="id('reload')" (click)="reloadListings()">
           <mat-icon>refresh</mat-icon>
+          Refresh
         </button>
         <button mat-stroked-button type="button" [id]="id('inactive')" (click)="toggleInactive()">
           {{ inactive() ? 'Show live' : 'Show inactive' }}
@@ -179,7 +174,7 @@
           </mat-form-field>
           <div formArrayName="connections">
             @for (row of connectionArray().controls; track $index) {
-              <div class="connection-edit" [formGroupName]="$index">
+              <div class="connection-edit" [class.has-remove]="$index > 0" [formGroupName]="$index">
                 <mat-form-field appearance="outline">
                   <mat-label>Kind</mat-label>
                   <mat-select [id]="id('conn-' + $index + '-kind')" formControlName="kind">
@@ -200,16 +195,17 @@
                     formControlName="url"
                   />
                 </mat-form-field>
-                <button
-                  mat-icon-button
-                  type="button"
-                  [id]="id('remove-conn-' + $index)"
-                  aria-label="Remove connection"
-                  [disabled]="connectionArray().length <= 1"
-                  (click)="removeConnection($index)"
-                >
-                  <mat-icon>close</mat-icon>
-                </button>
+                @if ($index > 0) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [id]="id('remove-conn-' + $index)"
+                    aria-label="Remove connection"
+                    (click)="removeConnection($index)"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
               </div>
             }
           </div>
@@ -238,9 +234,8 @@
           <mat-form-field appearance="outline">
             <mat-label>Signing block hash</mat-label>
             <input matInput [id]="id('signHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
-          </mat-form-field>
-          <div class="row">
             <button
+              matSuffix
               mat-icon-button
               type="button"
               [id]="id('refresh-tip')"
@@ -249,7 +244,7 @@
             >
               <mat-icon>refresh</mat-icon>
             </button>
-          </div>
+          </mat-form-field>
           <div class="row">
             <button mat-stroked-button type="button" [id]="id('compose')" (click)="composeRegister()">
               Compose messages
@@ -317,12 +312,10 @@
       <mat-form-field appearance="outline">
         <mat-label>Signing block hash</mat-label>
         <input matInput [id]="id('attestSignHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
-      </mat-form-field>
-      <div class="row">
-        <button mat-icon-button type="button" [id]="id('attest-refresh-tip')" aria-label="Refresh tip" (click)="refreshTip()">
+        <button matSuffix mat-icon-button type="button" [id]="id('attest-refresh-tip')" aria-label="Refresh tip" (click)="refreshTip()">
           <mat-icon>refresh</mat-icon>
         </button>
-      </div>
+      </mat-form-field>
       <div class="row">
         <button mat-stroked-button type="button" [id]="id('compose-attest')" (click)="composeAttestCommand()">
           Compose messages

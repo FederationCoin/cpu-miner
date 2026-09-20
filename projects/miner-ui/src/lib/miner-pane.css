@@ -24,10 +24,10 @@ textarea {
   box-sizing: border-box;
   width: 100%;
   padding: 0.45rem 0.55rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 4px;
-  background: #1a1d24;
-  color: #e8eaed;
+  background: #1a1204;
+  color: #f4e9c8;
   font: inherit;
   user-select: text;
 }
@@ -59,6 +59,11 @@ mat-form-field {
   margin: 1rem 0;
 }
 
+.row.toolbar-row {
+  margin: 0 0 0.75rem;
+  align-items: center;
+}
+
 .path-row {
   margin: 0 0 0.85rem;
 }
@@ -80,24 +85,9 @@ mat-form-field {
 
 .hint {
   margin: -0.35rem 0 0.85rem;
-  color: #9aa0aa;
+  color: #d4c89a;
   font-size: 0.82rem;
   line-height: 1.35;
-}
-
-button {
-  padding: 0.45rem 0.9rem;
-  border: 0;
-  border-radius: 4px;
-  background: #3d6ea8;
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 input:disabled,
@@ -114,7 +104,7 @@ dl {
 }
 
 dt {
-  color: #9aa0aa;
+  color: #d4c89a;
 }
 
 dd {
@@ -136,8 +126,8 @@ dd {
 }
 
 .link-pill[data-link='up'] {
-  background: #1a3358;
-  color: #7eb6ff;
+  background: #1a1204;
+  color: #c9a227;
 }
 
 .link-pill[data-link='down'] {
@@ -146,8 +136,8 @@ dd {
 }
 
 .link-pill[data-link='idle'] {
-  background: #2a2d33;
-  color: #9aa0aa;
+  background: #1a1204;
+  color: #d4c89a;
 }
 
 .err,
@@ -172,7 +162,7 @@ code {
 }
 
 fieldset.mode {
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.4rem 0.75rem 0.55rem;
@@ -182,12 +172,12 @@ fieldset.mode legend,
 fieldset.gpus legend,
 fieldset.partition legend {
   padding: 0 0.35rem;
-  color: #9aa0aa;
+  color: #d4c89a;
   font-size: 0.82rem;
 }
 
 fieldset.partition {
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.55rem 0.85rem 0.75rem;
@@ -220,7 +210,7 @@ fieldset.gpus {
   gap: 0.7rem;
   box-sizing: border-box;
   width: 100%;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.75rem 0.9rem 0.9rem;
@@ -242,19 +232,19 @@ fieldset.gpu-adapter {
   width: 100%;
   margin: 0;
   padding: 0.45rem 0.65rem 0.55rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 4px;
 }
 
 fieldset.gpu-adapter legend {
   display: block;
   padding: 0 0.35rem;
-  color: #e8eaed;
+  color: #f4e9c8;
   font-size: 0.9rem;
 }
 
 .hint-inline {
-  color: #9aa0aa;
+  color: #d4c89a;
   font-size: 0.78rem;
 }
 
@@ -267,7 +257,7 @@ fieldset.gpu-adapter legend {
 .finder-list li {
   margin: 0 0 1rem;
   padding: 0.75rem 0.85rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 4px;
 }
 
@@ -291,10 +281,10 @@ fieldset.gpu-adapter legend {
 dialog.finder-attest {
   width: min(36rem, calc(100vw - 2rem));
   padding: 1rem 1.1rem 1.2rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #8a7318;
   border-radius: 6px;
-  background: #16181e;
-  color: #e8eaed;
+  background: #0a0a0a;
+  color: #f4e9c8;
 }
 
 dialog.finder-attest::backdrop {
@@ -336,9 +326,13 @@ dialog.finder-attest::backdrop {
 
 .connection-edit {
   display: grid;
-  grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(14rem, 0.45fr) minmax(12rem, 1fr);
   gap: 0.4rem;
   align-items: start;
+}
+
+.connection-edit.has-remove {
+  grid-template-columns: minmax(14rem, 0.45fr) minmax(12rem, 1fr) auto;
 }
 
 .stamp-muted {

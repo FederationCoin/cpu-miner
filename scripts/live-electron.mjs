@@ -269,7 +269,9 @@ function snapshot(cdp) {
       tides = [];
     }
     return {
-      network: val('network-toggle'),
+      network: document.querySelector('#network-toggle .mat-mdc-select-value-text')?.textContent?.trim()
+        ?? document.getElementById('network-toggle')?.textContent?.trim()
+        ?? null,
       operator: val('testnet-pool-operator'),
       poolStatus: poolRec.Status ?? '',
       poolHeight: poolRec.Height ?? '',
@@ -336,8 +338,8 @@ async function main() {
   const out = { operatorLen: operator.length, walletALen: walletA.length };
   const { cdp, ws } = await connect();
   try {
-  const net = await cdp.eval(`document.getElementById('network-toggle')?.value`);
-  if (net !== 'testnet') {
+  const net = await cdp.eval(`document.querySelector('#network-toggle .mat-mdc-select-value-text')?.textContent?.trim() || document.getElementById('network-toggle')?.textContent?.trim()`);
+  if (!String(net).toLowerCase().includes('testnet')) {
     throw new Error(`network is ${net}, expected testnet`);
   }
   await cdp.eval(`document.getElementById('testnet-tab-pool')?.click()`);

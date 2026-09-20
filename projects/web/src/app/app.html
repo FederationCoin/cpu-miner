@@ -4,17 +4,17 @@
     <span class="brand">GFCN</span>
     <h1>FederationCoin mill</h1>
     <span class="spacer"></span>
-    <label class="network-toggle" for="network-toggle">
-      Network
-      <select
+    <mat-form-field class="network-toggle" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Network</mat-label>
+      <mat-select
         id="network-toggle"
         [value]="network.chain()"
-        (change)="selectNetwork($any($event.target).value)"
+        (selectionChange)="selectNetwork($event.value)"
       >
-        <option value="testnet">Testnet</option>
-        <option value="main">Main</option>
-      </select>
-    </label>
+        <mat-option value="testnet">Testnet</mat-option>
+        <mat-option value="main">Main</mat-option>
+      </mat-select>
+    </mat-form-field>
   </mat-toolbar>
   <p class="lead">
     Mine in this tab. The hasher speaks Stratum over WebSocket to a pool or your local
@@ -28,6 +28,13 @@
   <app-miner-footer />
 
   @if (mining.toast()) {
-    <div class="toast" role="status">{{ mining.toast() }}</div>
+    <div
+      class="toast"
+      [class.toast-ok]="mining.toastKind() === 'ok'"
+      [class.toast-error]="mining.toastKind() !== 'ok'"
+      role="status"
+    >
+      {{ mining.toast() }}
+    </div>
   }
 </main>

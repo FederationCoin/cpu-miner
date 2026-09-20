@@ -17,6 +17,7 @@ import {
   type MinerInfo,
   type MinerStartOpts,
   type MinerStats,
+  type MinerToast,
   type PoolStartOpts,
   type PoolStats,
 } from './miner-api';
@@ -74,7 +75,7 @@ export class WebHasherHost implements HasherHost {
   private statsState: MinerStats = { ...IDLE_WEB_STATS };
   private poolState: PoolStats = { ...IDLE_WEB_POOL };
   private statsCbs: Array<(s: MinerStats) => void> = [];
-  private toastCbs: Array<(m: string) => void> = [];
+  private toastCbs: Array<(t: MinerToast) => void> = [];
   private poolCbs: Array<(s: PoolStats) => void> = [];
   private client: StratumWsClient | null = null;
   private hashes = 0;
@@ -248,7 +249,7 @@ export class WebHasherHost implements HasherHost {
     };
   }
 
-  onToast(cb: (message: string) => void): () => void {
+  onToast(cb: (toast: MinerToast) => void): () => void {
     this.toastCbs.push(cb);
     return () => {
       this.toastCbs = this.toastCbs.filter((c) => c !== cb);
@@ -499,8 +500,9 @@ export class WebHasherHost implements HasherHost {
   }
 
   private toast(message: string): void {
+    const payload: MinerToast = { message, kind: 'error' };
     for (const cb of this.toastCbs) {
-      cb(message);
+      cb(payload);
     }
   }
 }

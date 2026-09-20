@@ -1,10 +1,12 @@
 import { Component, inject } from '@angular/core';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, type MinerChain } from '@federationcoin/miner-ui';
 
 @Component({
   selector: 'app-root',
-  imports: [NetworkWorkspace, MinerFooter, MatToolbarModule],
+  imports: [NetworkWorkspace, MinerFooter, MatToolbarModule, MatFormFieldModule, MatSelectModule],
   styleUrl: './app.css',
   templateUrl: './app.html',
 })

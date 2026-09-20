@@ -11,6 +11,7 @@ import { concat, toHex, u256ToHex, writeLe32 } from './bytes.js';
 import { serializeBlock } from './coinbase.js';
 import { buildJobFromGbt, fillFromSubmit, jobKey, type GbtResult, type Job } from './gbt.js';
 import { logHistory, pushLog, redactSecret, type LogLine } from './log.js';
+import { toastKindFromMessage, type ToastKind } from './toast.js';
 import { datumWorkHeader, datumWorkRoot, headerHash, hashMeetsTarget, targetFromCompact, xorKeyMaskBytes } from './pow.js';
 import { grindTargetForShare, specAfterShareAccept } from './difficulty.js';
 import {
@@ -127,15 +128,19 @@ function emitStats(): void {
   win?.webContents.send('miner:stats', stats());
 }
 
-function emitLog(mode: string, message: string, toast = false): LogLine {
+function emitLog(mode: string, message: string, toast: false | ToastKind = false): LogLine {
   const line = pushLog(mode, safeText(message));
   const payload = { ...line };
   win?.webContents.send('miner:log', payload);
   logWin?.webContents.send('miner:log', payload);
   if (toast) {
-    win?.webContents.send('miner:toast', payload.message);
+    win?.webContents.send('miner:toast', { message: payload.message, kind: toast });
   }
   return line;
+}
+
+function sendToast(message: string, kind: ToastKind): void {
+  win?.webContents.send('miner:toast', { message, kind });
 }
 
 function emitPoolStats(): void {
@@ -232,7 +237,7 @@ function spawnWorkers(spec: GrindSpec, threads: number): void {
   const target = spec.target;
   if (target.length !== 32) {
     lastError = 'bad target';
-    emitLog(activeKind, lastError, true);
+    emitLog(activeKind, lastError, 'error');
     emitStats();
     return;
   }
@@ -272,7 +277,7 @@ function spawnWorkers(spec: GrindSpec, threads: number): void {
     });
     w.on('error', (err) => {
       lastError = err.message;
-      emitLog(activeKind, lastError, true);
+      emitLog(activeKind, lastError, 'error');
       emitStats();
     });
     workers.push(w);
@@ -340,10 +345,10 @@ function spawnGpu(spec: GrindSpec, target: Uint8Array): void {
           );
         }
       },
-      onLog: (message) => emitLog(activeKind, message, true),
+      onLog: (message) => emitLog(activeKind, message, toastKindFromMessage(message)),
     });
     if (!started) {
-      emitLog(activeKind, `gpu: start failed ${id}`, true);
+      emitLog(activeKind, `gpu: start failed ${id}`, 'error');
     }
   }
 }
@@ -372,7 +377,7 @@ async function onRpcFound(job: Job, msg: Extract<WorkerMsg, { type: 'found' }>, 
   if (!target || !hashMeetsTarget(hash, target)) {
     rejected++;
     lastError = 'high-hash after reconstruct';
-    emitLog('rpc', lastError, true);
+    emitLog('rpc', lastError, 'error');
     emitStats();
     return;
   }
@@ -391,12 +396,12 @@ async function onRpcFound(job: Job, msg: Extract<WorkerMsg, { type: 'found' }>, 
     } else {
       rejected++;
       lastError = String(result);
-      emitLog('rpc', lastError, true);
+      emitLog('rpc', lastError, 'error');
     }
   } catch (e) {
     rejected++;
     lastError = e instanceof Error ? e.message : String(e);
-    emitLog('rpc', lastError, true);
+    emitLog('rpc', lastError, 'error');
   }
   emitStats();
 }
@@ -434,7 +439,7 @@ async function mineRpcLoop(payout: Uint8Array, threads: number): Promise<void> {
           };
         if (spec.target.every((b) => b === 0)) {
           lastError = 'bad nBits';
-          emitLog('rpc', lastError, true);
+          emitLog('rpc', lastError, 'error');
           emitStats();
         } else {
           spawnWorkers(spec, threads);
@@ -448,7 +453,7 @@ async function mineRpcLoop(payout: Uint8Array, threads: number): Promise<void> {
       delay = nextBackoff(delay);
       const waitSec = Math.round(delay / 1000);
       status = `reconnecting in ${waitSec}s`;
-      emitLog('rpc', `${lastError}; retry in ${waitSec}s`, true);
+      emitLog('rpc', `${lastError}; retry in ${waitSec}s`, 'error');
       emitStats();
       await sleep(delay);
     }
@@ -496,7 +501,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
         onJobIgnored: (reason) => {
           lastError = reason;
           status = reason;
-          emitLog('stratum', reason, true);
+          emitLog('stratum', reason, 'error');
           emitStats();
         },
         onPoolStats: (stats) => {
@@ -520,7 +525,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
           const target = grindTargetForShare(job.nBits, shareDiff);
           if (!target) {
             lastError = 'bad nBits';
-            emitLog('stratum', lastError, true);
+            emitLog('stratum', lastError, 'error');
             emitStats();
             return;
           }
@@ -558,7 +563,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
           } else {
             rejected++;
             lastError = error ?? 'Share rejected';
-            emitLog('stratum', lastError, true);
+            emitLog('stratum', lastError, 'error');
           }
           emitStats();
         },
@@ -576,7 +581,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
           delay = nextBackoff(delay);
           const waitSec = Math.round(delay / 1000);
           status = `reconnecting in ${waitSec}s`;
-          emitLog('stratum', `${reason}; retry in ${waitSec}s`, true);
+          emitLog('stratum', `${reason}; retry in ${waitSec}s`, 'error');
           emitStats();
           void sleep(delay).then(() => {
             if (!running || stopRequested || finished) {
@@ -768,14 +773,14 @@ ipcMain.handle('miner:webgpu-progress', (_e, msg: { gen: number; hashes: number 
 });
 
 ipcMain.handle('miner:webgpu-log', (_e, message: string) => {
-  emitLog(activeKind, String(message ?? ''), true);
+  emitLog(activeKind, String(message ?? ''), toastKindFromMessage(String(message ?? '')));
 });
 
 ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
   try {
     const chain = parseChain(opts.chain);
     if (chain === 'main' && !MAIN_IS_LIVE) {
-      win?.webContents.send('miner:toast', 'MAIN is not live');
+      sendToast('MAIN is not live', 'error');
     }
     const args = poolArgv(opts);
     const cli = resolvePoolCli(process.env, here, process.resourcesPath);
@@ -824,7 +829,7 @@ ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
       const msg = chunk.trim();
       if (msg) {
         poolStatsState = { ...poolStatsState, lastError: msg };
-        emitLog('pool', msg, true);
+        emitLog('pool', msg, toastKindFromMessage(msg));
         emitPoolStats();
       }
     });
@@ -845,7 +850,7 @@ ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
     return { ok: true as const };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
-    emitLog('pool', error, true);
+    emitLog('pool', error, 'error');
     return { ok: false as const, error };
   }
 });
@@ -878,7 +883,7 @@ ipcMain.handle(
     try {
       const chain = parseChain(opts.chain);
       if (chain === 'main' && !MAIN_IS_LIVE) {
-        win?.webContents.send('miner:toast', 'MAIN is not live');
+        sendToast('MAIN is not live', 'error');
       }
       if (running) {
         stopRequested = true;
@@ -899,11 +904,11 @@ ipcMain.handle(
       lastRateAt = Date.now();
       lastError = '';
       emitStats();
-      emitLog(activeKind, `start ${activeChain} ${activeKind}`);
+      emitLog(activeKind, `start ${activeChain} ${activeKind}`, 'ok');
       loopPromise = runMiner(opts)
         .catch((e) => {
           lastError = e instanceof Error ? e.message : String(e);
-          emitLog(activeKind, lastError, true);
+          emitLog(activeKind, lastError, 'error');
         })
         .finally(() => {
           killWorkers();
@@ -915,7 +920,7 @@ ipcMain.handle(
     } catch (e) {
       running = false;
       lastError = e instanceof Error ? e.message : String(e);
-      emitLog(activeKind, lastError, true);
+      emitLog(activeKind, lastError, 'error');
       emitStats();
       return { ok: false as const, error: lastError };
     }

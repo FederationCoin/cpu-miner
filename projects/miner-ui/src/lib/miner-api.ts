@@ -153,6 +153,13 @@ export function tidesSatsField(raw: unknown): string {
   return '0';
 }
 
+export type ToastKind = 'ok' | 'error';
+
+export type MinerToast = {
+  message: string;
+  kind: ToastKind;
+};
+
 export type MinerApi = {
   start: (opts: MinerStartOpts) => Promise<{ ok: boolean; error?: string }>;
   stop: () => Promise<void>;
@@ -162,7 +169,7 @@ export type MinerApi = {
   logHistory: () => Promise<LogLine[]>;
   onStats: (cb: (s: MinerStats) => void) => () => void;
   onLog: (cb: (line: LogLine) => void) => () => void;
-  onToast: (cb: (message: string) => void) => () => void;
+  onToast: (cb: (toast: MinerToast) => void) => () => void;
   poolStart: (opts: PoolStartOpts) => Promise<{ ok: boolean; error?: string }>;
   poolStop: () => Promise<void>;
   poolRefresh: () => Promise<{ ok: boolean; error?: string }>;

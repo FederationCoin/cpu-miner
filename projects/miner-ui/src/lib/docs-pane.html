@@ -8,7 +8,7 @@
       requires Apps On Device permission. The hasher never speaks DATUM.
     </p>
     <figure class="docs-figure">
-      <img src="docs/mill-web.svg" width="720" height="280" alt="Web mill: browser loads the SPA, then WSS Stratum to a pool or local gateway" />
+      <img src="docs/mill-web.svg" width="720" height="300" alt="Web mill: browser SPA speaks WSS Stratum to a pool or DATUM Gateway; gateway talks GBT to the node and DATUM to Prime" />
     </figure>
   } @else {
     <p class="hint">
@@ -16,7 +16,7 @@
       required. Host a pool stays Prime spawn for friends, family, LAN, and mesh.
     </p>
     <figure class="docs-figure">
-      <img src="docs/mill-desktop.svg" width="720" height="240" alt="Desktop mill: Electron speaks TCP Stratum or node RPC" />
+      <img src="docs/mill-desktop.svg" width="720" height="280" alt="Desktop mill: Electron speaks TCP Stratum to a pool or gateway, or RPC to a node; gateway talks GBT to the node and DATUM to Prime" />
     </figure>
   }
 

@@ -1,4 +1,4 @@
-import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, PoolStartOpts, PoolStats } from './miner-api';
+import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, MinerToast, PoolStartOpts, PoolStats } from './miner-api';
 import type { HasherHost } from './hasher-host';
 import type { RegistryRequest } from './registry';
 import { bindDesktopWebGpu } from './webgpu-desktop';
@@ -51,7 +51,7 @@ export class ElectronHasherHost implements HasherHost {
     return window.miner?.onStats(cb) ?? (() => undefined);
   }
 
-  onToast(cb: (message: string) => void): () => void {
+  onToast(cb: (toast: MinerToast) => void): () => void {
     return window.miner?.onToast(cb) ?? (() => undefined);
   }
 
