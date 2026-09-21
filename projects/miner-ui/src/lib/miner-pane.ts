@@ -22,29 +22,16 @@ import {
 import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import { IDLE_STATS, MiningService } from './mining.service';
-import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
+import { rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
 import { isLoopbackWsHost, isTcpStratumEndpoint, peerStatusLabel, stratumWsUrl, type GatewayInfoRpc, type PeerStatus } from './stratum-ws';
 import { DefaultsFold } from './defaults-fold';
 import { WebgpuHelp } from './webgpu-help';
+import { DesktopMineTo } from './desktop-mine-to';
+import { WebMineTo } from './web-mine-to';
+import type { GatewayInfoView } from './gateway-info';
+import { WalletService } from './wallet.service';
 
 const GATEWAY_INFO_DEBOUNCE_MS = 5000;
-
-const LOOPBACK_GATEWAY_TOOLTIP =
-  'localhost gateway needs Apps On Device; if you rejected the prompt and still want to mine to a localhost DATUM Gateway, re-enable it in site settings';
-
-export type GatewayInfoView =
-  | { kind: 'notRequested' }
-  | { kind: 'notProvided'; asOf: number }
-  | {
-      kind: 'provided';
-      asOf: number;
-      nodeStatus: PeerStatus;
-      name: string;
-      coinbaseTag: string;
-      websiteUrl: string;
-      prime?: string;
-      poolStatus?: PeerStatus;
-    };
 
 const DROPPED_KINDS = new Set([
   'datum',
@@ -66,9 +53,10 @@ function emptyWsGroup(): FormGroup<{ url: FormControl<string>; worker: FormContr
   selector: 'app-miner-pane',
   imports: [
     ReactiveFormsModule,
-    RpcConnect,
     DefaultsFold,
     WebgpuHelp,
+    DesktopMineTo,
+    WebMineTo,
     MatRadioModule,
     MatFormFieldModule,
     MatInputModule,
@@ -86,6 +74,7 @@ export class MinerPane implements OnInit {
   protected readonly mining = inject(MiningService);
   protected readonly shell = inject(MINER_SHELL);
   private readonly host = inject(HASHER_HOST);
+  private readonly wallet = inject(WalletService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly gpuPicks = signal<GpuPick[]>([]);
@@ -93,7 +82,7 @@ export class MinerPane implements OnInit {
   protected readonly webgpuHelpAutoOpen = signal(false);
   protected readonly formError = signal('');
   protected readonly gatewayInfoView = signal<GatewayInfoView>({ kind: 'notRequested' });
-  protected readonly loopbackGatewayTooltip = LOOPBACK_GATEWAY_TOOLTIP;
+  protected readonly pendingMineTo = signal<string | null>(null);
   private lastGatewayInfoAt = 0;
 
   protected readonly form = new FormGroup({
@@ -121,6 +110,14 @@ export class MinerPane implements OnInit {
       if (!localStorage.getItem(this.key('threads')) && inf.defaultThreads > 0) {
         this.form.controls.threads.setValue(inf.defaultThreads, { emitEvent: false });
       }
+    });
+    effect(() => {
+      const addr = this.wallet.mineToRequest();
+      if (!addr) {
+        return;
+      }
+      this.applyPayout(addr);
+      this.wallet.mineToRequest.set(null);
     });
   }
 
@@ -265,6 +262,30 @@ export class MinerPane implements OnInit {
       return;
     }
     this.gatewayInfoView.set({ kind: 'notProvided', asOf });
+  }
+
+  protected requestStart(): void {
+    this.formError.set('');
+    this.pendingMineTo.set(this.payoutHint());
+  }
+
+  protected payoutHint(): string {
+    const kind = this.kind();
+    if (kind === 'node') {
+      return this.form.controls.payout.value.trim() || '(empty payout)';
+    }
+    if (kind === 'stratum') {
+      return this.form.controls.stratum.controls.worker.value.trim() || '(empty worker)';
+    }
+    if (kind === 'datumGatewayWebsocket') {
+      return this.form.controls.gatewayWebsocket.controls.worker.value.trim() || '(empty worker)';
+    }
+    return this.form.controls.poolWebsocket.controls.worker.value.trim() || '(empty worker)';
+  }
+
+  protected async confirmStart(): Promise<void> {
+    this.pendingMineTo.set(null);
+    await this.start();
   }
 
   protected async start(): Promise<void> {
@@ -579,12 +600,20 @@ export class MinerPane implements OnInit {
     return formatHashRate(n);
   }
 
-  protected rpcCookie(form: RpcConnectForm): boolean {
-    return form.controls.authKind.value === 'cookie';
-  }
-
-  protected rpcSummary(form: RpcConnectForm): string {
-    const v = form.getRawValue();
-    return `${v.host}:${v.port}`;
+  protected applyPayout(address: string): void {
+    const kind = this.kind();
+    if (kind === 'node') {
+      this.form.controls.payout.setValue(address);
+      return;
+    }
+    if (kind === 'stratum') {
+      this.form.controls.stratum.controls.worker.setValue(address);
+      return;
+    }
+    if (kind === 'datumGatewayWebsocket') {
+      this.form.controls.gatewayWebsocket.controls.worker.setValue(address);
+      return;
+    }
+    this.form.controls.poolWebsocket.controls.worker.setValue(address);
   }
 }

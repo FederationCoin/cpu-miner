@@ -78,4 +78,43 @@ export class ElectronHasherHost implements HasherHost {
     }
     return api.registryRequest(req);
   }
+
+  extrasProbe() {
+    return window.miner?.extrasProbe?.() ?? Promise.resolve({ node: false, gateway: false, pool: false });
+  }
+
+  nodeStart(chain: import('./miner-api').MinerChain) {
+    return window.miner?.nodeStart?.(chain) ?? Promise.resolve({ ok: false, error: 'no node module' });
+  }
+
+  nodeStop() {
+    return window.miner?.nodeStop?.() ?? Promise.resolve({ ok: false, error: 'no node module' });
+  }
+
+  nodeStatus(chain: import('./miner-api').MinerChain) {
+    return (
+      window.miner?.nodeStatus?.(chain) ??
+      Promise.resolve({ session: 'idle' as const, chain: null, height: 0, running: false, lastError: '' })
+    );
+  }
+
+  gatewayStart(opts: { chain: import('./miner-api').MinerChain; poolAddress: string; poolHost?: string; poolPubkey?: string }) {
+    return window.miner?.gatewayStart?.(opts) ?? Promise.resolve({ ok: false, error: 'no gateway module' });
+  }
+
+  gatewayStop() {
+    return window.miner?.gatewayStop?.() ?? Promise.resolve({ ok: false, error: 'no gateway module' });
+  }
+
+  gatewayStatus() {
+    return window.miner?.gatewayStatus?.() ?? Promise.resolve({ session: 'idle' as const, running: false, lastError: '' });
+  }
+
+  walletLoad(chain: import('./miner-api').MinerChain) {
+    return window.miner?.walletLoad?.(chain) ?? Promise.resolve(null);
+  }
+
+  walletSave(chain: import('./miner-api').MinerChain, blob: string) {
+    return window.miner?.walletSave?.(chain, blob) ?? Promise.resolve({ ok: false, error: 'no wallet store' });
+  }
 }

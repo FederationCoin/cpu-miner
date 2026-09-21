@@ -19,3 +19,4 @@ export * from './lib/docs-pane';
 export * from './lib/finder-pane';
 export * from './lib/network-workspace';
 export * from './lib/registry';
+export * from './lib/wallet.service';

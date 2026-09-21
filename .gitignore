@@ -23,6 +23,10 @@ pnpm-debug.log*
 # Built pool CLI copied from the sibling clone (keep README)
 /vendor/federation-pool/*
 !/vendor/federation-pool/README.md
+/vendor/federationcoind/*
+!/vendor/federationcoind/README.md
+/vendor/datum_gateway/*
+!/vendor/datum_gateway/README.md
 
 # electron-builder
 /dist-electron

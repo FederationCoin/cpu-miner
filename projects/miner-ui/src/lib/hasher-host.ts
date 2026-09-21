@@ -1,5 +1,17 @@
 import { InjectionToken } from '@angular/core';
-import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, MinerToast, PoolStartOpts, PoolStats } from './miner-api';
+import type {
+  ExtrasProbe,
+  GatewayStatusView,
+  GpuScan,
+  MinerChain,
+  MinerInfo,
+  MinerStartOpts,
+  MinerStats,
+  MinerToast,
+  NodeStatusView,
+  PoolStartOpts,
+  PoolStats,
+} from './miner-api';
 import type { RegistryRequest, RegistryResponse } from './registry';
 import type { GatewayInfoRpc } from './stratum-ws';
 
@@ -21,6 +33,20 @@ export type HasherHost = {
   requestGatewayInfo?: () => boolean;
   fetchGatewayInfo?: (url: string) => Promise<GatewayInfoRpc>;
   onGatewayInfo?: (cb: (info: GatewayInfoRpc) => void) => () => void;
+  extrasProbe?: () => Promise<ExtrasProbe>;
+  nodeStart?: (chain: MinerChain) => Promise<{ ok: boolean; error?: string }>;
+  nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
+  nodeStatus?: (chain: MinerChain) => Promise<NodeStatusView>;
+  gatewayStart?: (opts: {
+    chain: MinerChain;
+    poolAddress: string;
+    poolHost?: string;
+    poolPubkey?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
+  gatewayStatus?: () => Promise<GatewayStatusView>;
+  walletLoad?: (chain: MinerChain) => Promise<string | null>;
+  walletSave?: (chain: MinerChain, blob: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
 export const HASHER_HOST = new InjectionToken<HasherHost>('HASHER_HOST');

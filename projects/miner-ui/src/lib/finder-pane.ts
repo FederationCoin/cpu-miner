@@ -17,6 +17,8 @@ import { MiningService } from './mining.service';
 import { formatStakeGfCn } from './miner-format';
 import { applyDesktopStratumTarget, applyWebPoolWssTarget } from './mine-target';
 import { WorkspaceNav } from './workspace-nav';
+import { WalletService } from './wallet.service';
+import { millSignNeedsKeystore, millSignNeedsPassword } from './finder-sign';
 import {
   ConnectionKindLabel,
   ConnectionKindPlaceholder,
@@ -93,6 +95,7 @@ export class FinderPane {
   protected readonly mining = inject(MiningService);
   private readonly nav = inject(WorkspaceNav);
   private readonly host = inject(HASHER_HOST);
+  private readonly wallet = inject(WalletService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
   private readonly attestDialog = viewChild<ElementRef<HTMLDialogElement>>('attestDialog');
@@ -112,6 +115,10 @@ export class FinderPane {
   protected readonly holdBlocks = signal(0);
   protected readonly identityWallet = signal(localStorage.getItem(IDENTITY_WALLET_KEY)?.trim() ?? '');
   protected readonly attested = signal<AttestedMap>(loadAttested());
+  protected readonly millSignKind = signal<'none' | 'register' | 'attest'>('none');
+  protected readonly millSignForm = new FormGroup({
+    password: new FormControl('', { nonNullable: true }),
+  });
   readonly listingKinds = RegisterConnectionKinds;
   protected readonly kindLabel = ConnectionKindLabel;
   protected readonly maxConnections = MaxPoolConnections;
@@ -404,6 +411,11 @@ export class FinderPane {
   }
 
   protected composeRegister(): void {
+    this.pasteSparrow();
+  }
+
+  /** Paste-a-Sparrow-signature path: compose the 64-hex hash only. */
+  protected pasteSparrow(): void {
     if (!this.liveTenant()) {
       this.notice.set('Main is not live. Dummy MAIN is not a registry tenant.');
       return;
@@ -431,6 +443,84 @@ export class FinderPane {
     this.notice.set(
       'Copy the 64-hex message below into federation-sparrow Sign/Verify. Format is Electrum Format. Sign with the listing P2WPKH wallet, then paste the signature.',
     );
+  }
+
+  protected registerWithConfirm(): void {
+    if (millSignNeedsKeystore(this.wallet.view())) {
+      this.notice.set(
+        'Create or import a keystore on Wallet to sign here. Or compose and paste a Sparrow signature.',
+      );
+      return;
+    }
+    this.pasteSparrow();
+    if (!this.sparrowMessage()) {
+      return;
+    }
+    const receive = this.wallet.receive();
+    if (receive) {
+      this.form.controls.wallet.setValue(receive);
+    }
+    this.millSignKind.set('register');
+    this.notice.set(`Review the command and hash, then confirm. Registry: ${this.baseUrl()}`);
+  }
+
+  protected attestWithConfirm(): void {
+    if (millSignNeedsKeystore(this.wallet.view())) {
+      this.notice.set(
+        'Create or import a keystore on Wallet to sign here. Or compose and paste a Sparrow signature.',
+      );
+      return;
+    }
+    this.composeAttestCommand();
+    if (!this.attestSparrowMessage()) {
+      return;
+    }
+    const receive = this.wallet.receive();
+    if (receive) {
+      this.attestForm.controls.wallet.setValue(receive);
+    }
+    this.millSignKind.set('attest');
+    this.notice.set(`Review the attest command and hash, then confirm. Registry: ${this.baseUrl()}`);
+  }
+
+  protected millSignNeedsPassword(): boolean {
+    return millSignNeedsPassword(this.wallet.view());
+  }
+
+  protected async confirmMillSign(): Promise<void> {
+    this.error.set('');
+    try {
+      if (millSignNeedsPassword(this.wallet.view())) {
+        await this.wallet.unlock(this.millSignForm.controls.password.value);
+      }
+      const kind = this.millSignKind();
+      const msg = kind === 'attest' ? this.attestSparrowMessage() : this.sparrowMessage();
+      if (!msg) {
+        this.notice.set('Compose the message first.');
+        return;
+      }
+      const sig = this.wallet.signMessage(msg);
+      const receive = this.wallet.receive();
+      if (kind === 'attest') {
+        this.attestForm.controls.signature.setValue(sig);
+        if (receive) {
+          this.attestForm.controls.wallet.setValue(receive);
+        }
+      } else {
+        this.form.controls.signature.setValue(sig);
+        if (receive) {
+          this.form.controls.wallet.setValue(receive);
+        }
+      }
+      this.millSignKind.set('none');
+      this.notice.set('Signed in this mill. Review and submit.');
+    } catch (e) {
+      this.error.set(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  protected cancelMillSign(): void {
+    this.millSignKind.set('none');
   }
 
   protected openAttest(p: ListingPublic, c: PoolConnection): void {

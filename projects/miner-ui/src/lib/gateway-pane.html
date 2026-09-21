@@ -1,0 +1,73 @@
+<div class="pane">
+  @if (isWeb()) {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Local gateway WebSocket</mat-card-title>
+      </mat-card-header>
+      <mat-card-content [formGroup]="webForm">
+        <p class="hint">
+          Point Mine at this URL if a desktop Big One (or laptop gateway) is already listening.
+          The browser cannot cookie-RPC.
+        </p>
+        <mat-form-field appearance="outline">
+          <mat-label>DATUM Gateway WebSocket URL</mat-label>
+          <input matInput [id]="chain() + '-gateway-wss'" type="text" formControlName="url" />
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+    <app-node-download-cta />
+  } @else if (!extraPresent()) {
+    <app-addon-missing-card label="DATUM Gateway" />
+  } @else {
+    @if (showMainWarning()) {
+      <p class="warn" data-main-warning>
+        Main is not live. The Big One will not start a gateway on dummy MAIN.
+      </p>
+    }
+    <mat-card [formGroup]="deskForm">
+      <mat-card-header>
+        <mat-card-title>DATUM Gateway</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="hint">
+          Default is solo (<code>pool_host</code> empty). House Prime is opt-in. Hasher still
+          speaks Stratum only.
+        </p>
+        <mat-form-field appearance="outline">
+          <mat-label>Payout address for gateway coinbase</mat-label>
+          <input matInput [id]="chain() + '-gateway-payout'" type="text" formControlName="poolAddress" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>House Prime host (optional)</mat-label>
+          <input matInput [id]="chain() + '-gateway-prime-host'" type="text" formControlName="poolHost" placeholder="leave empty for solo" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Prime identity pubkey (optional)</mat-label>
+          <input matInput [id]="chain() + '-gateway-prime-pub'" type="text" formControlName="poolPubkey" />
+        </mat-form-field>
+        <p class="hint">Empty pubkey does not auto-fetch. Compare identity frames yourself.</p>
+        <dl>
+          <dt>Session</dt>
+          <dd [attr.id]="chain() + '-gateway-session'">{{ status().session }}</dd>
+        </dl>
+        @if (status().lastError) {
+          <p class="err">{{ status().lastError }}</p>
+        }
+        <div class="row">
+          @if (!showMainWarning()) {
+            <button mat-flat-button color="primary" type="button" [id]="chain() + '-gateway-start'" (click)="start()">
+              Start
+            </button>
+          }
+          @if (showStop()) {
+            <button mat-stroked-button type="button" [id]="chain() + '-gateway-stop'" (click)="stop()">Stop</button>
+          }
+          <button mat-stroked-button type="button" [id]="chain() + '-gateway-refresh'" (click)="refresh()">Refresh</button>
+        </div>
+        @if (error()) {
+          <p class="err">{{ error() }}</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

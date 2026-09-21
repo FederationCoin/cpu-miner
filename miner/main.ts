@@ -43,6 +43,7 @@ import {
   type RpcConnect,
 } from './mine-to.js';
 import type { MinerInfo, MinerStats } from './preload.js';
+import { registerProcessIpc, stopAllProcesses } from './process-ipc.js';
 import { registryOrigin, registryRequestWithFetch, type RegistryFetchReq } from './registry-fetch.js';
 import { StratumClient } from './stratum.js';
 import type { WorkerInit, WorkerMsg } from './worker.js';
@@ -884,6 +885,7 @@ ipcMain.handle(
       const chain = parseChain(opts.chain);
       if (chain === 'main' && !MAIN_IS_LIVE) {
         sendToast('MAIN is not live', 'error');
+        return { ok: false as const, error: 'MAIN is not live' };
       }
       if (running) {
         stopRequested = true;
@@ -927,6 +929,15 @@ ipcMain.handle(
   },
 );
 
+registerProcessIpc(ipcMain, {
+  here,
+  resourcesPath: () => process.resourcesPath,
+  userData: () => app.getPath('userData'),
+  emitLog: (mode, message, kind) => {
+    emitLog(mode, message, kind ?? false);
+  },
+});
+
 ipcMain.handle('miner:stop', async () => {
   stopRequested = true;
   running = false;
@@ -954,5 +965,6 @@ app.on('window-all-closed', () => {
   protocolClient?.close();
   killWorkers();
   stopPoolChild();
+  stopAllProcesses();
   app.quit();
 });

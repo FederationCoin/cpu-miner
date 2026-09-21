@@ -2,8 +2,11 @@
   <mat-toolbar class="mill-bar">
     <img class="seal" src="federation-seal.png" width="40" height="40" alt="" />
     <span class="brand">GFCN</span>
-    <h1>FederationCoin mill</h1>
+    <h1>The Big One</h1>
     <span class="spacer"></span>
+    @if (wallet.chipLabel()) {
+      <span class="wallet-chip" id="wallet-chip">{{ wallet.chipLabel() }}</span>
+    }
     <mat-form-field class="network-toggle" appearance="outline" subscriptSizing="dynamic">
       <mat-label>Network</mat-label>
       <mat-select

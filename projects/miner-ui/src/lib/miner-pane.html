@@ -2,8 +2,8 @@
   @if (showMainWarning()) {
     <p class="warn" data-main-warning>
       Main is not live. Dummy genesis and RPC {{ config().rpcPort }} are
-      placeholders. Start is allowed; expect cookie/RPC failures until
-      announcement. Mine Testnet until then.
+      placeholders. The Big One will not start mining on dummy MAIN.
+      Mine Testnet until announcement.
     </p>
   }
 
@@ -16,227 +16,19 @@
       <mat-card-title>Mine to</mat-card-title>
     </mat-card-header>
     <mat-card-content>
-      @if (!isWebDemo()) {
-        <mat-radio-group formControlName="kind" [attr.aria-label]="'Mine to'">
-          <mat-radio-button [id]="id('mineToNode')" value="node" [disabled]="kindLocked()">
-            Node RPC
-          </mat-radio-button>
-          <mat-radio-button [id]="id('mineToStratum')" value="stratum" [disabled]="kindLocked()">
-            Stratum
-          </mat-radio-button>
-        </mat-radio-group>
-        @if (kind() === 'stratum') {
-          <p class="hint">
-            Hasher-to-gateway is Stratum v1. You may point this at a DATUM Gateway that is reachable.
-            Authorize password is <code>x</code>.
-          </p>
-        }
+      @if (isWebDemo()) {
+        <app-web-mine-to
+          [form]="form"
+          [chain]="chain()"
+          [kindLocked]="kindLocked()"
+          [gatewayInfo]="gatewayInfoView()"
+          (fetchInfo)="fetchGatewayInfo()"
+        />
       } @else {
-        <mat-radio-group formControlName="kind" [attr.aria-label]="'Mine to'">
-          <mat-radio-button [id]="id('mineToStratumPoolWebsocket')" value="stratumPoolWebsocket" [disabled]="kindLocked()">
-            Stratum pool via WebSocket
-          </mat-radio-button>
-          <mat-radio-button [id]="id('mineToDatumGatewayWebsocket')" value="datumGatewayWebsocket" [disabled]="kindLocked()">
-            DATUM Gateway via WebSocket
-          </mat-radio-button>
-        </mat-radio-group>
-        @if (kind() === 'stratumPoolWebsocket') {
-          <p class="hint">
-            Mine over Stratum v1 on WebSocket (newline JSON-RPC, password <code>x</code>).
-            Pool Finder → Mine this fills this URL.
-          </p>
-        }
-        @if (kind() === 'datumGatewayWebsocket') {
-          <p class="hint">
-            This is your local gateway’s Stratum listener, not the DATUM Prime Pool and not the pool.
-            Point the gateway at a DATUM Prime Pool listing from Pool Finder.
-          </p>
-        }
+        <app-desktop-mine-to [form]="form" [chain]="chain()" [kindLocked]="kindLocked()" />
       }
     </mat-card-content>
   </mat-card>
-
-  @switch (kind()) {
-    @case ('node') {
-      @if (rpcCookie(form.controls.rpc)) {
-        <app-defaults-fold [foldId]="id('rpc-fold')" title="Node RPC" [summary]="rpcSummary(form.controls.rpc)">
-          <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain()" [chain]="chain()" />
-        </app-defaults-fold>
-      } @else {
-        <fieldset class="partition">
-          <legend>Node RPC</legend>
-          <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain()" [chain]="chain()" />
-        </fieldset>
-      }
-      <mat-form-field appearance="outline">
-        <mat-label>Payout address</mat-label>
-        <input
-          matInput
-          [id]="id('payout')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1…'"
-          formControlName="payout"
-        />
-      </mat-form-field>
-    }
-    @case ('stratum') {
-      <div class="mine-fields" formGroupName="stratum">
-        <mat-form-field appearance="outline">
-          <mat-label>Host</mat-label>
-          <input matInput [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="host" />
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Port</mat-label>
-          <input matInput [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="port" />
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Worker</mat-label>
-          <input
-            matInput
-            [id]="id('stratumWorker')"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            [placeholder]="config().hrp + '1….cpu'"
-            formControlName="worker"
-          />
-        </mat-form-field>
-        <p class="hint">Username as on firmware. A <code>.worker</code> suffix is allowed.</p>
-        <mat-form-field appearance="outline">
-          <mat-label>Password</mat-label>
-          <input
-            matInput
-            [id]="id('stratumPassword')"
-            type="password"
-            autocomplete="off"
-            spellcheck="false"
-            formControlName="password"
-          />
-        </mat-form-field>
-      </div>
-    }
-    @case ('stratumPoolWebsocket') {
-      <div class="mine-fields" formGroupName="poolWebsocket">
-        <mat-form-field appearance="outline">
-          <mat-label>Stratum pool WebSocket URL</mat-label>
-          <input
-            matInput
-            [id]="id('stratumPoolWebsocketUrl')"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="wss://host/stratum"
-            formControlName="url"
-          />
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Worker</mat-label>
-          <input
-            matInput
-            [id]="id('stratumPoolWebsocketWorker')"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            [placeholder]="config().hrp + '1….cpu'"
-            formControlName="worker"
-          />
-        </mat-form-field>
-      </div>
-    }
-    @case ('datumGatewayWebsocket') {
-      <div class="mine-fields" formGroupName="gatewayWebsocket">
-        <mat-form-field appearance="outline">
-          <mat-label>DATUM Gateway WebSocket URL</mat-label>
-          <input
-            matInput
-            [id]="id('datumGatewayWebsocketUrl')"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="ws://127.0.0.1:23335/stratum"
-            formControlName="url"
-          />
-          @if (gatewayLoopbackWarning()) {
-            <mat-icon
-              matSuffix
-              class="url-warn"
-              [id]="id('gatewayLoopbackWarning')"
-              [matTooltip]="loopbackGatewayTooltip"
-            >warning</mat-icon>
-          }
-        </mat-form-field>
-        <mat-card class="pool-info-card" [attr.id]="id('gateway-info')">
-          <mat-card-header>
-            <mat-card-title>Gateway info</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            @if (gatewayInfoView(); as info) {
-              @switch (info.kind) {
-                @case ('notRequested') {
-                  <p class="hint">Not yet requested</p>
-                  <button mat-stroked-button type="button" [id]="id('gateway-info-fetch')" (click)="fetchGatewayInfo()">
-                    Fetch gateway info
-                  </button>
-                }
-                @case ('notProvided') {
-                  <p>Gateway is not providing gateway info</p>
-                  <p class="hint">as of {{ formatGatewayInfoAsOf(info.asOf) }}</p>
-                  <button mat-stroked-button type="button" [id]="id('gateway-info-refresh')" (click)="fetchGatewayInfo()">
-                    Refresh
-                  </button>
-                }
-                @case ('provided') {
-                  <p>Gateway published info</p>
-                  <dl>
-                    <dt>Node</dt>
-                    <dd>{{ statusLabel(info.nodeStatus) }}</dd>
-                    @if (info.prime) {
-                      <dt>DATUM Prime Pool</dt>
-                      <dd class="mono">{{ info.prime }}</dd>
-                    }
-                    @if (info.poolStatus) {
-                      <dt>Pool</dt>
-                      <dd>{{ statusLabel(info.poolStatus) }}</dd>
-                    }
-                    @if (info.name) {
-                      <dt>Name</dt>
-                      <dd>{{ info.name }}</dd>
-                    }
-                    @if (info.coinbaseTag) {
-                      <dt>Coinbase tag</dt>
-                      <dd class="mono">{{ info.coinbaseTag }}</dd>
-                    }
-                    @if (info.websiteUrl) {
-                      <dt>Website</dt>
-                      <dd class="mono">{{ info.websiteUrl }}</dd>
-                    }
-                  </dl>
-                  <p class="hint">as of {{ formatGatewayInfoAsOf(info.asOf) }}</p>
-                  <button mat-stroked-button type="button" [id]="id('gateway-info-refresh')" (click)="fetchGatewayInfo()">
-                    Refresh
-                  </button>
-                }
-              }
-            }
-          </mat-card-content>
-        </mat-card>
-        <mat-form-field appearance="outline">
-          <mat-label>Worker</mat-label>
-          <input
-            matInput
-            [id]="id('datumGatewayWebsocketWorker')"
-            type="text"
-            autocomplete="off"
-            spellcheck="false"
-            [placeholder]="config().hrp + '1….cpu'"
-            formControlName="worker"
-          />
-        </mat-form-field>
-      </div>
-    }
-  }
 
   <mat-form-field appearance="outline">
     <mat-label>Threads</mat-label>
@@ -244,11 +36,29 @@
   </mat-form-field>
 
   <div class="row">
-    <button mat-flat-button type="button" color="primary" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">
-      Start
-    </button>
+    @if (!showMainWarning()) {
+      <button mat-flat-button type="button" color="primary" [id]="id('start')" [disabled]="startDisabled()" (click)="requestStart()">
+        Start
+      </button>
+    }
     <button mat-stroked-button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
   </div>
+
+  @if (pendingMineTo()) {
+    <mat-card [attr.id]="id('mine-to-confirm')">
+      <mat-card-header>
+        <mat-card-title>Confirm mine-to</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Hashrate will use:</p>
+        <p class="mono">{{ pendingMineTo() }}</p>
+        <div class="row">
+          <button mat-flat-button color="primary" type="button" [id]="id('confirm-mine-to')" (click)="confirmStart()">Confirm</button>
+          <button mat-stroked-button type="button" [id]="id('cancel-mine-to')" (click)="pendingMineTo.set(null)">Cancel</button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
 
   @if (formError()) {
     <p class="err">{{ formError() }}</p>

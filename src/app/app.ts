@@ -1,8 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, effect, inject } from '@angular/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, type MinerChain } from '@federationcoin/miner-ui';
+import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, WalletService, type MinerChain } from '@federationcoin/miner-ui';
 
 @Component({
   selector: 'app-root',
@@ -14,6 +14,13 @@ export class App {
   protected readonly mining = inject(MiningService);
   protected readonly pool = inject(PoolService);
   protected readonly network = inject(NetworkContext);
+  protected readonly wallet = inject(WalletService);
+
+  constructor() {
+    effect(() => {
+      void this.wallet.load(this.network.chain());
+    });
+  }
 
   protected selectNetwork(id: MinerChain): void {
     const current = this.network.chain();

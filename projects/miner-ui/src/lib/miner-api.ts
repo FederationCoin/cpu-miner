@@ -160,6 +160,27 @@ export type MinerToast = {
   kind: ToastKind;
 };
 
+export type ExtrasProbe = {
+  node: boolean;
+  gateway: boolean;
+  pool: boolean;
+};
+
+export type NodeStatusView = {
+  session: 'idle' | 'spawned' | 'attached';
+  chain: MinerChain | null;
+  height: number;
+  running: boolean;
+  lastError: string;
+};
+
+export type GatewayStatusView = {
+  session: 'idle' | 'spawned';
+  running: boolean;
+  chain?: MinerChain;
+  lastError: string;
+};
+
 export type MinerApi = {
   start: (opts: MinerStartOpts) => Promise<{ ok: boolean; error?: string }>;
   stop: () => Promise<void>;
@@ -180,6 +201,20 @@ export type MinerApi = {
   webGpuProgress?: (msg: WebGpuIpcProgress) => Promise<void>;
   webGpuLog?: (message: string) => Promise<void>;
   registryRequest?: (req: RegistryRequest) => Promise<RegistryResponse>;
+  extrasProbe?: () => Promise<ExtrasProbe>;
+  nodeStart?: (chain: MinerChain) => Promise<{ ok: boolean; error?: string }>;
+  nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
+  nodeStatus?: (chain: MinerChain) => Promise<NodeStatusView>;
+  gatewayStart?: (opts: {
+    chain: MinerChain;
+    poolAddress: string;
+    poolHost?: string;
+    poolPubkey?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
+  gatewayStatus?: () => Promise<GatewayStatusView>;
+  walletLoad?: (chain: MinerChain) => Promise<string | null>;
+  walletSave?: (chain: MinerChain, blob: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
 declare global {

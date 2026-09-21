@@ -1,0 +1,46 @@
+<div class="pane">
+  @if (isWeb()) {
+    <app-node-download-cta />
+  } @else if (!extraPresent()) {
+    <app-addon-missing-card label="Node" />
+  } @else {
+    @if (showMainWarning()) {
+      <p class="warn" data-main-warning>
+        Main is not live. The Big One will not start a node on dummy MAIN.
+      </p>
+    }
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Local node</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <dl>
+          <dt>Session</dt>
+          <dd [attr.id]="chain() + '-node-session'">{{ status().session }}</dd>
+          <dt>Height</dt>
+          <dd [attr.id]="chain() + '-node-height'">{{ status().height }}</dd>
+          <dt>Status</dt>
+          <dd>{{ status().running ? 'listening' : 'idle' }}</dd>
+        </dl>
+        @if (status().lastError) {
+          <p class="err">{{ status().lastError }}</p>
+        }
+        <div class="row">
+          @if (!showMainWarning()) {
+            <button mat-flat-button color="primary" type="button" [id]="chain() + '-node-start'" (click)="start()">
+              Start
+            </button>
+          }
+          @if (showStop()) {
+            <button mat-stroked-button type="button" [id]="chain() + '-node-stop'" (click)="stop()">Stop</button>
+          }
+          <button mat-stroked-button type="button" [id]="chain() + '-node-refresh'" (click)="refresh()">Refresh</button>
+        </div>
+        @if (error()) {
+          <p class="err">{{ error() }}</p>
+        }
+        <p class="hint">RPC binds 127.0.0.1. Stop is only offered for a node this app spawned.</p>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

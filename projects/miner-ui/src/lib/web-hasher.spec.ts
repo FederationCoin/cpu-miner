@@ -468,4 +468,14 @@ describe('WebHasherHost reconnect', () => {
       host.stopWatch();
     }
   });
+
+  it('refuses dummy MAIN', async () => {
+    const host = new WebHasherHost(DEFAULT_HOSTED_TESTNET);
+    const r = await host.start({
+      chain: 'main',
+      threads: 1,
+      mineTo: { kind: 'stratumPoolWebsocket', url: 'wss://pool.example/stratum', worker: 'gfcn1abc' },
+    });
+    expect(r).toEqual({ ok: false, error: 'MAIN is not live' });
+  });
 });

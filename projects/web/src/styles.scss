@@ -16,30 +16,30 @@ html {
 }
 
 :root {
-  --mat-sys-surface: #0a0a0a;
-  --mat-sys-on-surface: #f4e9c8;
-  --mat-sys-on-surface-variant: #d4c89a;
-  --mat-sys-primary: #c9a227;
-  --mat-sys-on-primary: #0a0a0a;
-  --mat-sys-tertiary: #b71c2c;
-  --mat-sys-on-tertiary: #f4e9c8;
-  --mat-sys-error: #e53935;
-  --mat-sys-outline: #8a7318;
-  --mat-sys-surface-container: #1a1204;
-  --mat-sys-surface-container-low: #0a0a0a;
-  --mat-sys-surface-container-high: #1a1204;
-  --mat-sys-surface-container-highest: #241a08;
-  --mat-sys-surface-variant: #1a1204;
-  --mdc-outlined-button-label-text-color: #f4e9c8;
-  --mdc-outlined-button-outline-color: #c9a227;
-  --mdc-outlined-button-disabled-label-text-color: #8a7318;
-  --mdc-outlined-button-disabled-outline-color: #8a7318;
+  --mat-sys-surface: #0e1824;
+  --mat-sys-on-surface: #e8e4d9;
+  --mat-sys-on-surface-variant: #c4bfb0;
+  --mat-sys-primary: #c9a85a;
+  --mat-sys-on-primary: #0e1824;
+  --mat-sys-tertiary: #b33a2b;
+  --mat-sys-on-tertiary: #e8e4d9;
+  --mat-sys-error: #b33a2b;
+  --mat-sys-outline: #c9a85a;
+  --mat-sys-surface-container: #15202e;
+  --mat-sys-surface-container-low: #0e1824;
+  --mat-sys-surface-container-high: #15202e;
+  --mat-sys-surface-container-highest: #1c2836;
+  --mat-sys-surface-variant: #15202e;
+  --mdc-outlined-button-label-text-color: #e8e4d9;
+  --mdc-outlined-button-outline-color: #c9a85a;
+  --mdc-outlined-button-disabled-label-text-color: #6b5a32;
+  --mdc-outlined-button-disabled-outline-color: #6b5a32;
 }
 
 html,
 body {
   margin: 0;
-  background: #0a0a0a;
-  color: #f4e9c8;
+  background: #0e1824;
+  color: #e8e4d9;
   font-family: Roboto, system-ui, sans-serif;
 }

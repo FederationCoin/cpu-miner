@@ -498,4 +498,17 @@ describe('web demo shell', () => {
     expect(img.alt).toMatch(/DATUM Prime Pool/);
     expect(img.alt).not.toMatch(/hasher never/i);
   });
+
+  it('shows a Node download CTA and never Host a pool', async () => {
+    const f = await render();
+    expect(has(f, '#testnet-tab-pool')).toBe(false);
+    expect(has(f, '#testnet-tab-node')).toBe(true);
+    (f.nativeElement.querySelector('#testnet-tab-node') as HTMLButtonElement).click();
+    f.detectChanges();
+    expect(has(f, '[data-node-download]')).toBe(true);
+    (f.nativeElement.querySelector('#testnet-tab-gateway') as HTMLButtonElement).click();
+    f.detectChanges();
+    expect(has(f, '#testnet-gateway-wss')).toBe(true);
+    expect(has(f, '[data-node-download]')).toBe(true);
+  });
 });

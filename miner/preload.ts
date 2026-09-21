@@ -111,4 +111,13 @@ contextBridge.exposeInMainWorld('miner', {
     body?: unknown;
     authorization?: string;
   }) => ipcRenderer.invoke('registry:request', req),
+  extrasProbe: () => ipcRenderer.invoke('extras:probe'),
+  nodeStart: (chain: import('./chain.js').MinerChain) => ipcRenderer.invoke('node:start', chain),
+  nodeStop: () => ipcRenderer.invoke('node:stop'),
+  nodeStatus: (chain: import('./chain.js').MinerChain) => ipcRenderer.invoke('node:status', chain),
+  gatewayStart: (opts: unknown) => ipcRenderer.invoke('gateway:start', opts),
+  gatewayStop: () => ipcRenderer.invoke('gateway:stop'),
+  gatewayStatus: () => ipcRenderer.invoke('gateway:status'),
+  walletLoad: (chain: import('./chain.js').MinerChain) => ipcRenderer.invoke('wallet:load', chain),
+  walletSave: (chain: import('./chain.js').MinerChain, blob: string) => ipcRenderer.invoke('wallet:save', chain, blob),
 });

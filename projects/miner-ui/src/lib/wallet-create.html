@@ -1,0 +1,17 @@
+<div class="create" [formGroup]="form">
+  <p class="hint">Write these {{ wordCount }} words down. They are the wallet. We will not store them in plaintext.</p>
+  <p class="mono" [attr.data-phrase]="wordCount">{{ phrase() }}</p>
+  <mat-checkbox formControlName="saved">I saved these words</mat-checkbox>
+  <mat-form-field appearance="outline">
+    <mat-label>Re-enter the phrase</mat-label>
+    <textarea matInput rows="3" formControlName="reenter"></textarea>
+  </mat-form-field>
+  <mat-form-field appearance="outline">
+    <mat-label>Password (wraps the stored seed)</mat-label>
+    <input matInput type="password" formControlName="password" />
+  </mat-form-field>
+  <button mat-flat-button color="primary" type="button" [id]="'wallet-save-' + wordCount" (click)="save()">Save wallet</button>
+  @if (error()) {
+    <p class="err">{{ error() }}</p>
+  }
+</div>

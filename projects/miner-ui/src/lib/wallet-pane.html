@@ -1,0 +1,96 @@
+<div class="pane">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Hot wallet</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p>
+        This mill wallet is quite hot. The Big One aims to be everything you need to mine.
+        We still recommend Federation Sparrow or a cold wallet for storing value.
+        Unlock lasts five minutes of idle time. Confirm is not a substitute for lock.
+      </p>
+      @if (isWeb()) {
+        <svg viewBox="0 0 360 120" width="360" height="120" role="img" aria-label="Browser extensions can read this key">
+          <rect width="360" height="120" fill="#0e1824" stroke="#c9a85a" />
+          <rect x="12" y="12" width="180" height="96" rx="6" fill="#15202e" stroke="#c9a85a" />
+          <text x="102" y="40" text-anchor="middle" fill="#e8e4d9" font-size="12">Browser</text>
+          <circle cx="48" cy="70" r="10" fill="#c9a85a" />
+          <circle cx="78" cy="70" r="10" fill="#c9a85a" />
+          <circle cx="108" cy="70" r="10" fill="#c9a85a" />
+          <text x="102" y="98" text-anchor="middle" fill="#c4bfb0" font-size="10">extensions</text>
+          <path d="M200 60 H250" stroke="#b33a2b" marker-end="url(#arr)" />
+          <rect x="258" y="40" width="88" height="40" rx="6" fill="#15202e" stroke="#b33a2b" />
+          <text x="302" y="64" text-anchor="middle" fill="#e8e4d9" font-size="11">key</text>
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0 0 L8 4 L0 8 Z" fill="#b33a2b" />
+            </marker>
+          </defs>
+        </svg>
+        <p class="hint">All of these can read this key. Do not keep large balances.</p>
+      }
+    </mat-card-content>
+  </mat-card>
+
+  @switch (wallet.view().kind) {
+    @case ('empty') {
+      @if (path() === 'home') {
+        <div class="row">
+          <button mat-flat-button type="button" [id]="chain() + '-wallet-create-12'" (click)="path.set('create12')">Create 12-word</button>
+          <button mat-stroked-button type="button" [id]="chain() + '-wallet-create-24'" (click)="path.set('create24')">Create 24-word</button>
+          <button mat-stroked-button type="button" [id]="chain() + '-wallet-import'" (click)="path.set('import')">Import</button>
+        </div>
+      }
+    }
+    @case ('watchOnly') {
+      <p class="hint">Address-only identity. Create or import a keystore to sign.</p>
+      <p class="mono">{{ wallet.receive() }}</p>
+      @if (path() === 'home') {
+        <div class="row">
+          <button mat-flat-button type="button" (click)="path.set('create12')">Create 12-word</button>
+          <button mat-stroked-button type="button" (click)="path.set('create24')">Create 24-word</button>
+          <button mat-stroked-button type="button" (click)="path.set('import')">Import</button>
+        </div>
+      }
+    }
+    @case ('locked') {
+      <p class="mono">{{ wallet.receive() }}</p>
+      <form [formGroup]="unlockForm">
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <input matInput type="password" [id]="chain() + '-wallet-password'" formControlName="password" />
+        </mat-form-field>
+        <button mat-flat-button type="button" [id]="chain() + '-wallet-unlock'" (click)="unlock()">Unlock</button>
+      </form>
+    }
+    @case ('unlocked') {
+      <p class="mono" [attr.id]="chain() + '-wallet-receive'">{{ wallet.receive() }}</p>
+      <div class="row">
+        <button mat-flat-button type="button" [id]="chain() + '-wallet-set-mine'" (click)="requestMineTo()">Set as mine-to</button>
+        <button mat-stroked-button type="button" (click)="wallet.lock()">Lock</button>
+      </div>
+      @if (pendingMine()) {
+        <mat-card>
+          <mat-card-content>
+            <p>Point hashrate at {{ wallet.receive() }}?</p>
+            <button mat-flat-button type="button" [id]="chain() + '-wallet-confirm-mine'" (click)="confirmMineTo()">Confirm</button>
+          </mat-card-content>
+        </mat-card>
+      }
+    }
+  }
+
+  @if (path() === 'create12') {
+    <app-wallet-create-12 [chain]="chain()" (done)="path.set('home')" />
+  }
+  @if (path() === 'create24') {
+    <app-wallet-create-24 [chain]="chain()" (done)="path.set('home')" />
+  }
+  @if (path() === 'import') {
+    <app-wallet-import [chain]="chain()" (done)="path.set('home')" />
+  }
+
+  @if (error()) {
+    <p class="err">{{ error() }}</p>
+  }
+</div>

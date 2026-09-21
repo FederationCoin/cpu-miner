@@ -6,7 +6,7 @@
   margin: 0 auto;
   padding: 0 1.75rem 2rem;
   font-family: Roboto, system-ui, sans-serif;
-  color: #f4e9c8;
+  color: #e8e4d9;
 }
 
 .mill-bar {
@@ -16,8 +16,8 @@
   gap: 0.75rem;
   margin: 0 -1.75rem 1rem;
   padding: 0 1.75rem;
-  background: #0a0a0a;
-  color: #c9a227;
+  background: #0e1824;
+  color: #c9a85a;
 }
 
 .seal {
@@ -35,17 +35,26 @@
   margin: 0;
   font-size: 1.15rem;
   font-weight: 600;
-  color: #f4e9c8;
+  color: #e8e4d9;
 }
 
 .spacer {
   flex: 1 1 auto;
 }
 
+.wallet-chip {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: #e8e4d9;
+  border: 1px solid #c9a85a;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+}
+
 .lead {
   margin: 0 0 1.25rem;
   max-width: 46rem;
-  color: #d4c89a;
+  color: #c4bfb0;
   line-height: 1.45;
 }
 

@@ -1,59 +1,55 @@
 <div class="workspace">
   <nav mat-tab-nav-bar [tabPanel]="tabPanel" class="tabs" role="tablist">
-    <a
-      mat-tab-link
-      role="tab"
-      [id]="chain() + '-tab-mine'"
-      [active]="tab() === 'mine'"
-      [attr.aria-selected]="tab() === 'mine'"
-      (click)="$event.preventDefault(); selectTab('mine')"
-    >
-      Mine
-    </a>
+    <a mat-tab-link role="tab" [id]="chain() + '-tab-node'" [active]="tab() === 'node'" [attr.aria-selected]="tab() === 'node'" (click)="$event.preventDefault(); selectTab('node')">Node</a>
+    <a mat-tab-link role="tab" [id]="chain() + '-tab-wallet'" [active]="tab() === 'wallet'" [attr.aria-selected]="tab() === 'wallet'" (click)="$event.preventDefault(); selectTab('wallet')">Wallet</a>
+    <a mat-tab-link role="tab" [id]="chain() + '-tab-mine'" [active]="tab() === 'mine'" [attr.aria-selected]="tab() === 'mine'" (click)="$event.preventDefault(); selectTab('mine')">Mine</a>
+    <a mat-tab-link role="tab" [id]="chain() + '-tab-gateway'" [active]="tab() === 'gateway'" [attr.aria-selected]="tab() === 'gateway'" (click)="$event.preventDefault(); selectTab('gateway')">DATUM Gateway</a>
+    <a mat-tab-link role="tab" [id]="chain() + '-tab-radar'" [active]="tab() === 'radar'" [attr.aria-selected]="tab() === 'radar'" (click)="$event.preventDefault(); selectTab('radar')">Radar</a>
+    <a mat-tab-link role="tab" [id]="chain() + '-tab-finder'" [active]="tab() === 'finder'" [attr.aria-selected]="tab() === 'finder'" (click)="$event.preventDefault(); selectTab('finder')">Pool Finder</a>
+    <a mat-tab-link role="tab" [id]="chain() + '-tab-docs'" [active]="tab() === 'docs'" [attr.aria-selected]="tab() === 'docs'" (click)="$event.preventDefault(); selectTab('docs')">Docs</a>
     @if (showHostPool()) {
-    <a
-      mat-tab-link
-      role="tab"
-      [id]="chain() + '-tab-pool'"
-      [active]="tab() === 'pool'"
-      [attr.aria-selected]="tab() === 'pool'"
-      (click)="$event.preventDefault(); selectTab('pool')"
-    >
-      Host a pool
-    </a>
+      <a mat-tab-link role="tab" [id]="chain() + '-tab-pool'" [active]="tab() === 'pool'" [attr.aria-selected]="tab() === 'pool'" (click)="$event.preventDefault(); selectTab('pool')">Host a pool</a>
     }
-    <a
-      mat-tab-link
-      role="tab"
-      [id]="chain() + '-tab-docs'"
-      [active]="tab() === 'docs'"
-      [attr.aria-selected]="tab() === 'docs'"
-      (click)="$event.preventDefault(); selectTab('docs')"
-    >
-      Docs
-    </a>
-    <a
-      mat-tab-link
-      role="tab"
-      [id]="chain() + '-tab-finder'"
-      [active]="tab() === 'finder'"
-      [attr.aria-selected]="tab() === 'finder'"
-      (click)="$event.preventDefault(); selectTab('finder')"
-    >
-      Pool Finder
-    </a>
   </nav>
   <mat-tab-nav-panel #tabPanel>
+    @if (tab() === 'node') {
+      <section class="pane-col" [attr.id]="chain() + '-node'">
+        <h2>Node</h2>
+        <app-node-pane [chain]="chain()" />
+      </section>
+    }
+    @if (tab() === 'wallet') {
+      <section class="pane-col" [attr.id]="chain() + '-wallet'">
+        <h2>Wallet</h2>
+        <app-wallet-pane [chain]="chain()" />
+      </section>
+    }
     @if (tab() === 'mine') {
       <section class="pane-col" [attr.id]="chain() + '-mining'">
         <h2>Mine</h2>
         <app-miner-pane [chain]="chain()" />
       </section>
     }
+    @if (tab() === 'gateway') {
+      <section class="pane-col" [attr.id]="chain() + '-gateway'">
+        <h2>DATUM Gateway</h2>
+        <app-gateway-pane [chain]="chain()" />
+      </section>
+    }
+    @if (tab() === 'radar') {
+      <section class="pane-col" [attr.id]="chain() + '-radar'">
+        <h2>Radar</h2>
+        <app-radar-pane />
+      </section>
+    }
     @if (tab() === 'pool' && showHostPool()) {
       <section class="pane-col" [attr.id]="chain() + '-pool'">
         <h2>Host a pool</h2>
-        <app-pool-pane [chain]="chain()" />
+        @if (poolExtra()) {
+          <app-pool-pane [chain]="chain()" />
+        } @else {
+          <app-addon-missing-card label="Host a pool" />
+        }
       </section>
     }
     @if (tab() === 'docs') {

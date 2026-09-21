@@ -247,10 +247,36 @@
             </button>
           </mat-form-field>
           <div class="row">
-            <button mat-stroked-button type="button" [id]="id('compose')" (click)="composeRegister()">
-              Compose messages
+            <button mat-stroked-button type="button" [id]="id('compose')" (click)="pasteSparrow()">
+              Compose for Sparrow
+            </button>
+            <button mat-stroked-button type="button" [id]="id('register-confirm')" (click)="registerWithConfirm()">
+              Sign in this mill
             </button>
           </div>
+          @if (millSignKind() === 'register') {
+            <mat-card [attr.id]="id('mill-sign')">
+              <mat-card-header>
+                <mat-card-title>Confirm register signature</mat-card-title>
+              </mat-card-header>
+              <mat-card-content [formGroup]="millSignForm">
+                <p class="hint">Registry {{ baseUrl() }}</p>
+                <p class="mono">{{ sparrowMessage() }}</p>
+                @if (millSignNeedsPassword()) {
+                  <mat-form-field appearance="outline">
+                    <mat-label>Wallet password</mat-label>
+                    <input matInput type="password" [id]="id('mill-sign-password')" formControlName="password" />
+                  </mat-form-field>
+                }
+                <div class="row">
+                  <button mat-flat-button color="primary" type="button" [id]="id('confirm-mill-sign')" (click)="confirmMillSign()">
+                    Confirm
+                  </button>
+                  <button mat-stroked-button type="button" [id]="id('cancel-mill-sign')" (click)="cancelMillSign()">Cancel</button>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          }
           @if (commandJson()) {
             <mat-form-field appearance="outline">
               <mat-label>Command (review before signing)</mat-label>
@@ -319,9 +345,32 @@
       </mat-form-field>
       <div class="row">
         <button mat-stroked-button type="button" [id]="id('compose-attest')" (click)="composeAttestCommand()">
-          Compose messages
+          Compose for Sparrow
+        </button>
+        <button mat-stroked-button type="button" [id]="id('attest-confirm')" (click)="attestWithConfirm()">
+          Sign in this mill
         </button>
       </div>
+      @if (millSignKind() === 'attest') {
+        <mat-card [attr.id]="id('attest-mill-sign')">
+          <mat-card-content [formGroup]="millSignForm">
+            <p class="hint">Registry {{ baseUrl() }}</p>
+            <p class="mono">{{ attestSparrowMessage() }}</p>
+            @if (millSignNeedsPassword()) {
+              <mat-form-field appearance="outline">
+                <mat-label>Wallet password</mat-label>
+                <input matInput type="password" formControlName="password" />
+              </mat-form-field>
+            }
+            <div class="row">
+              <button mat-flat-button color="primary" type="button" [id]="id('confirm-attest-mill-sign')" (click)="confirmMillSign()">
+                Confirm
+              </button>
+              <button mat-stroked-button type="button" (click)="cancelMillSign()">Cancel</button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
       @if (attestCommandJson()) {
         <mat-form-field appearance="outline">
           <mat-label>Attest command (review before signing)</mat-label>

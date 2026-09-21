@@ -22,6 +22,7 @@ import {
   type PoolStats,
 } from './miner-api';
 import type { HostedEndpoints } from './miner-shell';
+import { CHAINS } from './chain';
 import {
   StratumWsClient,
   fetchGatewayInfo,
@@ -95,6 +96,9 @@ export class WebHasherHost implements HasherHost {
   ) {}
 
   async start(opts: MinerStartOpts): Promise<{ ok: boolean; error?: string }> {
+    if (opts.chain === 'main' && !CHAINS.main.mainIsLive) {
+      return { ok: false, error: 'MAIN is not live' };
+    }
     this.stopMining();
     this.stopStatsWatch();
     const url = this.stratumUrl(opts);
@@ -531,6 +535,10 @@ export class WebHasherHost implements HasherHost {
     for (const cb of this.statsCbs) {
       cb(snap);
     }
+  }
+
+  extrasProbe() {
+    return Promise.resolve({ node: false, gateway: false, pool: false });
   }
 
   private toast(message: string): void {
