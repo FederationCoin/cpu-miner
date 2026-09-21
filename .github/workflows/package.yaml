@@ -1,6 +1,10 @@
 # Unsigned Electron miner for a human-created git tag.
 # Tag: vMAJOR.MINOR.PATCH-federationcoin.<fork> plus optional .alpha/.beta/.rcN
 # (same shape as Sparrow; MAJOR.MINOR.PATCH is package.json version).
+# After npm ci, fetch-extras.mjs downloads pinned node/gateway daemon zips
+# for this runner OS (MILL_ARTIFACT). Empty extras pin skips. Filled pin
+# SHA-256 mismatch fails the job. Fetch uses github.token; electron-builder
+# must keep GH_TOKEN empty. Never CONVOY. Never MAIN. Dummy MAIN unused.
 # CI does not create tags. Do not dispatch this from the test workflow.
 # GH_TOKEN is github.token on gate/draft for gh (same as Sparrow). The pack
 # job must not pass it to electron-builder; --publish never so v26 cannot
@@ -129,6 +133,16 @@ jobs:
           if (-not $cl) { throw 'vswhere did not find Hostx64 cl.exe' }
           echo (Split-Path $cl) >> $env:GITHUB_PATH
       - run: npm ci
+      # Pinned node/gateway daemon zips. Empty extras pin skips. Filled pin
+      # SHA-256 mismatch fails this job. Uses github.token against promoted
+      # public Releases on FederationCoin/FederationCoin and
+      # FederationCoin/datum_gateway. Never CONVOY. Never MAIN.
+      # Do not pass this token to electron-builder.
+      - name: Fetch pinned extras
+        env:
+          MILL_ARTIFACT: ${{ matrix.artifact }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/fetch-extras.mjs
       - name: Native GPU hasher (Electron ABI)
         env:
           FC_GPU_REQUIRED: '1'

@@ -21,6 +21,7 @@
     "build": "npm run build:app",
     "build:web": "ng build miner-web --configuration production",
     "build:app": "ng build --configuration development && npm run build:electron",
+    "fetch:extras": "node scripts/fetch-extras.mjs",
     "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\" && node scripts/copy-federation-pool.mjs && node scripts/copy-extras.mjs",
     "build:gpu": "node native/gpu-hasher/rebuild.mjs",
     "watch": "ng build --watch --configuration development",

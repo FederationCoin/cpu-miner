@@ -1,1 +1,1 @@
-Optional federationcoind extra. Filled from a SHA-256 pin in extras-checksums.json at build time. Never a MAIN binary.
+Optional federationcoind extra. Filled from extras-checksums.json (git SHA plus per-OS SHA-256). Never a MAIN binary.
