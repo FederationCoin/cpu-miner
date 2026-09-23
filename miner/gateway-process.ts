@@ -3,8 +3,15 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { MAIN_IS_LIVE, type MinerChain } from './chain.js';
 import type { AddonPresence } from './extras.js';
+import { formatCommand } from './process-usage.js';
 
-export type GatewaySession = { kind: 'idle' } | { kind: 'spawned'; child: ChildProcess; chain: MinerChain };
+export type GatewaySession =
+  | { kind: 'idle' }
+  | { kind: 'spawned'; child: ChildProcess; chain: MinerChain; command: string; configPath: string };
+
+export function gatewayCommand(binPath: string, configPath: string): string {
+  return formatCommand(binPath, ['-c', configPath]);
+}
 
 export type GatewayStartOpts = {
   chain: MinerChain;

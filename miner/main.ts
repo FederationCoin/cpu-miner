@@ -641,6 +641,10 @@ function prepareStart(opts: MinerStartOpts): void {
   }
   if (mineTo.kind === 'stratum') {
     stratumSecret = mineTo.stratum.password;
+    return;
+  }
+  if (mineTo.kind === 'datumGateway') {
+    stratumSecret = mineTo.gateway.password;
   }
 }
 
@@ -654,6 +658,9 @@ async function runMiner(opts: MinerStartOpts): Promise<void> {
       return;
     case 'stratum':
       await mineStratumLoop({ ...mineTo.stratum, threads: opts.threads });
+      return;
+    case 'datumGateway':
+      await mineStratumLoop({ ...mineTo.gateway, threads: opts.threads });
       return;
   }
 }

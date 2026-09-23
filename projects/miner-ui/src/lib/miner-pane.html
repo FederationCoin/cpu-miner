@@ -23,9 +23,10 @@
           [kindLocked]="kindLocked()"
           [gatewayInfo]="gatewayInfoView()"
           (fetchInfo)="fetchGatewayInfo()"
+          (pull)="pullSelected()"
         />
       } @else {
-        <app-desktop-mine-to [form]="form" [chain]="chain()" [kindLocked]="kindLocked()" />
+        <app-desktop-mine-to [form]="form" [chain]="chain()" [kindLocked]="kindLocked()" (pull)="pullSelected()" />
       }
     </mat-card-content>
   </mat-card>

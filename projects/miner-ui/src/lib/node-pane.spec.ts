@@ -4,6 +4,7 @@ import { NodePane } from './node-pane';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
 import { MINER_SHELL, desktopShell, webDemoShell } from './miner-shell';
 import { ExtrasService } from './extras.service';
+import { EMPTY_NODE_STATUS } from './miner-api';
 
 function host(probe: { node: boolean; gateway: boolean; pool: boolean }, extras: Partial<HasherHost> = {}): HasherHost {
   return {
@@ -20,7 +21,7 @@ function host(probe: { node: boolean; gateway: boolean; pool: boolean }, extras:
     poolStop: async () => undefined,
     onPoolStats: () => () => undefined,
     extrasProbe: async () => probe,
-    nodeStatus: async () => ({ session: 'idle', chain: null, height: 0, running: false, lastError: '' }),
+    nodeStatus: async () => EMPTY_NODE_STATUS,
     nodeStart: async () => ({ ok: true }),
     nodeStop: async () => ({ ok: true }),
     ...extras,
@@ -59,14 +60,22 @@ describe('NodePane', () => {
     expect(f.nativeElement.querySelector('[data-addon-missing="Node"]')).toBeTruthy();
   });
 
-  it('shows Start when present and hides Stop unless spawned', async () => {
+  it('hides Start and shows Stop when this app spawned the node', async () => {
     const f = await render(
       'desktop',
       host({ node: true, gateway: false, pool: true }, {
-        nodeStatus: async () => ({ session: 'spawned', chain: 'testnet', height: 1, running: true, lastError: '' }),
+        nodeStatus: async () => ({ ...EMPTY_NODE_STATUS, session: 'spawned', chain: 'testnet', height: 1, running: true, command: 'federationcoind -testnet' }),
       }),
     );
-    expect(f.nativeElement.querySelector('#testnet-node-start')).toBeTruthy();
+    expect(f.nativeElement.querySelector('#testnet-node-start')).toBeNull();
     expect(f.nativeElement.querySelector('#testnet-node-stop')).toBeTruthy();
+    expect(f.nativeElement.querySelector('#testnet-node-command')?.textContent).toContain('-testnet');
+    expect(f.nativeElement.textContent).toMatch(/Poll now/);
+  });
+
+  it('shows Start while idle', async () => {
+    const f = await render('desktop', host({ node: true, gateway: false, pool: true }));
+    expect(f.nativeElement.querySelector('#testnet-node-start')).toBeTruthy();
+    expect(f.nativeElement.querySelector('#testnet-node-stop')).toBeNull();
   });
 });

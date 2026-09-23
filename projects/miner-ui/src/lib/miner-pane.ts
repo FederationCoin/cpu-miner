@@ -97,6 +97,12 @@ export class MinerPane implements OnInit {
     }),
     poolWebsocket: emptyWsGroup(),
     gatewayWebsocket: emptyWsGroup(),
+    gateway: new FormGroup({
+      host: new FormControl('127.0.0.1', { nonNullable: true }),
+      port: new FormControl(23334, { nonNullable: true }),
+      worker: new FormControl('', { nonNullable: true }),
+      password: new FormControl(STRATUM_PASSWORD, { nonNullable: true }),
+    }),
     threads: new FormControl(4, { nonNullable: true }),
   });
 
@@ -139,6 +145,7 @@ export class MinerPane implements OnInit {
     } else {
       const desk = d as { stratum: { host: string; port: number; password: string }; rpc: { host: string; port: number } };
       this.form.controls.stratum.patchValue(this.loadStratum(desk.stratum));
+      this.form.controls.gateway.patchValue(this.loadGateway());
       this.form.controls.rpc.patchValue(this.loadRpc('rpc', desk.rpc));
     }
     this.form.controls.payout.setValue(localStorage.getItem(this.key('payout')) ?? '');
@@ -153,7 +160,10 @@ export class MinerPane implements OnInit {
     const fallback = d.mineToKind;
     this.form.controls.kind.setValue(savedKind && allowed.includes(savedKind) ? savedKind : fallback);
     this.gpuPicks.set(this.loadGpuPicks());
-    this.form.valueChanges.subscribe(() => this.persist());
+    this.form.valueChanges.subscribe(() => {
+      this.persist();
+      this.wallet.notePayout(this.currentPayout());
+    });
     this.form.controls.gatewayWebsocket.controls.url.valueChanges.subscribe(() => {
       this.gatewayInfoView.set({ kind: 'notRequested' });
     });
@@ -211,7 +221,15 @@ export class MinerPane implements OnInit {
   }
 
   protected allowedKinds(): MineToKind[] {
-    return this.isWebDemo() ? ['stratumPoolWebsocket', 'datumGatewayWebsocket'] : ['node', 'stratum'];
+    return this.isWebDemo() ? ['stratumPoolWebsocket', 'datumGatewayWebsocket'] : ['node', 'stratum', 'datumGateway'];
+  }
+
+  protected pullSelected(): void {
+    const addr = this.wallet.selectedReceive();
+    if (!addr) {
+      return;
+    }
+    this.applyPayout(addr);
   }
 
   protected kindLocked(): boolean {
@@ -277,6 +295,9 @@ export class MinerPane implements OnInit {
     if (kind === 'stratum') {
       return this.form.controls.stratum.controls.worker.value.trim() || '(empty worker)';
     }
+    if (kind === 'datumGateway') {
+      return this.form.controls.gateway.controls.worker.value.trim() || '(empty worker)';
+    }
     if (kind === 'datumGatewayWebsocket') {
       return this.form.controls.gatewayWebsocket.controls.worker.value.trim() || '(empty worker)';
     }
@@ -317,6 +338,9 @@ export class MinerPane implements OnInit {
     if (kind === 'stratum') {
       return { kind: 'stratum', stratum: this.form.controls.stratum.getRawValue() };
     }
+    if (kind === 'datumGateway') {
+      return { kind: 'datumGateway', gateway: this.form.controls.gateway.getRawValue() };
+    }
     if (kind === 'datumGatewayWebsocket') {
       const ws = this.form.controls.gatewayWebsocket.getRawValue();
       return { kind: 'datumGatewayWebsocket', url: ws.url.trim(), worker: ws.worker };
@@ -338,6 +362,10 @@ export class MinerPane implements OnInit {
       return;
     }
     this.persistRpc('rpc', v.rpc);
+    localStorage.setItem(this.key('gateway.host'), v.gateway.host);
+    localStorage.setItem(this.key('gateway.port'), String(v.gateway.port));
+    localStorage.setItem(this.key('gateway.worker'), v.gateway.worker);
+    localStorage.setItem(this.key('gateway.password'), v.gateway.password);
     localStorage.setItem(this.key('stratum.host'), v.stratum.host);
     localStorage.setItem(this.key('stratum.port'), String(v.stratum.port));
     localStorage.setItem(this.key('stratum.worker'), v.stratum.worker);
@@ -367,13 +395,39 @@ export class MinerPane implements OnInit {
       }
       return null;
     }
-    if (saved === 'node' || saved === 'stratum') {
+    if (saved === 'node' || saved === 'stratum' || saved === 'datumGateway') {
       return saved;
     }
     if (isWebStratumKind(saved as MineToKind) || DROPPED_KINDS.has(saved)) {
       return 'stratum';
     }
     return null;
+  }
+
+  private loadGateway() {
+    return {
+      host: localStorage.getItem(this.key('gateway.host'))?.trim() || '127.0.0.1',
+      port: this.loadNum('gateway.port', 23334),
+      worker: localStorage.getItem(this.key('gateway.worker')) ?? '',
+      password: localStorage.getItem(this.key('gateway.password')) ?? STRATUM_PASSWORD,
+    };
+  }
+
+  private currentPayout(): string {
+    const kind = this.kind();
+    if (kind === 'node') {
+      return this.form.controls.payout.value.trim();
+    }
+    if (kind === 'stratum') {
+      return this.form.controls.stratum.controls.worker.value.trim();
+    }
+    if (kind === 'datumGateway') {
+      return this.form.controls.gateway.controls.worker.value.trim();
+    }
+    if (kind === 'datumGatewayWebsocket') {
+      return this.form.controls.gatewayWebsocket.controls.worker.value.trim();
+    }
+    return this.form.controls.poolWebsocket.controls.worker.value.trim();
   }
 
   private loadStratum(fallback: { host: string; port: number; password: string }) {
@@ -590,6 +644,10 @@ export class MinerPane implements OnInit {
       const s = this.form.controls.stratum.getRawValue();
       return `${s.host}:${s.port} (stratum)`;
     }
+    if (kind === 'datumGateway') {
+      const s = this.form.controls.gateway.getRawValue();
+      return `${s.host}:${s.port} (datum gateway stratum)`;
+    }
     if (kind === 'datumGatewayWebsocket') {
       return `${this.form.controls.gatewayWebsocket.getRawValue().url} (gateway websocket)`;
     }
@@ -608,6 +666,10 @@ export class MinerPane implements OnInit {
     }
     if (kind === 'stratum') {
       this.form.controls.stratum.controls.worker.setValue(address);
+      return;
+    }
+    if (kind === 'datumGateway') {
+      this.form.controls.gateway.controls.worker.setValue(address);
       return;
     }
     if (kind === 'datumGatewayWebsocket') {

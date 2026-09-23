@@ -17,6 +17,7 @@ export default defineConfig({
       'projects/miner-ui/src/lib/electrum-sign.spec.ts',
       'projects/miner-ui/src/lib/finder-sign.spec.ts',
       'projects/miner-ui/src/lib/radar-frame.spec.ts',
+      'projects/miner-ui/src/lib/wallet-file.spec.ts',
     ],
     environment: 'node',
     coverage: {
@@ -26,6 +27,9 @@ export default defineConfig({
         'miner/node-process.ts',
         'miner/gateway-process.ts',
         'miner/wallet-store.ts',
+        'miner/process-usage.ts',
+        'miner/prime-keys.ts',
+        'projects/miner-ui/src/lib/wallet-file.ts',
         'projects/miner-ui/src/lib/wallet-crypto.ts',
         'projects/miner-ui/src/lib/wallet-derive.ts',
         'projects/miner-ui/src/lib/electrum-sign.ts',

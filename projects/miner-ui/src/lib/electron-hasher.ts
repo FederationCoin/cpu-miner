@@ -1,4 +1,14 @@
-import type { GpuScan, MinerInfo, MinerStartOpts, MinerStats, MinerToast, PoolStartOpts, PoolStats } from './miner-api';
+import {
+  EMPTY_GATEWAY_STATUS,
+  EMPTY_NODE_STATUS,
+  type GpuScan,
+  type MinerInfo,
+  type MinerStartOpts,
+  type MinerStats,
+  type MinerToast,
+  type PoolStartOpts,
+  type PoolStats,
+} from './miner-api';
 import type { HasherHost } from './hasher-host';
 import type { RegistryRequest } from './registry';
 import { bindDesktopWebGpu } from './webgpu-desktop';
@@ -83,22 +93,25 @@ export class ElectronHasherHost implements HasherHost {
     return window.miner?.extrasProbe?.() ?? Promise.resolve({ node: false, gateway: false, pool: false });
   }
 
-  nodeStart(chain: import('./miner-api').MinerChain) {
-    return window.miner?.nodeStart?.(chain) ?? Promise.resolve({ ok: false, error: 'no node module' });
+  nodeStart(opts: { chain: import('./miner-api').MinerChain; datadir: string }) {
+    return window.miner?.nodeStart?.(opts) ?? Promise.resolve({ ok: false, error: 'no node module' });
   }
 
   nodeStop() {
     return window.miner?.nodeStop?.() ?? Promise.resolve({ ok: false, error: 'no node module' });
   }
 
-  nodeStatus(chain: import('./miner-api').MinerChain) {
-    return (
-      window.miner?.nodeStatus?.(chain) ??
-      Promise.resolve({ session: 'idle' as const, chain: null, height: 0, running: false, lastError: '' })
-    );
+  nodeStatus(opts: { chain: import('./miner-api').MinerChain; datadir: string }) {
+    return window.miner?.nodeStatus?.(opts) ?? Promise.resolve(EMPTY_NODE_STATUS);
   }
 
-  gatewayStart(opts: { chain: import('./miner-api').MinerChain; poolAddress: string; poolHost?: string; poolPubkey?: string }) {
+  gatewayStart(opts: {
+    chain: import('./miner-api').MinerChain;
+    poolAddress: string;
+    poolHost?: string;
+    poolPubkey?: string;
+    configPath?: string;
+  }) {
     return window.miner?.gatewayStart?.(opts) ?? Promise.resolve({ ok: false, error: 'no gateway module' });
   }
 
@@ -106,8 +119,12 @@ export class ElectronHasherHost implements HasherHost {
     return window.miner?.gatewayStop?.() ?? Promise.resolve({ ok: false, error: 'no gateway module' });
   }
 
-  gatewayStatus() {
-    return window.miner?.gatewayStatus?.() ?? Promise.resolve({ session: 'idle' as const, running: false, lastError: '' });
+  gatewayStatus(opts: { chain: import('./miner-api').MinerChain; configPath: string }) {
+    return window.miner?.gatewayStatus?.(opts) ?? Promise.resolve(EMPTY_GATEWAY_STATUS);
+  }
+
+  fetchPrimeKeys(url: string) {
+    return window.miner?.fetchPrimeKeys?.(url) ?? Promise.resolve({ ok: false, error: 'no gateway module' });
   }
 
   walletLoad(chain: import('./miner-api').MinerChain) {

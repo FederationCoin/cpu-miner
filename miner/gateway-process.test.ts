@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { canStopGateway, gatewayConfig, spawnGateway, writeGatewayConfig, type GatewaySession } from './gateway-process.js';
+import { canStopGateway, gatewayCommand, gatewayConfig, spawnGateway, writeGatewayConfig, type GatewaySession } from './gateway-process.js';
 import type { ChildProcess } from 'node:child_process';
 
 const base = {
@@ -26,6 +26,8 @@ describe('gateway-process', () => {
     expect(cfg.datum.pool_pubkey).toBe('');
     expect(cfg.stratum.ws_listen_addr).toBe('127.0.0.1');
     expect(cfg.stratum.ws_listen_port).toBe(23335);
+    expect(gatewayCommand('/usr/bin/datum_gateway', '/tmp/g.json')).toBe('/usr/bin/datum_gateway -c /tmp/g.json');
+    expect(gatewayCommand('  ', '/tmp/g.json')).toBe('');
   });
 
   it('keeps an opt-in House Prime host when set', () => {

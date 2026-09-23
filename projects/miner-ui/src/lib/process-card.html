@@ -1,0 +1,72 @@
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>{{ title() }}</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <dl>
+      <dt>Session</dt>
+      <dd [attr.id]="idPrefix() + '-session'">{{ session() }}</dd>
+      @if (height() != null) {
+        <dt>Height</dt>
+        <dd [attr.id]="idPrefix() + '-height'">{{ height() }}</dd>
+      }
+      <dt>PID</dt>
+      <dd [attr.id]="idPrefix() + '-pid'">{{ dash(pid()) }}</dd>
+      <dt>CPU</dt>
+      <dd>{{ dash(cpu()) }}</dd>
+      <dt>Memory</dt>
+      <dd>{{ dash(rss()) }}</dd>
+      <dt>Ports</dt>
+      <dd>
+        @if (ports().length === 0) {
+          —
+        } @else {
+          @for (p of ports(); track p.label) {
+            <span class="port">{{ p.label }} {{ p.port }}</span>
+          }
+        }
+      </dd>
+    </dl>
+    @if (otherCount() > 0) {
+      <p class="hint" [attr.id]="idPrefix() + '-others'">
+        {{ otherCount() }} other {{ otherNoun() }} {{ otherCount() === 1 ? 'process is' : 'processes are' }} running.
+        Stop only affects the one this app started.
+      </p>
+    }
+    <label class="path-label" [attr.for]="idPrefix() + '-path'">{{ pathLabel() }}</label>
+    <div class="path-row">
+      <input
+        [id]="idPrefix() + '-path'"
+        type="text"
+        autocomplete="off"
+        spellcheck="false"
+        [value]="path()"
+        [disabled]="pathDisabled()"
+        (input)="onPath($event)"
+      />
+      @if (showBrowse()) {
+        <button mat-stroked-button type="button" [id]="idPrefix() + '-browse'" [disabled]="pathDisabled()" (click)="browse.emit()">
+          Browse
+        </button>
+      }
+    </div>
+    <p class="hint">Locked while this process is running.</p>
+    <p class="hint">Command</p>
+    <pre class="mono" [attr.id]="idPrefix() + '-command'">{{ command() || '—' }}</pre>
+    <p class="hint">Logs</p>
+    <pre class="mono log" [attr.id]="idPrefix() + '-log'">{{ logTail() || '—' }}</pre>
+    @if (lastError()) {
+      <p class="err">{{ lastError() }}</p>
+    }
+    <div class="row">
+      @if (showStart()) {
+        <button mat-flat-button color="primary" type="button" [id]="idPrefix() + '-start'" (click)="start.emit()">Start</button>
+      }
+      @if (showStop()) {
+        <button mat-stroked-button type="button" [id]="idPrefix() + '-stop'" (click)="stop.emit()">Stop</button>
+      }
+      <button mat-stroked-button type="button" [id]="idPrefix() + '-poll'" (click)="poll.emit()">Poll now</button>
+    </div>
+    <p class="hint">Poll now re-reads height, peers, and the process this app owns.</p>
+  </mat-card-content>
+</mat-card>

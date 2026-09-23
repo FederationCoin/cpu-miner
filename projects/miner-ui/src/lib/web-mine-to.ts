@@ -10,6 +10,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { CHAINS, type MinerChain } from './chain';
 import { isLoopbackWsHost, peerStatusLabel, type PeerStatus } from './stratum-ws';
 import type { GatewayInfoView } from './gateway-info';
+import { HOUSE_HINTS } from './house-hints';
 
 const LOOPBACK_GATEWAY_TOOLTIP =
   'localhost gateway needs Apps On Device; if you rejected the prompt and still want to mine to a localhost DATUM Gateway, re-enable it in site settings';
@@ -25,6 +26,20 @@ const LOOPBACK_GATEWAY_TOOLTIP =
     MatCardModule,
     MatIconModule,
     MatTooltipModule,
+  ],
+  styles: [
+    `
+      mat-radio-group {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      mat-form-field {
+        display: block;
+        width: 100%;
+      }
+    `,
   ],
   template: `
     <div [formGroup]="form()">
@@ -44,12 +59,14 @@ const LOOPBACK_GATEWAY_TOOLTIP =
         <div class="mine-fields" formGroupName="poolWebsocket">
           <mat-form-field appearance="outline">
             <mat-label>Stratum pool WebSocket URL</mat-label>
-            <input matInput [id]="id('stratumPoolWebsocketUrl')" type="text" placeholder="wss://host/stratum" formControlName="url" />
+            <input matInput [id]="id('stratumPoolWebsocketUrl')" type="text" [placeholder]="hints.stratumWss" formControlName="url" />
+            <mat-hint>{{ hints.stratumWss }}</mat-hint>
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Worker</mat-label>
             <input matInput [id]="id('stratumPoolWebsocketWorker')" type="text" [placeholder]="hrp() + '1….cpu'" formControlName="worker" />
           </mat-form-field>
+          <button mat-stroked-button type="button" [id]="id('pull-selected-pool')" (click)="pull.emit()">Set to currently selected default</button>
         </div>
       }
       @if (kind() === 'datumGatewayWebsocket') {
@@ -59,7 +76,8 @@ const LOOPBACK_GATEWAY_TOOLTIP =
         <div class="mine-fields" formGroupName="gatewayWebsocket">
           <mat-form-field appearance="outline">
             <mat-label>DATUM Gateway WebSocket URL</mat-label>
-            <input matInput [id]="id('datumGatewayWebsocketUrl')" type="text" placeholder="ws://127.0.0.1:23335/stratum" formControlName="url" />
+            <input matInput [id]="id('datumGatewayWebsocketUrl')" type="text" [placeholder]="hints.gatewayWss" formControlName="url" />
+            <mat-hint>{{ hints.gatewayWss }}</mat-hint>
             @if (loopbackWarning()) {
               <mat-icon matSuffix class="url-warn" [id]="id('gatewayLoopbackWarning')" [matTooltip]="loopbackTooltip">warning</mat-icon>
             }
@@ -117,6 +135,7 @@ const LOOPBACK_GATEWAY_TOOLTIP =
             <mat-label>Worker</mat-label>
             <input matInput [id]="id('datumGatewayWebsocketWorker')" type="text" [placeholder]="hrp() + '1….cpu'" formControlName="worker" />
           </mat-form-field>
+          <button mat-stroked-button type="button" [id]="id('pull-selected-gateway-ws')" (click)="pull.emit()">Set to currently selected default</button>
         </div>
       }
     </div>
@@ -128,7 +147,9 @@ export class WebMineTo {
   readonly kindLocked = input(false);
   readonly gatewayInfo = input.required<GatewayInfoView>();
   readonly fetchInfo = output<void>();
+  readonly pull = output<void>();
   protected readonly loopbackTooltip = LOOPBACK_GATEWAY_TOOLTIP;
+  protected readonly hints = HOUSE_HINTS;
 
   protected id(suffix: string): string {
     return `${this.chain()}-${suffix}`;

@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { canStopNode, nodeArgv, spawnNode } from './node-process.js';
+import { canStopNode, nodeArgv, nodeCommand, nodePortLines, spawnNode } from './node-process.js';
 
 describe('node-process', () => {
   it('builds loopback testnet argv and refuses dummy MAIN', () => {
@@ -17,6 +17,9 @@ describe('node-process', () => {
       '-rpcport=35332',
     ]);
     expect(() => nodeArgv('main', '/tmp/fc', 4094)).toThrow(/MAIN is not live/);
+    expect(nodeCommand('federationcoind', 'testnet', '/tmp/fc')).toContain('-testnet');
+    expect(nodePortLines('testnet').map((p) => p.port)).toEqual([35332, 35333]);
+    expect(() => nodeCommand('federationcoind', 'main', '/tmp/fc')).toThrow(/MAIN is not live/);
     expect(nodeArgv('main', '/tmp/fc', 4094, true)).toEqual([
       '-datadir=/tmp/fc',
       '-server=1',

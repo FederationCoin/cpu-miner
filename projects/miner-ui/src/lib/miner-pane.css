@@ -340,6 +340,10 @@ dialog.finder-attest::backdrop {
   grid-template-columns: minmax(14rem, 0.45fr) minmax(12rem, 1fr) auto;
 }
 
+.connection-edit .prime-pin {
+  grid-column: 1 / -1;
+}
+
 .stamp-muted {
   opacity: 0.4;
 }

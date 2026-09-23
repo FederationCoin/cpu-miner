@@ -23,7 +23,8 @@ export type StratumConnect = {
 
 export type MineTo =
   | { kind: 'node'; rpc: RpcConnect; payout: string }
-  | { kind: 'stratum'; stratum: StratumConnect };
+  | { kind: 'stratum'; stratum: StratumConnect }
+  | { kind: 'datumGateway'; gateway: StratumConnect };
 
 export type MineToKind = MineTo['kind'];
 
@@ -80,21 +81,23 @@ export function parseMineTo(raw: unknown, chain: MinerChain): MineTo {
       payout: String(node.payout ?? '').trim(),
     };
   }
-  if (rec.kind === 'stratum') {
-    const s = (raw as { stratum?: Partial<StratumConnect> }).stratum ?? {};
+  if (rec.kind === 'stratum' || rec.kind === 'datumGateway') {
+    const field = rec.kind === 'datumGateway' ? 'gateway' : 'stratum';
+    const s = (raw as { stratum?: Partial<StratumConnect>; gateway?: Partial<StratumConnect> })[field] ?? {};
     const worker = String(s.worker ?? '').trim();
     if (!worker) {
       throw new Error('worker is empty');
     }
-    return {
-      kind: 'stratum',
-      stratum: {
-        host: parseHost(s.host ?? '127.0.0.1'),
-        port: parsePort(s.port ?? STRATUM_PORT_DEFAULT),
-        worker,
-        password: String(s.password ?? 'x'),
-      },
+    const connect: StratumConnect = {
+      host: parseHost(s.host ?? '127.0.0.1'),
+      port: parsePort(s.port ?? STRATUM_PORT_DEFAULT),
+      worker,
+      password: String(s.password ?? 'x'),
     };
+    if (rec.kind === 'datumGateway') {
+      return { kind: 'datumGateway', gateway: connect };
+    }
+    return { kind: 'stratum', stratum: connect };
   }
   throw new Error('unknown mineTo kind');
 }

@@ -90,6 +90,7 @@ export type StratumConnect = {
 export type MineTo =
   | { kind: 'node'; rpc: RpcConnect; payout: string }
   | { kind: 'stratum'; stratum: StratumConnect }
+  | { kind: 'datumGateway'; gateway: StratumConnect }
   | { kind: 'stratumPoolWebsocket'; url: string; worker: string }
   | { kind: 'datumGatewayWebsocket'; url: string; worker: string };
 
@@ -166,19 +167,80 @@ export type ExtrasProbe = {
   pool: boolean;
 };
 
+export type PortLine = { label: string; port: number };
+export type PeerLine = { addr: string; bytesSent: number; bytesRecv: number };
+export type TxLine = { txid: string; amount: string; category: string };
+
 export type NodeStatusView = {
   session: 'idle' | 'spawned' | 'attached';
   chain: MinerChain | null;
   height: number;
   running: boolean;
   lastError: string;
+  pid: number | null;
+  command: string;
+  datadir: string;
+  cpu: string;
+  rss: string;
+  otherCount: number;
+  ports: PortLine[];
+  logTail: string;
+  peers: PeerLine[];
+  trafficIn: string;
+  trafficOut: string;
+  transactions: TxLine[];
+  transactionsNote: string;
+};
+
+export const EMPTY_NODE_STATUS: NodeStatusView = {
+  session: 'idle',
+  chain: null,
+  height: 0,
+  running: false,
+  lastError: '',
+  pid: null,
+  command: '',
+  datadir: '',
+  cpu: '',
+  rss: '',
+  otherCount: 0,
+  ports: [],
+  logTail: '',
+  peers: [],
+  trafficIn: '',
+  trafficOut: '',
+  transactions: [],
+  transactionsNote: '',
 };
 
 export type GatewayStatusView = {
   session: 'idle' | 'spawned';
   running: boolean;
-  chain?: MinerChain;
+  chain?: MinerChain | null;
   lastError: string;
+  pid: number | null;
+  command: string;
+  configPath: string;
+  cpu: string;
+  rss: string;
+  otherCount: number;
+  ports: PortLine[];
+  logTail: string;
+};
+
+export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
+  session: 'idle',
+  running: false,
+  chain: null,
+  lastError: '',
+  pid: null,
+  command: '',
+  configPath: '',
+  cpu: '',
+  rss: '',
+  otherCount: 0,
+  ports: [],
+  logTail: '',
 };
 
 export type MinerApi = {
@@ -202,17 +264,19 @@ export type MinerApi = {
   webGpuLog?: (message: string) => Promise<void>;
   registryRequest?: (req: RegistryRequest) => Promise<RegistryResponse>;
   extrasProbe?: () => Promise<ExtrasProbe>;
-  nodeStart?: (chain: MinerChain) => Promise<{ ok: boolean; error?: string }>;
+  nodeStart?: (opts: { chain: MinerChain; datadir: string }) => Promise<{ ok: boolean; error?: string }>;
   nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
-  nodeStatus?: (chain: MinerChain) => Promise<NodeStatusView>;
+  nodeStatus?: (opts: { chain: MinerChain; datadir: string }) => Promise<NodeStatusView>;
   gatewayStart?: (opts: {
     chain: MinerChain;
     poolAddress: string;
     poolHost?: string;
     poolPubkey?: string;
+    configPath?: string;
   }) => Promise<{ ok: boolean; error?: string }>;
   gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
-  gatewayStatus?: () => Promise<GatewayStatusView>;
+  gatewayStatus?: (opts: { chain: MinerChain; configPath: string }) => Promise<GatewayStatusView>;
+  fetchPrimeKeys?: (url: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
   walletLoad?: (chain: MinerChain) => Promise<string | null>;
   walletSave?: (chain: MinerChain, blob: string) => Promise<{ ok: boolean; error?: string }>;
 };

@@ -5,6 +5,7 @@ import { GatewayPane } from './gateway-pane';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
 import { MINER_SHELL, desktopShell, webDemoShell } from './miner-shell';
 import { ExtrasService } from './extras.service';
+import { EMPTY_GATEWAY_STATUS } from './miner-api';
 import { installMemoryStorage } from './test-storage';
 
 function host(probe: { node: boolean; gateway: boolean; pool: boolean }): HasherHost {
@@ -22,7 +23,7 @@ function host(probe: { node: boolean; gateway: boolean; pool: boolean }): Hasher
     poolStop: async () => undefined,
     onPoolStats: () => () => undefined,
     extrasProbe: async () => probe,
-    gatewayStatus: async () => ({ session: 'idle', running: false, lastError: '' }),
+    gatewayStatus: async () => EMPTY_GATEWAY_STATUS,
     gatewayStart: async () => ({ ok: true }),
     gatewayStop: async () => ({ ok: true }),
   };
@@ -68,5 +69,44 @@ describe('GatewayPane', () => {
     const f = await render('desktop', { node: false, gateway: true, pool: true });
     expect(f.nativeElement.querySelector('#testnet-gateway-prime-host')).toBeTruthy();
     expect(f.nativeElement.textContent).toMatch(/opt-in/i);
+    expect(f.nativeElement.querySelector('#testnet-gateway-keys-url')).toBeTruthy();
+  });
+
+  it('does not overwrite a pubkey when the fetched document disagrees', async () => {
+    const ed = 'ab'.repeat(32);
+    const x = 'cd'.repeat(32);
+    const other = '11'.repeat(64);
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [GatewayPane],
+      providers: [
+        provideAnimations(),
+        {
+          provide: HASHER_HOST,
+          useValue: {
+            ...host({ node: false, gateway: true, pool: true }),
+            fetchPrimeKeys: async () => ({ ok: true, text: JSON.stringify({ ed25519: ed, x25519: x }) }),
+          },
+        },
+        { provide: MINER_SHELL, useValue: desktopShell() },
+        ExtrasService,
+      ],
+    }).compileComponents();
+    await TestBed.inject(ExtrasService).refresh();
+    const f = TestBed.createComponent(GatewayPane);
+    f.componentRef.setInput('chain', 'testnet');
+    f.detectChanges();
+    await f.whenStable();
+    const cmp = f.componentInstance as unknown as {
+      deskForm: { controls: { poolPubkey: { value: string; setValue: (v: string) => void }; keysUrl: { setValue: (v: string) => void } } };
+      fetchKeys: () => Promise<void>;
+    };
+    cmp.deskForm.controls.poolPubkey.setValue(other);
+    cmp.deskForm.controls.keysUrl.setValue('https://pool.example/keys.json');
+    await cmp.fetchKeys();
+    f.detectChanges();
+    expect(cmp.deskForm.controls.poolPubkey.value).toBe(other);
+    expect(f.nativeElement.textContent).toMatch(/left unchanged/);
+    expect(f.nativeElement.querySelector('#testnet-gateway-use-key')).toBeNull();
   });
 });

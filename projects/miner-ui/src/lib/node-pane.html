@@ -9,37 +9,73 @@
         Main is not live. The Big One will not start a node on dummy MAIN.
       </p>
     }
+    <app-process-card
+      [idPrefix]="chain() + '-node'"
+      title="Local node"
+      pathLabel="Node data directory"
+      otherNoun="federationcoind"
+      [showStart]="showStart()"
+      [showStop]="showStop()"
+      [showBrowse]="true"
+      [path]="datadir.value"
+      [pathDisabled]="status().session !== 'idle'"
+      [command]="status().command"
+      [pid]="status().pid"
+      [cpu]="status().cpu"
+      [rss]="status().rss"
+      [otherCount]="status().otherCount"
+      [ports]="status().ports"
+      [logTail]="status().logTail"
+      [lastError]="status().lastError"
+      [session]="status().session"
+      [height]="status().height"
+      (poll)="refresh()"
+      (start)="start()"
+      (stop)="stop()"
+      (browse)="browse()"
+      (pathChange)="onPath($event)"
+    />
+    @if (error()) {
+      <p class="err">{{ error() }}</p>
+    }
     <mat-card>
       <mat-card-header>
-        <mat-card-title>Local node</mat-card-title>
+        <mat-card-title>Network</mat-card-title>
       </mat-card-header>
       <mat-card-content>
+        <p class="hint">Peers and traffic from the local node.</p>
         <dl>
-          <dt>Session</dt>
-          <dd [attr.id]="chain() + '-node-session'">{{ status().session }}</dd>
-          <dt>Height</dt>
-          <dd [attr.id]="chain() + '-node-height'">{{ status().height }}</dd>
-          <dt>Status</dt>
-          <dd>{{ status().running ? 'listening' : 'idle' }}</dd>
+          <dt>In</dt>
+          <dd>{{ status().trafficIn || '—' }}</dd>
+          <dt>Out</dt>
+          <dd>{{ status().trafficOut || '—' }}</dd>
         </dl>
-        @if (status().lastError) {
-          <p class="err">{{ status().lastError }}</p>
+        @if (status().peers.length === 0) {
+          <p class="hint">No peers.</p>
+        } @else {
+          <ul class="peers">
+            @for (p of status().peers; track p.addr) {
+              <li>{{ p.addr }} · sent {{ p.bytesSent }} · received {{ p.bytesRecv }}</li>
+            }
+          </ul>
         }
-        <div class="row">
-          @if (!showMainWarning()) {
-            <button mat-flat-button color="primary" type="button" [id]="chain() + '-node-start'" (click)="start()">
-              Start
-            </button>
-          }
-          @if (showStop()) {
-            <button mat-stroked-button type="button" [id]="chain() + '-node-stop'" (click)="stop()">Stop</button>
-          }
-          <button mat-stroked-button type="button" [id]="chain() + '-node-refresh'" (click)="refresh()">Refresh</button>
-        </div>
-        @if (error()) {
-          <p class="err">{{ error() }}</p>
+      </mat-card-content>
+    </mat-card>
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Recent transactions</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="hint">{{ status().transactionsNote || 'Broadcasts the node wallet knows about.' }}</p>
+        @if (status().transactions.length === 0) {
+          <p class="hint">None.</p>
+        } @else {
+          <ul class="txs">
+            @for (tx of status().transactions; track tx.txid + tx.category) {
+              <li>{{ tx.category }} {{ tx.amount }} <span class="mono">{{ tx.txid }}</span></li>
+            }
+          </ul>
         }
-        <p class="hint">RPC binds 127.0.0.1. Stop is only offered for a node this app spawned.</p>
       </mat-card-content>
     </mat-card>
   }

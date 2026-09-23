@@ -34,17 +34,19 @@ export type HasherHost = {
   fetchGatewayInfo?: (url: string) => Promise<GatewayInfoRpc>;
   onGatewayInfo?: (cb: (info: GatewayInfoRpc) => void) => () => void;
   extrasProbe?: () => Promise<ExtrasProbe>;
-  nodeStart?: (chain: MinerChain) => Promise<{ ok: boolean; error?: string }>;
+  nodeStart?: (opts: { chain: MinerChain; datadir: string }) => Promise<{ ok: boolean; error?: string }>;
   nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
-  nodeStatus?: (chain: MinerChain) => Promise<NodeStatusView>;
+  nodeStatus?: (opts: { chain: MinerChain; datadir: string }) => Promise<NodeStatusView>;
   gatewayStart?: (opts: {
     chain: MinerChain;
     poolAddress: string;
     poolHost?: string;
     poolPubkey?: string;
+    configPath?: string;
   }) => Promise<{ ok: boolean; error?: string }>;
   gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
-  gatewayStatus?: () => Promise<GatewayStatusView>;
+  gatewayStatus?: (opts: { chain: MinerChain; configPath: string }) => Promise<GatewayStatusView>;
+  fetchPrimeKeys?: (url: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
   walletLoad?: (chain: MinerChain) => Promise<string | null>;
   walletSave?: (chain: MinerChain, blob: string) => Promise<{ ok: boolean; error?: string }>;
 };

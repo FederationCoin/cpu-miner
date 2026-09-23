@@ -112,12 +112,14 @@ contextBridge.exposeInMainWorld('miner', {
     authorization?: string;
   }) => ipcRenderer.invoke('registry:request', req),
   extrasProbe: () => ipcRenderer.invoke('extras:probe'),
-  nodeStart: (chain: import('./chain.js').MinerChain) => ipcRenderer.invoke('node:start', chain),
+  nodeStart: (opts: { chain: import('./chain.js').MinerChain; datadir: string }) => ipcRenderer.invoke('node:start', opts),
   nodeStop: () => ipcRenderer.invoke('node:stop'),
-  nodeStatus: (chain: import('./chain.js').MinerChain) => ipcRenderer.invoke('node:status', chain),
+  nodeStatus: (opts: { chain: import('./chain.js').MinerChain; datadir: string }) => ipcRenderer.invoke('node:status', opts),
   gatewayStart: (opts: unknown) => ipcRenderer.invoke('gateway:start', opts),
   gatewayStop: () => ipcRenderer.invoke('gateway:stop'),
-  gatewayStatus: () => ipcRenderer.invoke('gateway:status'),
+  gatewayStatus: (opts: { chain: import('./chain.js').MinerChain; configPath: string }) =>
+    ipcRenderer.invoke('gateway:status', opts),
+  fetchPrimeKeys: (url: string) => ipcRenderer.invoke('prime:fetchKeys', url),
   walletLoad: (chain: import('./chain.js').MinerChain) => ipcRenderer.invoke('wallet:load', chain),
   walletSave: (chain: import('./chain.js').MinerChain, blob: string) => ipcRenderer.invoke('wallet:save', chain, blob),
 });

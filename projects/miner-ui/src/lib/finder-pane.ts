@@ -18,6 +18,7 @@ import { formatStakeGfCn } from './miner-format';
 import { applyDesktopStratumTarget, applyWebPoolWssTarget } from './mine-target';
 import { WorkspaceNav } from './workspace-nav';
 import { WalletService } from './wallet.service';
+import { PrimePinService } from './prime-pin.service';
 import { millSignNeedsKeystore, millSignNeedsPassword } from './finder-sign';
 import {
   ConnectionKindLabel,
@@ -53,10 +54,14 @@ type AttestedMap = Record<string, PoolConnection>;
 function connectionGroup(kind: ConnectionKind = 'stratum', url = ''): FormGroup<{
   kind: FormControl<ConnectionKind>;
   url: FormControl<string>;
+  identityPubkey: FormControl<string>;
+  keysUrl: FormControl<string>;
 }> {
   return new FormGroup({
     kind: new FormControl<ConnectionKind>(kind, { nonNullable: true }),
     url: new FormControl(url, { nonNullable: true }),
+    identityPubkey: new FormControl('', { nonNullable: true }),
+    keysUrl: new FormControl('', { nonNullable: true }),
   });
 }
 
@@ -96,6 +101,7 @@ export class FinderPane {
   private readonly nav = inject(WorkspaceNav);
   private readonly host = inject(HASHER_HOST);
   private readonly wallet = inject(WalletService);
+  private readonly primePin = inject(PrimePinService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
   private readonly attestDialog = viewChild<ElementRef<HTMLDialogElement>>('attestDialog');
@@ -180,11 +186,43 @@ export class FinderPane {
   protected connectionValues(): PoolConnection[] {
     return this.connectionArray().controls.map((c) => {
       const g = c as FormGroup;
-      return {
-        kind: g.controls['kind'].value as ConnectionKind,
+      const kind = g.controls['kind'].value as ConnectionKind;
+      const row: PoolConnection = {
+        kind,
         url: String(g.controls['url'].value ?? '').trim(),
       };
+      if (kind === 'datumPrime') {
+        const pub = String(g.controls['identityPubkey'].value ?? '').trim().toLowerCase();
+        const keysUrl = String(g.controls['keysUrl'].value ?? '').trim();
+        if (pub) {
+          row.identityPubkey = pub;
+        }
+        if (keysUrl) {
+          row.keysUrl = keysUrl;
+        }
+      }
+      return row;
     });
+  }
+
+  protected isDatumPrime(row: { get: (n: string) => { value: unknown } | null }): boolean {
+    return row.get('kind')?.value === 'datumPrime';
+  }
+
+  protected pubkeyLabel(hex: string): string {
+    if (hex.length < 20) {
+      return hex;
+    }
+    return `${hex.slice(0, 8)}…${hex.slice(-6)}`;
+  }
+
+  protected usePrime(prime: PoolConnection): void {
+    this.primePin.offer({
+      hostPort: prime.url,
+      identityPubkey: prime.identityPubkey ?? '',
+      keysUrl: prime.keysUrl ?? '',
+    });
+    this.nav.selectTab('gateway', this.isDesktop());
   }
 
   protected placeholderFor(row: { get: (n: string) => { value: unknown } | null }): string {
@@ -425,6 +463,10 @@ export class FinderPane {
     const connections = this.connectionValues().filter((c) => c.url.length > 0);
     if (connections.length < 1) {
       this.notice.set('Add at least one connection.');
+      return;
+    }
+    if (connections.some((c) => c.kind === 'datumPrime' && !/^[0-9a-f]{128}$/.test(c.identityPubkey ?? ''))) {
+      this.notice.set('DATUM Prime Pool needs a 128-hex identity public key.');
       return;
     }
     const command = {

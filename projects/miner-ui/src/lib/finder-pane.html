@@ -115,6 +115,14 @@
                   <mat-card-content>
                     @for (prime of primesOf(p); track prime.url) {
                       <p class="mono">{{ prime.url }}</p>
+                      @if (prime.kind === 'datumPrime' && prime.identityPubkey) {
+                        <p class="mono" [attr.id]="id('prime-pub-' + p.poolId)">{{ pubkeyLabel(prime.identityPubkey) }}</p>
+                      }
+                      @if (prime.kind === 'datumPrime') {
+                        <button mat-stroked-button type="button" [id]="id('use-prime-' + p.poolId)" (click)="usePrime(prime)">
+                          Use this Prime
+                        </button>
+                      }
                     }
                     <p class="hint">
                       Point your personal DATUM Gateway at this address. It is not what you mine to.
@@ -196,6 +204,32 @@
                     formControlName="url"
                   />
                 </mat-form-field>
+                @if (isDatumPrime(row)) {
+                  <mat-form-field class="prime-pin" appearance="outline">
+                    <mat-label>Identity public key</mat-label>
+                    <input
+                      matInput
+                      [id]="id('conn-' + $index + '-pubkey')"
+                      type="text"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="128 hex"
+                      formControlName="identityPubkey"
+                    />
+                  </mat-form-field>
+                  <mat-form-field class="prime-pin" appearance="outline">
+                    <mat-label>Keys URL</mat-label>
+                    <input
+                      matInput
+                      [id]="id('conn-' + $index + '-keys-url')"
+                      type="text"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="https://pool.example/.well-known/prime-keys.json"
+                      formControlName="keysUrl"
+                    />
+                  </mat-form-field>
+                }
                 @if ($index > 0) {
                   <button
                     mat-icon-button

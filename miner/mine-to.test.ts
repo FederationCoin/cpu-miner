@@ -44,6 +44,14 @@ describe('parseMineTo', () => {
       'testnet',
     );
     expect(s.kind).toBe('stratum');
+    const g = parseMineTo(
+      { kind: 'datumGateway', gateway: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' } },
+      'testnet',
+    );
+    expect(g).toEqual({
+      kind: 'datumGateway',
+      gateway: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' },
+    });
   });
 
   it('rejects empty workers, DATUM kinds, and unknown kinds', () => {

@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { MAIN_IS_LIVE, RPC_PORT_TESTNET, type MinerChain } from './chain.js';
+import { MAIN_IS_LIVE, defaultRpcPort, type MinerChain } from './chain.js';
 import { defaultDatadir } from './rpc.js';
 import type { AddonPresence } from './extras.js';
+import { formatCommand, nodePorts, type PeerLine, type PortLine, type TxLine } from './process-usage.js';
 
 export type NodeSession =
   | { kind: 'idle' }
-  | { kind: 'spawned'; child: ChildProcess; chain: MinerChain }
-  | { kind: 'attached'; chain: MinerChain };
+  | { kind: 'spawned'; child: ChildProcess; chain: MinerChain; command: string; datadir: string }
+  | { kind: 'attached'; chain: MinerChain; datadir: string };
 
 export type NodeStatus = {
   session: 'idle' | 'spawned' | 'attached';
@@ -14,6 +15,19 @@ export type NodeStatus = {
   height: number;
   running: boolean;
   lastError: string;
+  pid: number | null;
+  command: string;
+  datadir: string;
+  cpu: string;
+  rss: string;
+  otherCount: number;
+  ports: PortLine[];
+  logTail: string;
+  peers: PeerLine[];
+  trafficIn: string;
+  trafficOut: string;
+  transactions: TxLine[];
+  transactionsNote: string;
 };
 
 export const IDLE_NODE_STATUS: NodeStatus = {
@@ -22,7 +36,24 @@ export const IDLE_NODE_STATUS: NodeStatus = {
   height: 0,
   running: false,
   lastError: '',
+  pid: null,
+  command: '',
+  datadir: '',
+  cpu: '',
+  rss: '',
+  otherCount: 0,
+  ports: [],
+  logTail: '',
+  peers: [],
+  trafficIn: '',
+  trafficOut: '',
+  transactions: [],
+  transactionsNote: '',
 };
+
+export function nodeCommand(binPath: string, chain: MinerChain, datadir: string): string {
+  return formatCommand(binPath, nodeArgv(chain, datadir, defaultRpcPort(chain)));
+}
 
 export function nodeArgv(
   chain: MinerChain,
@@ -52,8 +83,12 @@ export function spawnNode(bin: AddonPresence, chain: MinerChain, datadir = defau
   if (bin.kind !== 'present') {
     throw new Error('federationcoind addon was not included in this build');
   }
-  const args = nodeArgv(chain, datadir, RPC_PORT_TESTNET);
+  const args = nodeArgv(chain, datadir, defaultRpcPort(chain));
   return spawn(bin.path, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+}
+
+export function nodePortLines(chain: MinerChain): PortLine[] {
+  return nodePorts(chain);
 }
 
 export function canStopNode(session: NodeSession): boolean {

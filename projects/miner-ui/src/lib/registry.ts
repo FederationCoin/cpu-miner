@@ -10,7 +10,7 @@ export const MaxPoolConnectionsPerKind = 3;
 export const ConnectionKinds = ['stratum', 'stratumWs', 'datumPrime', 'datumPrimeWs'] as const;
 export const RegisterConnectionKinds = ['stratum', 'stratumWs', 'datumPrime'] as const;
 export type ConnectionKind = (typeof ConnectionKinds)[number];
-export type PoolConnection = { kind: ConnectionKind; url: string };
+export type PoolConnection = { kind: ConnectionKind; url: string; identityPubkey?: string; keysUrl?: string };
 
 /** Old listings until operators re-save. */
 export type RegistryConnect =

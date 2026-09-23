@@ -1,13 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideAnimations } from '@angular/platform-browser/animations';
-import { describe, expect, it, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
 import { MINER_SHELL, webDemoShell } from './miner-shell';
-import { WalletImport } from './wallet-import';
+import { NetworkContext } from './network-context';
 import { installMemoryStorage } from './test-storage';
-
-const TWELVE =
-  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+import { WalletPane } from './wallet-pane';
+import { WalletService } from './wallet.service';
+import { createPhrase } from './wallet-derive';
 
 function host(): HasherHost {
   return {
@@ -26,41 +26,32 @@ function host(): HasherHost {
   };
 }
 
-type ImportApi = {
-  boxes: { setValue: (v: string) => void }[];
-  password: { setValue: (v: string) => void };
-  save: () => Promise<void>;
-  error: () => string;
-};
-
-describe('WalletImport', () => {
+describe('WalletPane', () => {
   beforeEach(() => {
     installMemoryStorage();
   });
 
-  it('rejects an invalid phrase and empty password, then imports', async () => {
+  it('does not let the hidden network pane clear the selected wallet', async () => {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
-      imports: [WalletImport],
+      imports: [WalletPane],
       providers: [
         provideAnimations(),
         { provide: HASHER_HOST, useValue: host() },
         { provide: MINER_SHELL, useValue: webDemoShell() },
+        NetworkContext,
       ],
     }).compileComponents();
-    const f: ComponentFixture<WalletImport> = TestBed.createComponent(WalletImport);
-    f.componentRef.setInput('chain', 'testnet');
+    const wallet = TestBed.inject(WalletService);
+    await wallet.persistPhrase(createPhrase(128), 'secret', 'testnet');
+    const receive = wallet.receive();
+    const f: ComponentFixture<WalletPane> = TestBed.createComponent(WalletPane);
+    f.componentRef.setInput('chain', 'main');
     f.detectChanges();
-    const api = f.componentInstance as unknown as ImportApi;
-    await api.save();
-    expect(api.error()).toMatch(/invalid phrase/);
-    TWELVE.split(' ').forEach((word, i) => api.boxes[i]?.setValue(word));
-    api.password.setValue('');
-    await api.save();
-    expect(api.error()).toMatch(/Password/);
-    api.password.setValue('pw');
-    await api.save();
-    expect(api.error()).toBe('');
-    expect(localStorage.getItem('fc.keystore.testnet')).toBeTruthy();
+    await f.whenStable();
+    expect(wallet.receive()).toBe(receive);
+    expect(wallet.chipLabel()).toContain('…');
+    expect(f.nativeElement.querySelector('svg')).toBeTruthy();
+    expect(f.nativeElement.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 640 480');
   });
 });

@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { App } from './app';
 import { appConfig } from './app.config';
-import { IDLE_STATS } from '@federationcoin/miner-ui';
+import { EMPTY_NODE_STATUS, IDLE_STATS } from '@federationcoin/miner-ui';
 import type { MinerApi, MinerInfo, MinerStartOpts, MinerStats, MinerToast, PoolStartOpts, PoolStats } from '@federationcoin/miner-ui';
 
 const electronInfo: MinerInfo = {
@@ -980,7 +980,7 @@ describe('App', () => {
       const f = await render(
         stubMiner({
           extrasProbe: async () => ({ node: true, gateway: true, pool: true }),
-          nodeStatus: async () => ({ session: 'idle', chain: null, height: 0, running: false, lastError: '' }),
+          nodeStatus: async () => EMPTY_NODE_STATUS,
           nodeStart: async () => ({ ok: true }),
         }),
       );
@@ -996,11 +996,11 @@ describe('App', () => {
         stubMiner({
           extrasProbe: async () => ({ node: true, gateway: false, pool: true }),
           nodeStatus: async () => ({
+            ...EMPTY_NODE_STATUS,
             session: 'attached',
             chain: 'testnet',
             height: 12,
             running: true,
-            lastError: '',
           }),
         }),
       );
@@ -1015,7 +1015,7 @@ describe('App', () => {
       const f = await render(
         stubMiner({
           extrasProbe: async () => ({ node: true, gateway: true, pool: true }),
-          nodeStatus: async () => ({ session: 'idle', chain: null, height: 0, running: false, lastError: '' }),
+          nodeStatus: async () => EMPTY_NODE_STATUS,
         }),
       );
       selectNetwork(f, 'main');
