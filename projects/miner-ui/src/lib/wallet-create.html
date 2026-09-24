@@ -1,0 +1,24 @@
+<div class="phrase-region">
+  @if (step() === 'show') {
+    <p class="hint">Write these {{ wordCount() }} words down. They are the wallet. We will not store them in plaintext.</p>
+    <app-word-grid [words]="shownWords()" [readonly]="true" />
+    <div class="row">
+      <button mat-stroked-button type="button" [id]="'wallet-generate-' + wordCount()" (click)="generate()">Generate</button>
+      <button mat-flat-button color="primary" type="button" [id]="'wallet-saved-' + wordCount()" (click)="saved()">I saved these words</button>
+    </div>
+  } @else {
+    <p class="hint">Type the same {{ wordCount() }} words. Paste is blocked.</p>
+    <app-word-grid [words]="confirmWords()" />
+    <mat-form-field appearance="outline">
+      <mat-label>Password (wraps the stored seed)</mat-label>
+      <input matInput type="password" [formControl]="password" />
+    </mat-form-field>
+    <div class="row">
+      <button mat-stroked-button type="button" (click)="back()">Back</button>
+      <button mat-flat-button color="primary" type="button" [id]="'wallet-save-' + wordCount()" (click)="save()">Confirm</button>
+    </div>
+  }
+  @if (error()) {
+    <p class="err">{{ error() }}</p>
+  }
+</div>

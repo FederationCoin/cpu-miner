@@ -1,24 +1,29 @@
 <main>
-  <header class="header">
-    <div>
-      <h1>FederationCoin miner</h1>
-      <p class="lead">
-        Web demo. Network is the tenant. In-page mining is WebSocket Stratum (WebGPU or CPU).
-        DATUM and node RPC stay on the desktop app with your own node. MAIN house pool is off.
-      </p>
-    </div>
-    <label class="network-toggle" for="network-toggle">
-      Network
-      <select
+  <mat-toolbar class="mill-bar">
+    <img class="seal" src="federation-seal.png" width="40" height="40" alt="" />
+    <span class="brand">GFCN</span>
+    <h1>The Big One</h1>
+    <span class="spacer"></span>
+    @if (wallet.chipLabel()) {
+      <span class="wallet-chip" id="wallet-chip">{{ wallet.chipLabel() }}</span>
+    }
+    <mat-form-field class="network-toggle" appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Network</mat-label>
+      <mat-select
         id="network-toggle"
         [value]="network.chain()"
-        (change)="selectNetwork($any($event.target).value)"
+        (selectionChange)="selectNetwork($event.value)"
       >
-        <option value="testnet">Testnet</option>
-        <option value="main">Main</option>
-      </select>
-    </label>
-  </header>
+        <mat-option value="testnet">Testnet</mat-option>
+        <mat-option value="main">Main</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </mat-toolbar>
+  <p class="lead">
+    Mine in this tab. The hasher speaks Stratum over WebSocket to a pool or your local
+    gateway. Pool Finder fills a pool URL. Hashrate is your computer. Localhost gateway
+    needs Apps On Device.
+  </p>
 
   <app-network-workspace chain="testnet" [hidden]="network.chain() !== 'testnet'" />
   <app-network-workspace chain="main" [hidden]="network.chain() !== 'main'" />
@@ -26,6 +31,13 @@
   <app-miner-footer />
 
   @if (mining.toast()) {
-    <div class="toast" role="status">{{ mining.toast() }}</div>
+    <div
+      class="toast"
+      [class.toast-ok]="mining.toastKind() === 'ok'"
+      [class.toast-error]="mining.toastKind() !== 'ok'"
+      role="status"
+    >
+      {{ mining.toast() }}
+    </div>
   }
 </main>

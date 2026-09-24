@@ -1,41 +1,433 @@
 <div class="pane" [attr.id]="id('root')">
   <p class="hint">
-    Pools should be abundant. This list is curated for the demo. A public registry that proves the
-    name you post is the worker who hashed is still a TODO: coinbase tag, advertised Stratum, and
-    observed hashrate. DNS TXT is correlation, not cryptographic identity.
+    Pool Finder is a public directory of pools that meet a listing stake.
+    Identity is the last wallet that successfully signed an Electrum Format
+    envelope here — not a login service. FederationCoin origin is not the pool
+    of record. Compose messages, sign the 64-hex payload hash in
+    federation-sparrow (Electrum Format, not BIP137 or BIP322), then paste
+    the signature as one line.
   </p>
+  @if (error()) {
+    <p class="warn" [attr.id]="id('error')">{{ error() }}</p>
+  }
+  @if (notice()) {
+    <p class="hint" [attr.id]="id('notice')">{{ notice() }}</p>
+  }
 
-  <ul class="finder-list">
-    @for (p of listings(); track p.id) {
-      <li>
-        <strong>{{ p.name }}</strong>
-        <span class="hint-inline">{{ p.tag }}</span>
-        <p class="mono">{{ p.stratum }}</p>
-        <p class="mono">{{ p.datum }}</p>
-        <p class="hint">{{ listingHint(p) }}</p>
-      </li>
-    }
-  </ul>
+  @if (liveTenant()) {
+  @if (stakeLine()) {
+    <p class="hint" [attr.id]="id('stake-line')">{{ stakeLine() }}</p>
+  }
 
-  <fieldset class="partition" disabled [formGroup]="form">
-    <legend>Register (work in progress)</legend>
-    <p class="hint">
-      This form is disabled. A verifiable directory is later: coinbase ASCII tag, a Stratum we can
-      connect to, and observed work. A form post is not a listing.
-    </p>
-    <label [attr.for]="id('name')">Name</label>
-    <input [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
-    <label [attr.for]="id('tag')">Coinbase tag</label>
-    <input [id]="id('tag')" type="text" autocomplete="off" spellcheck="false" formControlName="tag" placeholder="/YourPool/" />
-    <label [attr.for]="id('stratum')">Stratum host:port</label>
-    <input [id]="id('stratum')" type="text" autocomplete="off" spellcheck="false" formControlName="stratum" />
-    <label [attr.for]="id('datum')">DATUM host:port</label>
-    <input [id]="id('datum')" type="text" autocomplete="off" spellcheck="false" formControlName="datum" />
-    <div class="row">
-      <button type="button" [id]="id('register')" disabled (click)="submit()">Submit listing</button>
-    </div>
-    @if (notice()) {
-      <p class="hint">{{ notice() }}</p>
-    }
-  </fieldset>
+  <div class="finder-split">
+    <section class="finder-subpane" [attr.id]="id('listings')">
+      <h3>Listings</h3>
+      <div class="row toolbar-row">
+        <button mat-stroked-button type="button" [id]="id('reload')" (click)="reloadListings()">
+          <mat-icon>refresh</mat-icon>
+          Refresh
+        </button>
+        <button mat-stroked-button type="button" [id]="id('inactive')" (click)="toggleInactive()">
+          {{ inactive() ? 'Show live' : 'Show inactive' }}
+        </button>
+      </div>
+      @if (!isDesktop()) {
+        <p class="hint">Mine this sits next to Stratum only. DATUM Prime Pool is a side card for your personal gateway, not mill MineTo.</p>
+      }
+
+      <ul class="finder-list">
+        @for (g of groups(); track g.domain) {
+        <li>
+          <p class="hint">
+            {{ g.domain }}
+            @if (g.multipleClaims) {
+              · more than one listing claims this domain; confirm the connection you use
+            }
+          </p>
+          @for (p of g.listings; track p.poolId) {
+          <mat-card class="listing-card">
+            <mat-card-header>
+              <mat-card-title>{{ p.name }}</mat-card-title>
+              <mat-card-subtitle>{{ p.coinbaseTag }}</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              <p class="mono">{{ connectHint(p) }}</p>
+              <p class="hint">
+                attestations {{ p.attestationCount }}
+                @if (p.listerConfirmedCoinbasePayee) { · lister payee in last window }
+                · score {{ p.reviewScore }}
+                @if (p.hasHostileFlag) { · hostile }
+              </p>
+              <ul class="connection-rows">
+                @for (c of connectionsOf(p); track c.kind + c.url) {
+                  <li class="connection-row">
+                    <span>{{ kindLabel[c.kind] }}</span>
+                    <code>{{ c.url }}</code>
+                    @switch (stampState(p, c)) {
+                      @case ('login') {
+                        <button
+                          mat-icon-button
+                          type="button"
+                          class="stamp-btn stamp-muted"
+                          [id]="stampId(p, c)"
+                          disabled
+                          matTooltip="log in to attest"
+                        >
+                          <mat-icon>verified</mat-icon>
+                        </button>
+                      }
+                      @case ('attest') {
+                        <button
+                          mat-icon-button
+                          type="button"
+                          class="stamp-btn"
+                          [id]="stampId(p, c)"
+                          matTooltip="Attest this connection"
+                          (click)="openAttest(p, c)"
+                        >
+                          <mat-icon>verified</mat-icon>
+                        </button>
+                      }
+                      @case ('done') {
+                        <span class="stamp-done" [attr.id]="stampId(p, c)" aria-label="Attested">
+                          <mat-icon>verified</mat-icon>
+                        </span>
+                      }
+                    }
+                  </li>
+                }
+              </ul>
+              <div class="row">
+                @if (canMineThis(p)) {
+                  <button mat-stroked-button type="button" [id]="id('target-' + p.poolId)" (click)="mineThis(p)">
+                    Mine this
+                  </button>
+                }
+                <button mat-stroked-button type="button" [id]="id('shares-' + p.poolId)" (click)="testCpuShares(p)">
+                  CPU share test
+                </button>
+              </div>
+              @if (primesOf(p).length > 0) {
+                <mat-card class="prime-card" [attr.id]="id('prime-' + p.poolId)">
+                  <mat-card-header>
+                    <mat-card-title>DATUM Prime Pool</mat-card-title>
+                  </mat-card-header>
+                  <mat-card-content>
+                    @for (prime of primesOf(p); track prime.url) {
+                      <p class="mono">{{ prime.url }}</p>
+                      @if (prime.kind === 'datumPrime' && prime.identityPubkey) {
+                        <p class="mono" [attr.id]="id('prime-pub-' + p.poolId)">{{ pubkeyLabel(prime.identityPubkey) }}</p>
+                      }
+                      @if (prime.kind === 'datumPrime') {
+                        <button mat-stroked-button type="button" [id]="id('use-prime-' + p.poolId)" (click)="usePrime(prime)">
+                          Use this Prime
+                        </button>
+                      }
+                    }
+                    <p class="hint">
+                      Point your personal DATUM Gateway at this address. It is not what you mine to.
+                    </p>
+                  </mat-card-content>
+                </mat-card>
+              }
+            </mat-card-content>
+          </mat-card>
+          }
+        </li>
+        } @empty {
+        <li class="hint" [attr.id]="id('empty')">No listings in this set.</li>
+        }
+      </ul>
+    </section>
+
+    <section class="finder-subpane" [attr.id]="id('register-pane')">
+      <mat-card [formGroup]="form">
+        <mat-card-header>
+          <mat-card-title>Register</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p class="hint">
+            Brand and every advertised host share one domain so a listing cannot
+            point your name at someone else's pool. Add connections (one to twelve;
+            at most three of each kind). DATUM Prime Pool is TCP for your gateway;
+            the browser mill never connects to that pool. DATUM WSS belongs on the
+            gateway, not the DATUM Prime Pool.
+          </p>
+          <div
+            class="hodl-pill"
+            [id]="id('hodl')"
+            [matTooltip]="stakeTooltip()"
+          >
+            <img src="federation-seal.png" alt="" width="28" height="28" />
+            <span>*{{ stakeGfCn() }} GFCN HODL</span>
+          </div>
+          <mat-form-field appearance="outline">
+            <mat-label>Name</mat-label>
+            <input matInput [id]="id('name')" type="text" autocomplete="off" spellcheck="false" formControlName="name" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Website</mat-label>
+            <input
+              matInput
+              [id]="id('website')"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="https://your-pool.example"
+              formControlName="websiteUrl"
+            />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Coinbase tag</mat-label>
+            <input matInput [id]="id('tag')" type="text" autocomplete="off" spellcheck="false" formControlName="coinbaseTag" />
+          </mat-form-field>
+          <div formArrayName="connections">
+            @for (row of connectionArray().controls; track $index) {
+              <div class="connection-edit" [class.has-remove]="$index > 0" [formGroupName]="$index">
+                <mat-form-field appearance="outline">
+                  <mat-label>Kind</mat-label>
+                  <mat-select [id]="id('conn-' + $index + '-kind')" formControlName="kind">
+                    @for (k of listingKinds; track k) {
+                      <mat-option [value]="k" [disabled]="kindOptionDisabled(k, $index)">{{ kindLabel[k] }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>URL</mat-label>
+                  <input
+                    matInput
+                    [id]="$index === 0 ? id('stratum') : id('conn-' + $index + '-url')"
+                    type="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    [placeholder]="placeholderFor(row)"
+                    formControlName="url"
+                  />
+                </mat-form-field>
+                @if (isDatumPrime(row)) {
+                  <mat-form-field class="prime-pin" appearance="outline">
+                    <mat-label>Identity public key</mat-label>
+                    <input
+                      matInput
+                      [id]="id('conn-' + $index + '-pubkey')"
+                      type="text"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="128 hex"
+                      formControlName="identityPubkey"
+                    />
+                  </mat-form-field>
+                  <mat-form-field class="prime-pin" appearance="outline">
+                    <mat-label>Keys URL</mat-label>
+                    <input
+                      matInput
+                      [id]="id('conn-' + $index + '-keys-url')"
+                      type="text"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="https://pool.example/.well-known/prime-keys.json"
+                      formControlName="keysUrl"
+                    />
+                  </mat-form-field>
+                }
+                @if ($index > 0) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    [id]="id('remove-conn-' + $index)"
+                    aria-label="Remove connection"
+                    (click)="removeConnection($index)"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+          <div class="row">
+            <button
+              mat-stroked-button
+              type="button"
+              [id]="id('add-connection')"
+              [disabled]="!canAddConnection()"
+              (click)="addConnection()"
+            >
+              Add connection
+            </button>
+          </div>
+          <mat-form-field appearance="outline">
+            <mat-label>P2WPKH wallet</mat-label>
+            <input matInput [id]="id('wallet')" type="text" autocomplete="off" spellcheck="false" formControlName="wallet" />
+          </mat-form-field>
+          @if (stakeKind()) {
+            <p class="hint" [attr.id]="id('stake')">Stake preview: {{ stakeKind() }}</p>
+          }
+          <mat-form-field appearance="outline">
+            <mat-label>Signing block height</mat-label>
+            <input matInput [id]="id('signHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="signingBlockHeight" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Signing block hash</mat-label>
+            <input matInput [id]="id('signHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              [id]="id('refresh-tip')"
+              aria-label="Refresh tip"
+              (click)="refreshTip()"
+            >
+              <mat-icon>refresh</mat-icon>
+            </button>
+          </mat-form-field>
+          <div class="row">
+            <button mat-stroked-button type="button" [id]="id('compose')" (click)="pasteSparrow()">
+              Compose for Sparrow
+            </button>
+            <button mat-stroked-button type="button" [id]="id('register-confirm')" (click)="registerWithConfirm()">
+              Sign in this mill
+            </button>
+          </div>
+          @if (millSignKind() === 'register') {
+            <mat-card [attr.id]="id('mill-sign')">
+              <mat-card-header>
+                <mat-card-title>Confirm register signature</mat-card-title>
+              </mat-card-header>
+              <mat-card-content [formGroup]="millSignForm">
+                <p class="hint">Registry {{ baseUrl() }}</p>
+                <p class="mono">{{ sparrowMessage() }}</p>
+                @if (millSignNeedsPassword()) {
+                  <mat-form-field appearance="outline">
+                    <mat-label>Wallet password</mat-label>
+                    <input matInput type="password" [id]="id('mill-sign-password')" formControlName="password" />
+                  </mat-form-field>
+                }
+                <div class="row">
+                  <button mat-flat-button color="primary" type="button" [id]="id('confirm-mill-sign')" (click)="confirmMillSign()">
+                    Confirm
+                  </button>
+                  <button mat-stroked-button type="button" [id]="id('cancel-mill-sign')" (click)="cancelMillSign()">Cancel</button>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          }
+          @if (commandJson()) {
+            <mat-form-field appearance="outline">
+              <mat-label>Command (review before signing)</mat-label>
+              <textarea matInput [id]="id('command')" readonly rows="8">{{ commandJson() }}</textarea>
+            </mat-form-field>
+          }
+          @if (sparrowMessage()) {
+            <mat-form-field appearance="outline">
+              <mat-label>Copy into federation-sparrow Sign/Verify (Electrum Format)</mat-label>
+              <textarea matInput [id]="id('sparrow')" readonly rows="2">{{ sparrowMessage() }}</textarea>
+            </mat-form-field>
+          }
+          <mat-form-field appearance="outline">
+            <mat-label>Signature (paste from Sparrow)</mat-label>
+            <input matInput [id]="id('signature')" type="text" autocomplete="off" spellcheck="false" formControlName="signature" />
+          </mat-form-field>
+          <div class="row">
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [id]="id('register')"
+              [disabled]="!canSubmitListing()"
+              (click)="submitRegister()"
+            >
+              Submit listing
+            </button>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </section>
+  </div>
+
+  <dialog class="finder-attest" [attr.id]="id('attest-dialog')" #attestDialog>
+    <form [formGroup]="attestForm" method="dialog">
+      <h3>Attest listing</h3>
+      <p class="hint">
+        Coinbase height is the block that paid you with this listing's tag. Sign
+        the 64-hex payload hash in federation-sparrow with Electrum Format.
+      </p>
+      <div class="hodl-pill" [matTooltip]="stakeTooltip()">
+        <img src="federation-seal.png" alt="" width="28" height="28" />
+        <span>*{{ stakeGfCn() }} GFCN HODL</span>
+      </div>
+      @if (attestSummary()) {
+        <p class="mono" [attr.id]="id('attest-summary')">{{ attestSummary() }}</p>
+      }
+      <mat-form-field appearance="outline">
+        <mat-label>Attester P2WPKH wallet</mat-label>
+        <input matInput [id]="id('attestWallet')" type="text" autocomplete="off" spellcheck="false" formControlName="wallet" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Coinbase height</mat-label>
+        <input matInput [id]="id('attestHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="coinbaseHeight" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Signing block height</mat-label>
+        <input matInput [id]="id('attestSignHeight')" type="text" inputmode="numeric" autocomplete="off" formControlName="signingBlockHeight" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Signing block hash</mat-label>
+        <input matInput [id]="id('attestSignHash')" type="text" autocomplete="off" spellcheck="false" formControlName="signingBlockHash" />
+        <button matSuffix mat-icon-button type="button" [id]="id('attest-refresh-tip')" aria-label="Refresh tip" (click)="refreshTip()">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </mat-form-field>
+      <div class="row">
+        <button mat-stroked-button type="button" [id]="id('compose-attest')" (click)="composeAttestCommand()">
+          Compose for Sparrow
+        </button>
+        <button mat-stroked-button type="button" [id]="id('attest-confirm')" (click)="attestWithConfirm()">
+          Sign in this mill
+        </button>
+      </div>
+      @if (millSignKind() === 'attest') {
+        <mat-card [attr.id]="id('attest-mill-sign')">
+          <mat-card-content [formGroup]="millSignForm">
+            <p class="hint">Registry {{ baseUrl() }}</p>
+            <p class="mono">{{ attestSparrowMessage() }}</p>
+            @if (millSignNeedsPassword()) {
+              <mat-form-field appearance="outline">
+                <mat-label>Wallet password</mat-label>
+                <input matInput type="password" formControlName="password" />
+              </mat-form-field>
+            }
+            <div class="row">
+              <button mat-flat-button color="primary" type="button" [id]="id('confirm-attest-mill-sign')" (click)="confirmMillSign()">
+                Confirm
+              </button>
+              <button mat-stroked-button type="button" (click)="cancelMillSign()">Cancel</button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+      @if (attestCommandJson()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Attest command (review before signing)</mat-label>
+          <textarea matInput [id]="id('attest-command')" readonly rows="8">{{ attestCommandJson() }}</textarea>
+        </mat-form-field>
+      }
+      @if (attestSparrowMessage()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Copy into federation-sparrow Sign/Verify (Electrum Format)</mat-label>
+          <textarea matInput [id]="id('attest-sparrow')" readonly rows="2">{{ attestSparrowMessage() }}</textarea>
+        </mat-form-field>
+      }
+      <mat-form-field appearance="outline">
+        <mat-label>Signature (paste from Sparrow)</mat-label>
+        <input matInput [id]="id('attest-signature')" type="text" autocomplete="off" spellcheck="false" formControlName="signature" />
+      </mat-form-field>
+      <div class="row">
+        <button mat-flat-button color="primary" type="button" [id]="id('submit-attest')" (click)="submitAttest()">
+          Submit attestation
+        </button>
+        <button mat-stroked-button type="button" [id]="id('close-attest')" (click)="closeAttest()">Close</button>
+      </div>
+    </form>
+  </dialog>
+  }
 </div>

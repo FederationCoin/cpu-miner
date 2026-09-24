@@ -1,4 +1,45 @@
 <div class="pane" [attr.id]="id('root')">
+  <h3>How to mine</h3>
+  @if (isWeb()) {
+    <p class="hint" data-how-to-mine>
+      You loaded this page from CloudFront. The hasher in this tab speaks
+      <strong>Stratum v1 over WebSocket</strong> to a pool or to
+      <code>ws://127.0.0.1:23335/stratum</code>.
+    </p>
+    <figure class="docs-figure">
+      <img src="docs/mill-web.svg" width="720" height="300" alt="Web mill: browser SPA speaks WSS Stratum to a pool or DATUM Gateway; gateway talks GBT to the node and DATUM to DATUM Prime Pool" />
+    </figure>
+  } @else {
+    <p class="hint" data-how-to-mine>
+      Desktop mill uses <strong>TCP Stratum</strong> or node RPC. No WebSocket
+      required. Host a pool stays DATUM Prime Pool spawn for friends, family, LAN, and mesh.
+    </p>
+    <figure class="docs-figure">
+      <img src="docs/mill-desktop.svg" width="720" height="280" alt="Desktop mill: Electron speaks TCP Stratum to a pool or gateway, or RPC to a node; gateway talks GBT to the node and DATUM to DATUM Prime Pool" />
+    </figure>
+  }
+
+  <h3>WebSocket protocol</h3>
+  <p class="hint">
+    Newline JSON-RPC. Password <code>x</code>. Path <code>/stratum</code>.
+    Subscribe, authorize, notify, set difficulty, submit. Junk frames are closed.
+    A pool may also send <code>client.pool_stats</code>; a gateway does not.
+    A DATUM Gateway may answer <code>client.gateway_info</code> when the operator
+    turns that extra on (default off). The mill only asks on DATUM Gateway WebSocket.
+    At most six WebSocket connections per client IP; one accepted
+    <code>client.gateway_info</code> per five seconds on that socket.
+  </p>
+  <figure class="docs-figure">
+    <img src="docs/mill-pool-info.svg" width="720" height="320" alt="Example of the mill gateway-info card under the DATUM Gateway WebSocket URL, showing node status and a published DATUM Prime Pool host" />
+  </figure>
+
+  <h3>If a connection drops or a message times out</h3>
+  <p class="hint">
+    The mill reconnects with exponential backoff (1s, doubling to 60s). Hashing
+    continues for 3s, then pauses. Submits retry from an outbox every 8s. Status
+    and a short toast say what happened. Nothing stalls silently.
+  </p>
+
   <h3>Pool grades</h3>
   <p class="hint">
     The <strong>app-hosted</strong> pool (desktop child process, loopback, JSONL on disk) is for
@@ -8,51 +49,25 @@
   </p>
   <p class="hint">
     A <strong>pro pool</strong> needs a shared share store (Postgres), replicas only after that
-    store exists, and backups. Sticky sessions are not TIDES. Templates:
-    <code>infra/k8s/federationcoin/values-pool-ha.yaml</code> and
-    <code>infra/cloudformation/pool-rds.yaml</code>. Do not apply RDS onto the current demo cluster
-    unless you mean to.
-  </p>
-  <p class="hint">
-    Node and mempool databases can stay cheap. If other peers still hold the chain, a wiped node can
-    IBD. Mempool MariaDB is a cache. <strong>Pool shares cannot be recovered from P2P.</strong>
-  </p>
-
-  <h3>This house pool</h3>
-  <p class="hint">
-    The EKS testnet deploy is a demonstration piece, not the pool of record. MAIN is not served.
-    Config is in the image / ConfigMap, not edited here.
+    store exists, and backups. Sticky sessions are not TIDES.
   </p>
 
   <h3>DATUM is bring your own node</h3>
   <p class="hint">
-    The pool DATUM port is the coinbaser. Template construction stays on <em>your</em> bitcoind.
-    This cloud UI will not proxy our node (that would defeat DATUM). Supported path: desktop app +
-    your node + TCP DATUM to the advertised pool host.
-  </p>
-  <p class="hint">
-    <strong>Explore (not implemented):</strong> a JSON-RPC-over-WebSocket spec for <em>your</em>
-    node, then a separate <code>RpcConnectWs</code> partition. A browser could combine pool
-    <code>WSS /datum</code> with that node URI. Until a spec exists, there is no live URI box.
-    Pool <code>WSS /datum</code> is the coinbaser wrap only.
+    You speak <strong>Stratum v1</strong> to the gateway (or to a Stratum pool).
+    <strong>DATUM</strong> is the encrypted gateway-to-<strong>DATUM Prime Pool</strong> link.
+    The mill does not open a DATUM socket. Template construction stays on
+    <em>your</em> <code>federationcoind</code>.
+    Do not send mill hashers to pool <code>WSS /datum</code>.
   </p>
 
-  <h3>WebSocket Stratum</h3>
+  <h3>Pool registration, stake, and attestation</h3>
   <p class="hint">
-    The web SPA is <code>mine.federationcoin.org</code> (network is the in-app dropdown). In-page
-    mining uses <code>wss://pool.testnet.federationcoin.org/stratum</code> (same jobs as TCP 23334).
-    Native miners keep TCP. Third-party Stratum from the browser also needs a WebSocket endpoint.
-  </p>
-
-  @if (isWeb()) {
-    <p class="hint">You are on the web demo shell. Desktop <code>npm start</code> is the LAN/mesh product.</p>
-  } @else {
-    <p class="hint">You are on the desktop shell. Bind loopback unless you mean to share on a LAN.</p>
-  }
-
-  <h3>Standalone clustered pool (later)</h3>
-  <p class="hint">
-    eksctl + Helm overlay for two pool replicas only after Postgres. CloudFormation RDS for the
-    hardened option. Same pool binary as the app child; the store binding is what changes the grade.
+    Pool Finder is a public directory, not a login. Listings sit on one side;
+    register on the other. A listing stake is hours of RTX 3090 Ti work, shown
+    as GFCN. You are not sending coin: that balance must sit in the wallet
+    (Electrum Format envelope, attest once per connection). There is no DATUM
+    Prime Pool WebSocket for the mill. The mill talks to a gateway over WSS;
+    the gateway talks to a DATUM Prime Pool over TCP.
   </p>
 </div>

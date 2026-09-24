@@ -17,10 +17,10 @@ input {
   box-sizing: border-box;
   width: 100%;
   padding: 0.45rem 0.55rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
-  background: #1a1d24;
-  color: #e8eaed;
+  background: #15202e;
+  color: #e8e4d9;
   font: inherit;
   user-select: text;
 }
@@ -39,17 +39,17 @@ input {
 
 .hint {
   margin: 0.35rem 0 0.85rem;
-  color: #9aa0aa;
+  color: #c4bfb0;
   font-size: 0.82rem;
   line-height: 1.35;
 }
 
 button {
   padding: 0.45rem 0.9rem;
-  border: 0;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
-  background: #3d6ea8;
-  color: #fff;
+  background: #0e1824;
+  color: #e8e4d9;
   font: inherit;
   cursor: pointer;
 }
@@ -66,10 +66,11 @@ code {
 
 fieldset.mode,
 fieldset.partition {
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.55rem 0.85rem 0.75rem;
+  background: #15202e;
 }
 
 fieldset.mode {
@@ -79,7 +80,7 @@ fieldset.mode {
 fieldset.mode legend,
 fieldset.partition legend {
   padding: 0 0.35rem;
-  color: #9aa0aa;
+  color: #c4bfb0;
   font-size: 0.82rem;
 }
 

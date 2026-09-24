@@ -37,71 +37,34 @@ describe('parseRpcConnect', () => {
 });
 
 describe('parseMineTo', () => {
-  const testnetRpc = cookieRpc('');
-
-  it('parses node, stratum, and DATUM variants', () => {
-    expect(
-      parseMineTo({ kind: 'node', rpc: cookieRpc('/tmp/x'), payout: 'tgfcn1qqq' }, 'testnet').kind,
-    ).toBe('node');
+  it('parses node and stratum', () => {
+    expect(parseMineTo({ kind: 'node', rpc: cookieRpc('/tmp/x'), payout: 'tgfcn1qqq' }, 'testnet').kind).toBe('node');
     const s = parseMineTo(
       { kind: 'stratum', stratum: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' } },
       'testnet',
     );
     expect(s.kind).toBe('stratum');
-    const d = parseMineTo({ kind: 'datum', datum: { host: '10.0.0.8', port: 28916, worker: 'tgfcn1abc.cpu' } }, 'testnet');
-    expect(d).toEqual({
-      kind: 'datum',
-      datum: { host: '10.0.0.8', port: 28916, worker: 'tgfcn1abc.cpu', rpc: testnetRpc },
-    });
-  });
-
-  it('keeps DATUM node RPC distinct from the DATUM host', () => {
-    const d = parseMineTo(
-      {
-        kind: 'datum',
-        datum: {
-          host: '10.0.0.8',
-          port: 28916,
-          worker: 'tgfcn1abc.cpu',
-          rpc: cookieRpc('/node', '192.168.1.4'),
-        },
-      },
+    const g = parseMineTo(
+      { kind: 'datumGateway', gateway: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' } },
       'testnet',
     );
-    expect(d).toEqual({
-      kind: 'datum',
-      datum: {
-        host: '10.0.0.8',
-        port: 28916,
-        worker: 'tgfcn1abc.cpu',
-        rpc: cookieRpc('/node', '192.168.1.4'),
-      },
+    expect(g).toEqual({
+      kind: 'datumGateway',
+      gateway: { host: '127.0.0.1', port: 23334, worker: 'tgfcn1abc.cpu', password: 'x' },
     });
   });
 
-  it('parses app-pool kinds without host or port', () => {
-    expect(parseMineTo({ kind: 'appPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' }, 'testnet')).toEqual({
-      kind: 'appPoolStratum',
-      worker: 'tgfcn1abc.cpu',
-      password: 'x',
-    });
-    expect(parseMineTo({ kind: 'appPoolDatum', worker: 'tgfcn1abc.cpu', rpc: cookieRpc('/node', '10.0.0.9') }, 'testnet')).toEqual({
-      kind: 'appPoolDatum',
-      worker: 'tgfcn1abc.cpu',
-      rpc: cookieRpc('/node', '10.0.0.9'),
-    });
-    expect(parseMineTo({ kind: 'appPoolDatum', worker: 'tgfcn1abc.cpu' }, 'testnet')).toEqual({
-      kind: 'appPoolDatum',
-      worker: 'tgfcn1abc.cpu',
-      rpc: testnetRpc,
-    });
-  });
-
-  it('rejects empty workers and unknown kinds', () => {
+  it('rejects empty workers, DATUM kinds, and unknown kinds', () => {
     expect(() => parseMineTo({ kind: 'stratum', stratum: { host: '127.0.0.1', port: 23334, worker: '  ' } }, 'testnet')).toThrow(
       /worker is empty/,
     );
     expect(() => parseMineTo({ kind: 'rpc' }, 'testnet')).toThrow(/unknown mineTo kind/);
+    expect(() => parseMineTo({ kind: 'datum', datum: { host: '10.0.0.8', port: 28916, worker: 'tgfcn1abc.cpu' } }, 'testnet')).toThrow(
+      /unknown mineTo kind/,
+    );
+    expect(() => parseMineTo({ kind: 'appPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' }, 'testnet')).toThrow(
+      /unknown mineTo kind/,
+    );
     expect(() =>
       parseMineTo({ kind: 'hostedPoolStratum', worker: 'tgfcn1abc.cpu', password: 'x' }, 'testnet'),
     ).toThrow(/unknown mineTo kind/);

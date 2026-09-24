@@ -11,7 +11,9 @@
     "node": ">=26"
   },
   "packageManager": "npm@11.19.1",
-  "workspaces": ["projects/miner-ui"],
+  "workspaces": [
+    "projects/miner-ui"
+  ],
   "scripts": {
     "ng": "ng",
     "start": "npm run build:app && node native/gpu-hasher/rebuild.mjs && electron .",
@@ -19,7 +21,8 @@
     "build": "npm run build:app",
     "build:web": "ng build miner-web --configuration production",
     "build:app": "ng build --configuration development && npm run build:electron",
-    "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\" && node scripts/copy-federation-pool.mjs",
+    "fetch:extras": "node scripts/fetch-extras.mjs",
+    "build:electron": "tsc -p miner/tsconfig.json && node --input-type=module -e \"import { copyFileSync, mkdirSync } from 'node:fs'; mkdirSync('out-electron',{recursive:true}); copyFileSync('miner/log.html','out-electron/log.html'); copyFileSync('build/icon.png','out-electron/icon.png')\" && node scripts/copy-federation-pool.mjs && node scripts/copy-extras.mjs",
     "build:gpu": "node native/gpu-hasher/rebuild.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test --watch=false && npm run test:miner && npm run test:gpu",
@@ -34,13 +37,20 @@
     "dist:mac": "npm run build:app && npm run build:gpu && electron-builder --mac --publish never"
   },
   "dependencies": {
+    "@angular/animations": "^22.1.6",
+    "@angular/cdk": "^22.1.6",
     "@angular/common": "^22.1.0",
     "@angular/compiler": "^22.1.0",
     "@angular/core": "^22.1.0",
     "@angular/forms": "^22.1.0",
+    "@angular/material": "^22.1.6",
     "@angular/platform-browser": "^22.1.0",
     "@angular/router": "^22.1.0",
+    "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
+    "@scure/bip32": "^2.4.0",
+    "@scure/bip39": "^2.4.0",
+    "canonicalize": "^2.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -49,6 +59,7 @@
     "@angular/cli": "^22.1.8",
     "@angular/compiler-cli": "^22.1.0",
     "@types/node": "^24.13.4",
+    "@vitest/coverage-v8": "^4.0.8",
     "electron": "^44.3.0",
     "electron-builder": "^26.8.1",
     "jsdom": "^28.0.0",
@@ -74,12 +85,30 @@
       {
         "from": "native/gpu-hasher/dist/",
         "to": "gpu-hasher",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "vendor/federation-pool/",
         "to": "federation-pool",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "vendor/federationcoind/",
+        "to": "federationcoind",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "vendor/datum_gateway/",
+        "to": "datum_gateway",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "files": [
@@ -91,19 +120,27 @@
       "!**/electron.png"
     ],
     "linux": {
-      "target": ["AppImage", "zip"],
+      "target": [
+        "AppImage",
+        "zip"
+      ],
       "category": "Utility",
       "synopsis": "Unsigned FederationCoin CPU miner (RPC or Stratum v1)"
     },
     "win": {
       "signAndEditExecutable": false,
-      "target": ["portable", "zip"]
+      "target": [
+        "portable",
+        "zip"
+      ]
     },
     "mac": {
       "identity": null,
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "target": ["zip"]
+      "target": [
+        "zip"
+      ]
     }
   }
 }

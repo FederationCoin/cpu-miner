@@ -2,8 +2,8 @@
   @if (showMainWarning()) {
     <p class="warn" data-main-warning>
       Main is not live. Dummy genesis and RPC {{ config().rpcPort }} are
-      placeholders. Start is allowed; expect cookie/RPC failures until
-      announcement. Mine Testnet until then.
+      placeholders. The Big One will not start mining on dummy MAIN.
+      Mine Testnet until announcement.
     </p>
   }
 
@@ -11,330 +11,68 @@
     <p class="hint" data-other-mining>Mining is running on {{ other }}.</p>
   }
 
-  <fieldset class="mode">
-    <legend>Mine to</legend>
-    <label class="check" [attr.for]="id('mineToNode')">
-      <input
-        [id]="id('mineToNode')"
-        type="radio"
-        formControlName="kind"
-        value="node"
-        [attr.disabled]="kindLocked() || nodeRpcDisabled() ? true : null"
-      />
-      Node RPC
-    </label>
-    @if (nodeRpcDisabled()) {
-      <p class="hint" [attr.id]="id('rpcDisabledHint')" title="The browser is not a node, and this demo will not host yours. Use the desktop app on loopback or your LAN node.">
-        Node RPC is grayed out here. The browser is not a node, and this demo will not host yours.
-        The desktop app talks to loopback (or your LAN node) instead.
-      </p>
-    }
-    @if (!isWebDemo()) {
-      <label class="check" [attr.for]="id('mineToStratum')">
-        <input [id]="id('mineToStratum')" type="radio" formControlName="kind" value="stratum" [attr.disabled]="kindLocked() ? true : null" />
-        Stratum
-      </label>
-    }
-    @if (isWebDemo()) {
-      <label class="check" [attr.for]="id('mineToStratumWebsocket')">
-        <input
-          [id]="id('mineToStratumWebsocket')"
-          type="radio"
-          formControlName="kind"
-          value="stratumWebsocket"
-          [attr.disabled]="kindLocked() ? true : null"
+  <mat-card class="mine-to-card">
+    <mat-card-header>
+      <mat-card-title>Mine to</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (isWebDemo()) {
+        <app-web-mine-to
+          [form]="form"
+          [chain]="chain()"
+          [kindLocked]="kindLocked()"
+          [gatewayInfo]="gatewayInfoView()"
+          (fetchInfo)="fetchGatewayInfo()"
+          (pull)="pullSelected()"
         />
-        Stratum Websocket
-      </label>
-    }
-    <label class="check" [attr.for]="id('mineToDatum')">
-      <input
-        [id]="id('mineToDatum')"
-        type="radio"
-        formControlName="kind"
-        value="datum"
-        [attr.disabled]="kindLocked() || datumDisabled() ? true : null"
-      />
-      DATUM Prime
-    </label>
-    @if (datumDisabled()) {
-      <p class="hint" [attr.id]="id('datumDisabledHint')" title="DATUM is bring your own node, so you cannot use ours.">
-        DATUM is bring your own node, so you cannot use ours. To run DATUM to this pool, use the
-        desktop app with your own node (TCP DATUM to the advertised pool host).
-      </p>
-    }
-    <label class="check" [attr.for]="id('mineToDatumWebsocket')">
-      <input
-        [id]="id('mineToDatumWebsocket')"
-        type="radio"
-        formControlName="kind"
-        value="datumWebsocket"
-        [attr.disabled]="kindLocked() || datumWebsocketDisabled() ? true : null"
-      />
-      DATUM Prime (Websocket)
-    </label>
-    @if (datumWebsocketDisabled()) {
-      <p class="hint" [attr.id]="id('datumWebsocketDisabledHint')">
-        DATUM Websocket needs a websocket proxy to your node. We do not offer that.
-      </p>
-    }
-    @if (hostedPoolReady()) {
-      <label class="check" [attr.for]="id('mineToHostedPoolStratum')">
-        <input
-          [id]="id('mineToHostedPoolStratum')"
-          type="radio"
-          formControlName="kind"
-          value="hostedPoolStratum"
-          [attr.disabled]="kindLocked() ? true : null"
-        />
-        {{ hostedLabel() }} (Stratum Websocket)
-      </label>
-    }
-    @if (appPoolReady()) {
-      <label class="check" [attr.for]="id('mineToAppPoolStratum')">
-        <input
-          [id]="id('mineToAppPoolStratum')"
-          type="radio"
-          formControlName="kind"
-          value="appPoolStratum"
-          [attr.disabled]="kindLocked() ? true : null"
-        />
-        App pool (Stratum)
-      </label>
-      <label class="check" [attr.for]="id('mineToAppPoolDatum')">
-        <input
-          [id]="id('mineToAppPoolDatum')"
-          type="radio"
-          formControlName="kind"
-          value="appPoolDatum"
-          [attr.disabled]="kindLocked() ? true : null"
-        />
-        App pool (DATUM)
-      </label>
-    }
-  </fieldset>
+      } @else {
+        <app-desktop-mine-to [form]="form" [chain]="chain()" [kindLocked]="kindLocked()" (pull)="pullSelected()" />
+      }
+    </mat-card-content>
+  </mat-card>
 
-  @switch (kind()) {
-    @case ('node') {
-      @if (rpcCookie(form.controls.rpc)) {
-        <app-defaults-fold [foldId]="id('rpc-fold')" title="Node RPC" [summary]="rpcSummary(form.controls.rpc)">
-          <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain()" [chain]="chain()" />
-        </app-defaults-fold>
-      } @else {
-        <fieldset class="partition">
-          <legend>Node RPC</legend>
-          <app-rpc-connect [form]="form.controls.rpc" [idPrefix]="chain()" [chain]="chain()" />
-        </fieldset>
-      }
-      <label [attr.for]="id('payout')">Payout address</label>
-      <input
-        [id]="id('payout')"
-        type="text"
-        autocomplete="off"
-        spellcheck="false"
-        [placeholder]="config().hrp + '1…'"
-        formControlName="payout"
-      />
-    }
-    @case ('stratum') {
-      <fieldset class="partition" formGroupName="stratum">
-        <legend>Stratum</legend>
-        <label [attr.for]="id('stratumHost')">Host</label>
-        <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="host" />
-        <label [attr.for]="id('stratumPort')">Port</label>
-        <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="port" />
-        <label [attr.for]="id('stratumWorker')">Worker</label>
-        <input
-          [id]="id('stratumWorker')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1….cpu'"
-          formControlName="worker"
-        />
-        <p class="hint">Username as on firmware. A <code>.worker</code> suffix is allowed.</p>
-        <label [attr.for]="id('stratumPassword')">Password</label>
-        <input
-          [id]="id('stratumPassword')"
-          type="password"
-          autocomplete="off"
-          spellcheck="false"
-          formControlName="password"
-        />
-      </fieldset>
-    }
-    @case ('stratumWebsocket') {
-      <fieldset class="partition" formGroupName="stratumWebsocket">
-        <legend>Stratum Websocket</legend>
-        <label [attr.for]="id('stratumWebsocketHost')">Host</label>
-        <input [id]="id('stratumWebsocketHost')" type="text" autocomplete="off" spellcheck="false" formControlName="host" />
-        <label [attr.for]="id('stratumWebsocketPort')">Port</label>
-        <input [id]="id('stratumWebsocketPort')" type="number" min="1" max="65535" formControlName="port" />
-        <label [attr.for]="id('stratumWebsocketWorker')">Worker</label>
-        <input
-          [id]="id('stratumWebsocketWorker')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1….cpu'"
-          formControlName="worker"
-        />
-        <p class="hint">Username as on firmware. A <code>.worker</code> suffix is allowed.</p>
-        <label [attr.for]="id('stratumWebsocketPassword')">Password</label>
-        <input
-          [id]="id('stratumWebsocketPassword')"
-          type="password"
-          autocomplete="off"
-          spellcheck="false"
-          formControlName="password"
-        />
-      </fieldset>
-    }
-    @case ('datum') {
-      @if (rpcCookie(form.controls.datum.controls.rpc)) {
-        <app-defaults-fold [foldId]="id('datum-rpc-fold')" title="Node RPC" [summary]="rpcSummary(form.controls.datum.controls.rpc)">
-          <p class="hint">DATUM Prime coordinates with the DATUM host. This node is yours; they are not assumed to be the same machine.</p>
-          <app-rpc-connect [form]="form.controls.datum.controls.rpc" [idPrefix]="id('datum')" [chain]="chain()" />
-        </app-defaults-fold>
-      } @else {
-        <fieldset class="partition">
-          <legend>Node RPC</legend>
-          <p class="hint">DATUM Prime coordinates with the DATUM host. This node is yours; they are not assumed to be the same machine.</p>
-          <app-rpc-connect [form]="form.controls.datum.controls.rpc" [idPrefix]="id('datum')" [chain]="chain()" />
-        </fieldset>
-      }
-      <fieldset class="partition" formGroupName="datum">
-        <legend>DATUM Prime</legend>
-        <label [attr.for]="id('datumHost')">Host</label>
-        <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="host" />
-        <label [attr.for]="id('datumPort')">Port</label>
-        <input [id]="id('datumPort')" type="number" min="1" max="65535" formControlName="port" />
-        <label [attr.for]="id('datumWorker')">Worker</label>
-        <input
-          [id]="id('datumWorker')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1….cpu'"
-          formControlName="worker"
-        />
-      </fieldset>
-    }
-    @case ('appPoolStratum') {
-      <fieldset class="partition" formGroupName="appPoolStratum">
-        <legend>App pool (Stratum)</legend>
-        <p class="hint">Host and port come from the running pool on this network.</p>
-        <p class="mono frozen">{{ frozenStratum() }}</p>
-        <label [attr.for]="id('appPoolStratumWorker')">Worker</label>
-        <input
-          [id]="id('appPoolStratumWorker')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1….cpu'"
-          formControlName="worker"
-        />
-        <label [attr.for]="id('appPoolStratumPassword')">Password</label>
-        <input
-          [id]="id('appPoolStratumPassword')"
-          type="password"
-          autocomplete="off"
-          spellcheck="false"
-          formControlName="password"
-        />
-      </fieldset>
-    }
-    @case ('appPoolDatum') {
-      @if (rpcCookie(form.controls.appPoolDatum.controls.rpc)) {
-        <app-defaults-fold
-          [foldId]="id('appPoolDatum-rpc-fold')"
-          title="Node RPC"
-          [summary]="rpcSummary(form.controls.appPoolDatum.controls.rpc)"
-        >
-          <p class="hint">The app pool DATUM bind is frozen. This node is the hasher's node; it is not assumed to be the pool's RPC host.</p>
-          <app-rpc-connect
-            [form]="form.controls.appPoolDatum.controls.rpc"
-            [idPrefix]="id('appPoolDatum')"
-            [chain]="chain()"
-          />
-        </app-defaults-fold>
-      } @else {
-        <fieldset class="partition">
-          <legend>Node RPC</legend>
-          <p class="hint">The app pool DATUM bind is frozen. This node is the hasher's node; it is not assumed to be the pool's RPC host.</p>
-          <app-rpc-connect
-            [form]="form.controls.appPoolDatum.controls.rpc"
-            [idPrefix]="id('appPoolDatum')"
-            [chain]="chain()"
-          />
-        </fieldset>
-      }
-      <fieldset class="partition" formGroupName="appPoolDatum">
-        <legend>App pool (DATUM)</legend>
-        <p class="hint">Host and port come from the running pool on this network.</p>
-        <p class="mono frozen">{{ frozenDatum() }}</p>
-        <label [attr.for]="id('appPoolDatumWorker')">Worker</label>
-        <input
-          [id]="id('appPoolDatumWorker')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1….cpu'"
-          formControlName="worker"
-        />
-      </fieldset>
-    }
-    @case ('datumWebsocket') {
-      <fieldset class="partition" formGroupName="datumWebsocket">
-        <legend>DATUM Prime (Websocket)</legend>
-        <p class="hint">Needs a websocket proxy to your node. We do not offer that.</p>
-        <label [attr.for]="id('datumWebsocketUrl')">URL</label>
-        <input [id]="id('datumWebsocketUrl')" type="text" autocomplete="off" spellcheck="false" formControlName="url" />
-      </fieldset>
-    }
-    @case ('hostedPoolStratum') {
-      <fieldset class="partition" formGroupName="hostedPoolStratum">
-        <legend>{{ hostedLabel() }} (Stratum Websocket)</legend>
-        <p class="hint">This pool is already running. Host and path come from the server.</p>
-        <p class="mono frozen">{{ frozenHostedStratum() }}</p>
-        <label [attr.for]="id('hostedPoolStratumWorker')">Worker</label>
-        <input
-          [id]="id('hostedPoolStratumWorker')"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          [placeholder]="config().hrp + '1….cpu'"
-          formControlName="worker"
-        />
-        <label [attr.for]="id('hostedPoolStratumPassword')">Password</label>
-        <input
-          [id]="id('hostedPoolStratumPassword')"
-          type="password"
-          autocomplete="off"
-          spellcheck="false"
-          formControlName="password"
-        />
-      </fieldset>
-    }
-  }
-
-  <label [attr.for]="id('threads')">Threads</label>
-  <input [id]="id('threads')" type="number" min="1" max="64" formControlName="threads" />
+  <mat-form-field appearance="outline">
+    <mat-label>Threads</mat-label>
+    <input matInput [id]="id('threads')" type="number" min="1" max="64" formControlName="threads" />
+  </mat-form-field>
 
   <div class="row">
-    <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
-    <button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+    @if (!showMainWarning()) {
+      <button mat-flat-button type="button" color="primary" [id]="id('start')" [disabled]="startDisabled()" (click)="requestStart()">
+        Start
+      </button>
+    }
+    <button mat-stroked-button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
   </div>
+
+  @if (pendingMineTo()) {
+    <mat-card [attr.id]="id('mine-to-confirm')">
+      <mat-card-header>
+        <mat-card-title>Confirm mine-to</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Hashrate will use:</p>
+        <p class="mono">{{ pendingMineTo() }}</p>
+        <div class="row">
+          <button mat-flat-button color="primary" type="button" [id]="id('confirm-mine-to')" (click)="confirmStart()">Confirm</button>
+          <button mat-stroked-button type="button" [id]="id('cancel-mine-to')" (click)="pendingMineTo.set(null)">Cancel</button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
 
   @if (formError()) {
     <p class="err">{{ formError() }}</p>
   }
 
   <app-defaults-fold [foldId]="id('gpus-fold')" title="GPUs" [summary]="gpuSummary()">
-    <fieldset class="gpus" [attr.id]="id('gpus')">
-      <legend>GPUs</legend>
+    <mat-card class="gpus" [attr.id]="id('gpus')">
+      <mat-card-header>
+        <mat-card-title>GPUs</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
       <div class="row">
-        <button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
+        <button mat-stroked-button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
           {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
         </button>
         @if (webGpuHelpVisible()) {
@@ -343,8 +81,11 @@
       </div>
       @if (gpuList().length > 0) {
         @for (dev of gpuList(); track dev.key) {
-          <fieldset class="gpu-adapter" [attr.id]="id('gpu-adapter-' + gpuDomId(dev.key))">
-            <legend>{{ dev.label }}</legend>
+          <mat-card class="gpu-adapter" [attr.id]="id('gpu-adapter-' + gpuDomId(dev.key))">
+            <mat-card-header>
+              <mat-card-title>{{ dev.label }}</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
             <span class="hint-inline">{{ gpuAdapterHint(dev) }}</span>
             <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.key) + '-off')">
               <input
@@ -370,11 +111,13 @@
                 {{ strategyKindLabel(strat.kind) }}
               </label>
             }
-          </fieldset>
+            </mat-card-content>
+          </mat-card>
         }
       }
       <p class="hint">{{ gpuHint() }}</p>
-    </fieldset>
+      </mat-card-content>
+    </mat-card>
   </app-defaults-fold>
 
   <dl>
@@ -399,4 +142,5 @@
     <dt>Endpoint</dt>
     <dd class="mono">{{ endpointHint() }}</dd>
   </dl>
+  <p class="hint">Hashrate is your computer, not a pool or gateway limit.</p>
 </div>

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -11,8 +11,9 @@ import { concat, toHex, u256ToHex, writeLe32 } from './bytes.js';
 import { serializeBlock } from './coinbase.js';
 import { buildJobFromGbt, fillFromSubmit, jobKey, type GbtResult, type Job } from './gbt.js';
 import { logHistory, pushLog, redactSecret, type LogLine } from './log.js';
+import { toastKindFromMessage, type ToastKind } from './toast.js';
 import { datumWorkHeader, datumWorkRoot, headerHash, hashMeetsTarget, targetFromCompact, xorKeyMaskBytes } from './pow.js';
-import { grindTargetForShare, shareWorkFromTargetByte, specAfterShareAccept } from './difficulty.js';
+import { grindTargetForShare, specAfterShareAccept } from './difficulty.js';
 import {
   cookiePath,
   cookiePathForDatadir,
@@ -33,10 +34,7 @@ import {
   type PoolStartOpts,
   type PoolStats,
 } from './pool.js';
-import { loadDatumClient } from './datum-load.js';
 import {
-  connectHost,
-  isAppPoolKind,
   parseMineTo,
   type MineTo,
   type MineToKind,
@@ -45,6 +43,8 @@ import {
   type RpcConnect,
 } from './mine-to.js';
 import type { MinerInfo, MinerStats } from './preload.js';
+import { registerProcessIpc, stopAllProcesses } from './process-ipc.js';
+import { registryOrigin, registryRequestWithFetch, type RegistryFetchReq } from './registry-fetch.js';
 import { StratumClient } from './stratum.js';
 import type { WorkerInit, WorkerMsg } from './worker.js';
 
@@ -129,15 +129,19 @@ function emitStats(): void {
   win?.webContents.send('miner:stats', stats());
 }
 
-function emitLog(mode: string, message: string, toast = false): LogLine {
+function emitLog(mode: string, message: string, toast: false | ToastKind = false): LogLine {
   const line = pushLog(mode, safeText(message));
   const payload = { ...line };
   win?.webContents.send('miner:log', payload);
   logWin?.webContents.send('miner:log', payload);
   if (toast) {
-    win?.webContents.send('miner:toast', payload.message);
+    win?.webContents.send('miner:toast', { message: payload.message, kind: toast });
   }
   return line;
+}
+
+function sendToast(message: string, kind: ToastKind): void {
+  win?.webContents.send('miner:toast', { message, kind });
 }
 
 function emitPoolStats(): void {
@@ -152,22 +156,6 @@ function stopPoolChild(): void {
   lastPoolOpts = null;
   poolStatsState = { ...IDLE_POOL_STATS, status: 'stopped' };
   emitPoolStats();
-  stopHasherBecauseAppPoolStopped();
-}
-
-function stopHasherBecauseAppPoolStopped(): void {
-  if (!running || !isAppPoolKind(activeKind)) {
-    return;
-  }
-  stopRequested = true;
-  running = false;
-  protocolClient?.close();
-  cancelSleep();
-  killWorkers();
-  status = 'stopped';
-  lastError = 'app pool stopped; mining stopped';
-  emitLog(activeKind, lastError, true);
-  emitStats();
 }
 
 function killWorkers(): void {
@@ -250,7 +238,7 @@ function spawnWorkers(spec: GrindSpec, threads: number): void {
   const target = spec.target;
   if (target.length !== 32) {
     lastError = 'bad target';
-    emitLog(activeKind, lastError, true);
+    emitLog(activeKind, lastError, 'error');
     emitStats();
     return;
   }
@@ -290,7 +278,7 @@ function spawnWorkers(spec: GrindSpec, threads: number): void {
     });
     w.on('error', (err) => {
       lastError = err.message;
-      emitLog(activeKind, lastError, true);
+      emitLog(activeKind, lastError, 'error');
       emitStats();
     });
     workers.push(w);
@@ -358,10 +346,10 @@ function spawnGpu(spec: GrindSpec, target: Uint8Array): void {
           );
         }
       },
-      onLog: (message) => emitLog(activeKind, message, true),
+      onLog: (message) => emitLog(activeKind, message, toastKindFromMessage(message)),
     });
     if (!started) {
-      emitLog(activeKind, `gpu: start failed ${id}`, true);
+      emitLog(activeKind, `gpu: start failed ${id}`, 'error');
     }
   }
 }
@@ -390,7 +378,7 @@ async function onRpcFound(job: Job, msg: Extract<WorkerMsg, { type: 'found' }>, 
   if (!target || !hashMeetsTarget(hash, target)) {
     rejected++;
     lastError = 'high-hash after reconstruct';
-    emitLog('rpc', lastError, true);
+    emitLog('rpc', lastError, 'error');
     emitStats();
     return;
   }
@@ -409,12 +397,12 @@ async function onRpcFound(job: Job, msg: Extract<WorkerMsg, { type: 'found' }>, 
     } else {
       rejected++;
       lastError = String(result);
-      emitLog('rpc', lastError, true);
+      emitLog('rpc', lastError, 'error');
     }
   } catch (e) {
     rejected++;
     lastError = e instanceof Error ? e.message : String(e);
-    emitLog('rpc', lastError, true);
+    emitLog('rpc', lastError, 'error');
   }
   emitStats();
 }
@@ -452,7 +440,7 @@ async function mineRpcLoop(payout: Uint8Array, threads: number): Promise<void> {
           };
         if (spec.target.every((b) => b === 0)) {
           lastError = 'bad nBits';
-          emitLog('rpc', lastError, true);
+          emitLog('rpc', lastError, 'error');
           emitStats();
         } else {
           spawnWorkers(spec, threads);
@@ -466,7 +454,7 @@ async function mineRpcLoop(payout: Uint8Array, threads: number): Promise<void> {
       delay = nextBackoff(delay);
       const waitSec = Math.round(delay / 1000);
       status = `reconnecting in ${waitSec}s`;
-      emitLog('rpc', `${lastError}; retry in ${waitSec}s`, true);
+      emitLog('rpc', `${lastError}; retry in ${waitSec}s`, 'error');
       emitStats();
       await sleep(delay);
     }
@@ -514,7 +502,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
         onJobIgnored: (reason) => {
           lastError = reason;
           status = reason;
-          emitLog('stratum', reason, true);
+          emitLog('stratum', reason, 'error');
           emitStats();
         },
         onPoolStats: (stats) => {
@@ -538,7 +526,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
           const target = grindTargetForShare(job.nBits, shareDiff);
           if (!target) {
             lastError = 'bad nBits';
-            emitLog('stratum', lastError, true);
+            emitLog('stratum', lastError, 'error');
             emitStats();
             return;
           }
@@ -575,8 +563,8 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
             }
           } else {
             rejected++;
-            lastError = error ?? 'share rejected';
-            emitLog('stratum', lastError, true);
+            lastError = error ?? 'Share rejected';
+            emitLog('stratum', lastError, 'error');
           }
           emitStats();
         },
@@ -594,7 +582,7 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
           delay = nextBackoff(delay);
           const waitSec = Math.round(delay / 1000);
           status = `reconnecting in ${waitSec}s`;
-          emitLog('stratum', `${reason}; retry in ${waitSec}s`, true);
+          emitLog('stratum', `${reason}; retry in ${waitSec}s`, 'error');
           emitStats();
           void sleep(delay).then(() => {
             if (!running || stopRequested || finished) {
@@ -613,135 +601,6 @@ function mineStratumLoop(opts: { host: string; port: number; worker: string; pas
 
     connect();
   });
-}
-
-async function mineDatumLoop(opts: { host: string; port: number; worker: string; threads: number }): Promise<void> {
-  const DatumClient = await loadDatumClient(here, process.resourcesPath);
-  return new Promise((resolve) => {
-    let delay = 0;
-    let finished = false;
-
-    const done = (): void => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      protocolClient?.close();
-      protocolClient = null;
-      resolve();
-    };
-
-    const connect = (): void => {
-      if (!running || stopRequested) {
-        done();
-        return;
-      }
-      extraNonce1 = new Uint8Array(4);
-      let lastSpec: GrindSpec | null = null;
-      let lastNBits = 0;
-      const client = new DatumClient(opts.host, opts.port, opts.worker, {
-        onNotify: (job) => {
-          delay = 0;
-          lastError = '';
-          extraNonce1 = new Uint8Array(job.extraNonce1);
-          const target = grindTargetForShare(job.nBits, shareWorkFromTargetByte(job.targetByte));
-          if (!target) {
-            lastError = 'bad nBits';
-            emitLog('datum', lastError, true);
-            emitStats();
-            return;
-          }
-          const spec: GrindSpec = {
-            coinb1: job.coinb1,
-            prevHidden: job.prevHidden,
-            ntime8: job.ntime8,
-            target,
-            xorKey: job.xorKey,
-            xorClear: job.xorClear,
-            extraNonce1,
-            height: job.height > 0 ? job.height - 1 : 0,
-            onFound: (msg: Extract<WorkerMsg, { type: 'found' }>, en12: Uint8Array) => {
-              const nonce8 = new Uint8Array(8);
-              writeLe32(nonce8, 0, msg.nonce);
-              writeLe32(nonce8, 4, msg.nonce2);
-              lastHash = toHex(nonce8);
-              client.submitPow({
-                jobId: job.jobId,
-                coinbaseId: job.coinbaseId,
-                flags: 0,
-                targetByte: job.targetByte,
-                ntime8: msg.ntime8,
-                nonce8,
-                version: job.version,
-                extranonce: en12,
-                username: opts.worker,
-              });
-            },
-          };
-          lastSpec = spec;
-          lastNBits = job.nBits;
-          spawnWorkers(spec, opts.threads);
-          spawnGpu(spec, spec.target);
-        },
-        onShareResult: (ok, reason) => {
-          if (ok) {
-            accepted++;
-            lastError = '';
-            status = 'share accepted';
-            const next = huntBlockAfterShare(lastSpec, lastNBits, opts.threads);
-            if (next) {
-              lastSpec = next;
-            }
-          } else {
-            rejected++;
-            lastError = `share rejected ${reason}`;
-            emitLog('datum', lastError, true);
-          }
-          emitStats();
-        },
-        onClose: (reason) => {
-          if (protocolClient !== client) {
-            return;
-          }
-          protocolClient = null;
-          killWorkers();
-          if (!running || stopRequested || finished) {
-            done();
-            return;
-          }
-          lastError = reason;
-          delay = nextBackoff(delay);
-          const waitSec = Math.round(delay / 1000);
-          status = `reconnecting in ${waitSec}s`;
-          emitLog('datum', `${reason}; retry in ${waitSec}s`, true);
-          emitStats();
-          void sleep(delay).then(() => {
-            if (!running || stopRequested || finished) {
-              done();
-              return;
-            }
-            connect();
-          });
-        },
-      });
-      protocolClient = client;
-      status = `connecting ${opts.host}:${opts.port}`;
-      emitStats();
-      client.connect();
-    };
-
-    connect();
-  });
-}
-
-function appPoolEndpoint(kind: 'stratum' | 'datum'): { host: string; port: number } {
-  if (!poolChild || !lastPoolOpts || lastPoolOpts.chain !== activeChain) {
-    throw new Error('app pool is not running on this network');
-  }
-  if (kind === 'stratum') {
-    return { host: connectHost(lastPoolOpts.stratumHost), port: lastPoolOpts.stratumPort };
-  }
-  return { host: connectHost(lastPoolOpts.datumHost), port: lastPoolOpts.datumPort };
 }
 
 let parsedMineTo: MineTo | null = null;
@@ -784,18 +643,8 @@ function prepareStart(opts: MinerStartOpts): void {
     stratumSecret = mineTo.stratum.password;
     return;
   }
-  if (mineTo.kind === 'appPoolStratum') {
-    stratumSecret = mineTo.password;
-    appPoolEndpoint('stratum');
-    return;
-  }
-  if (mineTo.kind === 'datum') {
-    bindNodeRpc(mineTo.datum.rpc, activeChain);
-    return;
-  }
-  if (mineTo.kind === 'appPoolDatum') {
-    appPoolEndpoint('datum');
-    bindNodeRpc(mineTo.rpc, activeChain);
+  if (mineTo.kind === 'datumGateway') {
+    stratumSecret = mineTo.gateway.password;
   }
 }
 
@@ -810,29 +659,9 @@ async function runMiner(opts: MinerStartOpts): Promise<void> {
     case 'stratum':
       await mineStratumLoop({ ...mineTo.stratum, threads: opts.threads });
       return;
-    case 'datum':
-      await mineDatumLoop({
-        host: mineTo.datum.host,
-        port: mineTo.datum.port,
-        worker: mineTo.datum.worker,
-        threads: opts.threads,
-      });
+    case 'datumGateway':
+      await mineStratumLoop({ ...mineTo.gateway, threads: opts.threads });
       return;
-    case 'appPoolStratum': {
-      const ep = appPoolEndpoint('stratum');
-      await mineStratumLoop({
-        host: ep.host,
-        port: ep.port,
-        worker: mineTo.worker,
-        password: mineTo.password,
-        threads: opts.threads,
-      });
-      return;
-    }
-    case 'appPoolDatum': {
-      const ep = appPoolEndpoint('datum');
-      await mineDatumLoop({ host: ep.host, port: ep.port, worker: mineTo.worker, threads: opts.threads });
-    }
   }
 }
 
@@ -952,14 +781,14 @@ ipcMain.handle('miner:webgpu-progress', (_e, msg: { gen: number; hashes: number 
 });
 
 ipcMain.handle('miner:webgpu-log', (_e, message: string) => {
-  emitLog(activeKind, String(message ?? ''), true);
+  emitLog(activeKind, String(message ?? ''), toastKindFromMessage(String(message ?? '')));
 });
 
 ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
   try {
     const chain = parseChain(opts.chain);
     if (chain === 'main' && !MAIN_IS_LIVE) {
-      win?.webContents.send('miner:toast', 'MAIN is not live');
+      sendToast('MAIN is not live', 'error');
     }
     const args = poolArgv(opts);
     const cli = resolvePoolCli(process.env, here, process.resourcesPath);
@@ -1008,7 +837,7 @@ ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
       const msg = chunk.trim();
       if (msg) {
         poolStatsState = { ...poolStatsState, lastError: msg };
-        emitLog('pool', msg, true);
+        emitLog('pool', msg, toastKindFromMessage(msg));
         emitPoolStats();
       }
     });
@@ -1025,12 +854,11 @@ ipcMain.handle('pool:start', async (_e, opts: PoolStartOpts) => {
       };
       emitPoolStats();
       emitLog('pool', `stopped${code ? ` (${code})` : ''}`);
-      stopHasherBecauseAppPoolStopped();
     });
     return { ok: true as const };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
-    emitLog('pool', error, true);
+    emitLog('pool', error, 'error');
     return { ok: false as const, error };
   }
 });
@@ -1049,13 +877,22 @@ ipcMain.handle('pool:refresh', () => {
   return { ok: true as const };
 });
 
+ipcMain.handle('registry:request', async (_e, req: RegistryFetchReq) => {
+  const chain = parseChain(req.chain);
+  if (chain === 'main' && !MAIN_IS_LIVE) {
+    throw new Error('Main is not live');
+  }
+  return registryRequestWithFetch((url, init) => net.fetch(url, init), registryOrigin(), { ...req, chain });
+});
+
 ipcMain.handle(
   'miner:start',
   async (_e, opts: MinerStartOpts) => {
     try {
       const chain = parseChain(opts.chain);
       if (chain === 'main' && !MAIN_IS_LIVE) {
-        win?.webContents.send('miner:toast', 'MAIN is not live');
+        sendToast('MAIN is not live', 'error');
+        return { ok: false as const, error: 'MAIN is not live' };
       }
       if (running) {
         stopRequested = true;
@@ -1076,11 +913,11 @@ ipcMain.handle(
       lastRateAt = Date.now();
       lastError = '';
       emitStats();
-      emitLog(activeKind, `start ${activeChain} ${activeKind}`);
+      emitLog(activeKind, `start ${activeChain} ${activeKind}`, 'ok');
       loopPromise = runMiner(opts)
         .catch((e) => {
           lastError = e instanceof Error ? e.message : String(e);
-          emitLog(activeKind, lastError, true);
+          emitLog(activeKind, lastError, 'error');
         })
         .finally(() => {
           killWorkers();
@@ -1092,12 +929,21 @@ ipcMain.handle(
     } catch (e) {
       running = false;
       lastError = e instanceof Error ? e.message : String(e);
-      emitLog(activeKind, lastError, true);
+      emitLog(activeKind, lastError, 'error');
       emitStats();
       return { ok: false as const, error: lastError };
     }
   },
 );
+
+registerProcessIpc(ipcMain, {
+  here,
+  resourcesPath: () => process.resourcesPath,
+  userData: () => app.getPath('userData'),
+  emitLog: (mode, message, kind) => {
+    emitLog(mode, message, kind ?? false);
+  },
+});
 
 ipcMain.handle('miner:stop', async () => {
   stopRequested = true;
@@ -1126,5 +972,6 @@ app.on('window-all-closed', () => {
   protocolClient?.close();
   killWorkers();
   stopPoolChild();
+  stopAllProcesses();
   app.quit();
 });

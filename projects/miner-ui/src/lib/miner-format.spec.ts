@@ -1,4 +1,4 @@
-import { cookiePathHint, formatHashRate, formatSats, gpuStatusHint, gpuStatusHintWeb, mainIsNotLive } from './miner-format';
+import { cookiePathHint, formatHashRate, formatSats, formatStakeGfCn, gpuStatusHint, gpuStatusHintWeb, mainIsNotLive } from './miner-format';
 
 describe('gpuStatusHintWeb', () => {
   it('covers detecting, unscanned, missing adapter, and ready', () => {
@@ -48,5 +48,16 @@ describe('formatSats', () => {
   it('formats whole tokens to 8 decimals without float', () => {
     expect(formatSats('5000000000')).toBe('50.00000000');
     expect(formatSats('34180')).toBe('0.00034180');
+  });
+});
+
+describe('formatStakeGfCn', () => {
+  it('rounds above one GFCN to a whole token and keeps smaller amounts as tokens', () => {
+    expect(formatStakeGfCn('150000000')).toBe('2');
+    expect(formatStakeGfCn('140000000')).toBe('1');
+    expect(formatStakeGfCn('5000000000')).toBe('50');
+    expect(formatStakeGfCn('100000000')).toBe('1');
+    expect(formatStakeGfCn('34180')).toBe('0.0003418');
+    expect(formatStakeGfCn('50000000')).toBe('0.5');
   });
 });

@@ -269,7 +269,9 @@ function snapshot(cdp) {
       tides = [];
     }
     return {
-      network: val('network-toggle'),
+      network: document.querySelector('#network-toggle .mat-mdc-select-value-text')?.textContent?.trim()
+        ?? document.getElementById('network-toggle')?.textContent?.trim()
+        ?? null,
       operator: val('testnet-pool-operator'),
       poolStatus: poolRec.Status ?? '',
       poolHeight: poolRec.Height ?? '',
@@ -279,12 +281,8 @@ function snapshot(cdp) {
       kind: {
         node: checked('testnet-mineToNode'),
         stratum: checked('testnet-mineToStratum'),
-        datum: checked('testnet-mineToDatum'),
-        appS: exists('testnet-mineToAppPoolStratum') && checked('testnet-mineToAppPoolStratum'),
-        appD: exists('testnet-mineToAppPoolDatum') && checked('testnet-mineToAppPoolDatum'),
       },
       appPoolRadios: exists('testnet-mineToAppPoolStratum'),
-      frozen: txt('.frozen'),
       toast: txt('[role="status"]'),
       err: txt('[data-chain="testnet"] .err'),
       startDisabled: !!document.getElementById('testnet-start')?.disabled,
@@ -340,8 +338,8 @@ async function main() {
   const out = { operatorLen: operator.length, walletALen: walletA.length };
   const { cdp, ws } = await connect();
   try {
-  const net = await cdp.eval(`document.getElementById('network-toggle')?.value`);
-  if (net !== 'testnet') {
+  const net = await cdp.eval(`document.querySelector('#network-toggle .mat-mdc-select-value-text')?.textContent?.trim() || document.getElementById('network-toggle')?.textContent?.trim()`);
+  if (!String(net).toLowerCase().includes('testnet')) {
     throw new Error(`network is ${net}, expected testnet`);
   }
   await cdp.eval(`document.getElementById('testnet-tab-pool')?.click()`);
@@ -371,21 +369,19 @@ async function main() {
     'pool start',
   );
   await cdp.eval(`document.getElementById('testnet-tab-mine')?.click()`);
-  out.poolRadios = await waitFor(
-    cdp,
-    `document.getElementById('testnet-mineToAppPoolStratum') ? { radios: true } : null`,
-    10000,
-    'app-pool radios',
-  );
+  out.noAppPoolRadios = await cdp.eval(`!document.getElementById('testnet-mineToAppPoolStratum')`);
+  if (!out.noAppPoolRadios) {
+    throw new Error('mill still shows app-pool MineTo radios');
+  }
 
-  await cdp.eval(`document.getElementById('testnet-mineToAppPoolStratum').click()`);
+  await cdp.eval(`document.getElementById('testnet-mineToStratum').click()`);
   out.gpu = await selectFirstGpu(cdp);
   if (!out.gpu.selected || out.gpu.checked !== true) {
     throw new Error(`GPU not selected (${out.gpu.hint ?? out.gpu.reason ?? 'no card'})`);
   }
-  out.pasteAppStratum = await paste(cdp, 'testnet-appPoolStratumWorker', `${walletA}.cpu`);
+  out.pasteStratumA = await paste(cdp, 'testnet-stratumWorker', `${walletA}.cpu`);
   await cdp.eval(`document.getElementById('testnet-start').click()`);
-  out.appStratum = await waitFor(
+  out.stratumA = await waitFor(
     cdp,
     `(() => {
       const dl = document.querySelector('#testnet-mining dl');
@@ -396,7 +392,7 @@ async function main() {
       return null;
     })()`,
     90000,
-    'app-pool stratum hasher',
+    'stratum hasher A',
   );
   await cdp.eval(`document.getElementById('testnet-stop').click()`);
   await waitFor(
@@ -406,34 +402,20 @@ async function main() {
     'hasher stop',
   );
 
-  await cdp.eval(`document.getElementById('testnet-mineToAppPoolDatum').click()`);
-  await selectCookieAuth(cdp, 'testnet-appPoolDatum');
-  out.pasteAppDatumRpc = await paste(cdp, 'testnet-appPoolDatum-rpcHost', '127.0.0.1');
-  out.pasteAppDatum = await paste(cdp, 'testnet-appPoolDatumWorker', `${walletB}.datum`);
+  out.pasteStratumB = await paste(cdp, 'testnet-stratumWorker', `${walletB}.cpu`);
   await cdp.eval(`document.getElementById('testnet-start').click()`);
-  await waitFor(
-    cdp,
-    `(() => {
-      const dl = document.querySelector('#testnet-mining dl');
-      const rec = Object.fromEntries([...dl.querySelectorAll('dt')].map((dt, i) => [dt.textContent.trim(), dl.querySelectorAll('dd')[i]?.textContent.trim() ?? '']));
-      return Number(rec.Accepted || 0) === 0 && /datum/i.test(rec.Endpoint || '') ? rec : null;
-    })()`,
-    10000,
-    'datum hasher reset',
-  );
-  out.appDatum = await waitFor(
+  out.stratumB = await waitFor(
     cdp,
     `(() => {
       const dl = document.querySelector('#testnet-mining dl');
       const rec = Object.fromEntries([...dl.querySelectorAll('dt')].map((dt, i) => [dt.textContent.trim(), dl.querySelectorAll('dd')[i]?.textContent.trim() ?? '']));
       const accepted = Number(rec.Accepted || 0);
-      if (accepted > 0 && /datum/i.test(rec.Endpoint || '')) {
-        return { rec };
-      }
+      const err = document.querySelector('#testnet-mining .err')?.textContent ?? '';
+      if (accepted > 0 && /stratum/i.test(rec.Endpoint || '')) return { rec, err };
       return null;
     })()`,
     90000,
-    'app-pool datum hasher',
+    'stratum hasher B',
   );
   await cdp.eval(`document.getElementById('testnet-tab-pool')?.click()`);
   await waitFor(

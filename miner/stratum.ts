@@ -1,5 +1,6 @@
 import { createConnection, type Socket } from 'node:net';
 import { parseHex, toHex } from './bytes.js';
+import { formatStratumReject } from './stratum-reject.js';
 
 export const STRATUM_HOST = '127.0.0.1';
 export const STRATUM_PORT = 23334;
@@ -293,8 +294,7 @@ export class StratumClient {
     }
     if (typeof rec.id === 'number' && rec.id >= 10) {
       const ok = rec.result === true && rec.error == null;
-      const err =
-        rec.error == null ? undefined : typeof rec.error === 'string' ? rec.error : JSON.stringify(rec.error);
+      const err = rec.error == null ? undefined : formatStratumReject(rec.error);
       this.handlers.onSubmitResult(ok, err);
     }
   }

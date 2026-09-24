@@ -17,18 +17,15 @@ export type StratumFormDefaults = {
   password: string;
 };
 
-export type DatumWebsocketFormDefaults = {
-  url: string;
-};
-
 export type WebChainDefaults = {
   mineToKind: MineToKind;
-  stratumWebsocket: StratumFormDefaults;
-  datumWebsocket: DatumWebsocketFormDefaults;
+  stratumPoolWebsocket: { url: string };
+  datumGatewayWebsocket: { url: string };
 };
 
 export type WebDefaults = {
   hosted: HostedEndpoints;
+  registryBaseUrl: string;
   chains: {
     main: WebChainDefaults;
     testnet: WebChainDefaults;
@@ -39,8 +36,6 @@ export type AppChainDefaults = {
   mineToKind: MineToKind;
   rpc: { host: string; port: number };
   stratum: StratumFormDefaults;
-  datum: { host: string; port: number };
-  datumWebsocket: DatumWebsocketFormDefaults;
   pool: {
     stratumHost: string;
     stratumPort: number;
@@ -51,6 +46,7 @@ export type AppChainDefaults = {
 };
 
 export type AppDefaults = {
+  registryBaseUrl: string;
   chains: {
     main: AppChainDefaults;
     testnet: AppChainDefaults;

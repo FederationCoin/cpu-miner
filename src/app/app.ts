@@ -1,9 +1,12 @@
 import { Component, effect, inject } from '@angular/core';
-import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, type MinerChain } from '@federationcoin/miner-ui';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, WalletService, type MinerChain } from '@federationcoin/miner-ui';
 
 @Component({
   selector: 'app-root',
-  imports: [NetworkWorkspace, MinerFooter],
+  imports: [NetworkWorkspace, MinerFooter, MatToolbarModule, MatFormFieldModule, MatSelectModule],
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
@@ -11,15 +14,11 @@ export class App {
   protected readonly mining = inject(MiningService);
   protected readonly pool = inject(PoolService);
   protected readonly network = inject(NetworkContext);
+  protected readonly wallet = inject(WalletService);
 
   constructor() {
     effect(() => {
-      const s = this.pool.stats();
-      const kind = this.mining.sessionKind();
-      if (!s.running && (kind === 'appPoolStratum' || kind === 'appPoolDatum')) {
-        void this.mining.stop();
-        this.mining.warn('App pool stopped; mining stopped.');
-      }
+      void this.wallet.load(this.network.chain());
     });
   }
 

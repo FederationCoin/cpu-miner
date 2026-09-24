@@ -23,4 +23,4 @@ export function webDemoShell(defaults: WebDefaults = WEB_DEFAULTS): MinerShell {
   return { kind: 'webDemo', defaults };
 }
 
-export type WorkspaceTab = 'mine' | 'pool' | 'docs' | 'finder';
+export type WorkspaceTab = 'node' | 'wallet' | 'mine' | 'gateway' | 'radar' | 'finder' | 'docs' | 'pool';

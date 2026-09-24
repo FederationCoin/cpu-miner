@@ -50,6 +50,26 @@ export function formatHashRate(n: number): string {
   return `${n.toFixed(0)} H/s`;
 }
 
+export function formatStakeGfCn(sats: string): string {
+  let n: bigint;
+  try {
+    n = BigInt(sats);
+  } catch {
+    return sats;
+  }
+  const neg = n < 0n;
+  const v = neg ? -n : n;
+  const one = 100_000_000n;
+  if (v > one) {
+    const rounded = (v + 50_000_000n) / one;
+    return `${neg ? '-' : ''}${rounded}`;
+  }
+  const whole = v / one;
+  const frac = (v % one).toString().padStart(8, '0');
+  const trimmed = `${whole}.${frac}`.replace(/0+$/, '').replace(/\.$/, '');
+  return `${neg ? '-' : ''}${trimmed}`;
+}
+
 export function formatSats(sats: string): string {
   let n: bigint;
   try {

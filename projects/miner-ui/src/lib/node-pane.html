@@ -1,0 +1,82 @@
+<div class="pane">
+  @if (isWeb()) {
+    <app-node-download-cta />
+  } @else if (!extraPresent()) {
+    <app-addon-missing-card label="Node" />
+  } @else {
+    @if (showMainWarning()) {
+      <p class="warn" data-main-warning>
+        Main is not live. The Big One will not start a node on dummy MAIN.
+      </p>
+    }
+    <app-process-card
+      [idPrefix]="chain() + '-node'"
+      title="Local node"
+      pathLabel="Node data directory"
+      otherNoun="federationcoind"
+      [showStart]="showStart()"
+      [showStop]="showStop()"
+      [showBrowse]="true"
+      [path]="datadir.value"
+      [pathDisabled]="status().session !== 'idle'"
+      [command]="status().command"
+      [pid]="status().pid"
+      [cpu]="status().cpu"
+      [rss]="status().rss"
+      [otherCount]="status().otherCount"
+      [ports]="status().ports"
+      [logTail]="status().logTail"
+      [lastError]="status().lastError"
+      [session]="status().session"
+      [height]="status().height"
+      (poll)="refresh()"
+      (start)="start()"
+      (stop)="stop()"
+      (browse)="browse()"
+      (pathChange)="onPath($event)"
+    />
+    @if (error()) {
+      <p class="err">{{ error() }}</p>
+    }
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Network</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="hint">Peers and traffic from the local node.</p>
+        <dl>
+          <dt>In</dt>
+          <dd>{{ status().trafficIn || '—' }}</dd>
+          <dt>Out</dt>
+          <dd>{{ status().trafficOut || '—' }}</dd>
+        </dl>
+        @if (status().peers.length === 0) {
+          <p class="hint">No peers.</p>
+        } @else {
+          <ul class="peers">
+            @for (p of status().peers; track p.addr) {
+              <li>{{ p.addr }} · sent {{ p.bytesSent }} · received {{ p.bytesRecv }}</li>
+            }
+          </ul>
+        }
+      </mat-card-content>
+    </mat-card>
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Recent transactions</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="hint">{{ status().transactionsNote || 'Broadcasts the node wallet knows about.' }}</p>
+        @if (status().transactions.length === 0) {
+          <p class="hint">None.</p>
+        } @else {
+          <ul class="txs">
+            @for (tx of status().transactions; track tx.txid + tx.category) {
+              <li>{{ tx.category }} {{ tx.amount }} <span class="mono">{{ tx.txid }}</span></li>
+            }
+          </ul>
+        }
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

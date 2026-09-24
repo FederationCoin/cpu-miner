@@ -1,0 +1,18 @@
+@startuml mill-desktop
+title Desktop mill
+left to right direction
+rectangle "Electron mill\napp" as Mill
+rectangle "Stratum pool" as Pool
+rectangle "DATUM Gateway" as Gw
+rectangle "Node" as Node
+rectangle "DATUM Prime" as Prime
+Mill --> Pool : TCP Stratum
+Mill --> Gw : TCP Stratum
+Mill --> Node : RPC
+Gw --> Node : GBT submitblock
+Gw --> Prime : DATUM
+note bottom of Mill
+  No WSS required.
+  Host a pool stays Prime spawn.
+end note
+@enduml

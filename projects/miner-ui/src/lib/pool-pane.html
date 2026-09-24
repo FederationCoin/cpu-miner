@@ -1,34 +1,6 @@
 <div class="pane" [formGroup]="form" [attr.data-tides]="tidesJson()">
-  @if (hostedMainDisabled()) {
-    <p class="warn" data-pool-main-warning>
-      Federation pool is not supported on main. It is offered only as a demonstration piece on
-      testnet. Point a miner at another pool if you have one. DATUM on main still needs your own
-      node and the desktop app.
-    </p>
-  } @else if (isHosted()) {
-    <h3>{{ hostedLabel() }}</h3>
     <p class="hint">
-      This pool is already set up and running if you want to mine. Settings are read-only; the
-      server image owns the config. Not the pool of record.
-    </p>
-    <dl>
-      <dt>Stratum TCP</dt>
-      <dd class="mono">{{ hostedStratum() }}</dd>
-      <dt>Stratum WSS</dt>
-      <dd class="mono">{{ hostedWss() }}</dd>
-      <dt>DATUM TCP</dt>
-      <dd class="mono">{{ hostedDatum() }}</dd>
-      <dt>DATUM WSS</dt>
-      <dd class="mono">{{ hostedDatumWss() }}</dd>
-    </dl>
-    <p class="hint">
-      DATUM is bring your own node. The desktop app can connect DATUM to these TCP ports with
-      <em>your</em> bitcoind. Pool <code>WSS /datum</code> is the coinbaser wrap only. This page
-      will not proxy ours.
-    </p>
-  } @else {
-    <p class="hint">
-      Starts a local DATUM Prime + TIDES + Stratum v1 process against
+      Starts a local DATUM Prime Pool + TIDES + Stratum v1 process against
       <code>federationcoind</code>. This is a <strong>friends-and-family</strong> pool: one
       process, JSONL on disk, not hardened. If a share is dropped you can get right with people
       you know. That is a problem at scale (strangers, public hashrate). Not the pool of record.
@@ -55,12 +27,12 @@
           <legend>Node RPC {{ $index + 1 }}</legend>
           <app-rpc-connect [form]="rpc" [idPrefix]="rpcIdPrefix($index)" [chain]="chain()" />
           @if (form.controls.rpc.length > 1) {
-            <button type="button" [id]="id('remove-rpc-' + $index)" (click)="removeRpc($index)">Remove</button>
+            <button mat-stroked-button type="button" [id]="id('remove-rpc-' + $index)" (click)="removeRpc($index)">Remove</button>
           }
         </fieldset>
       }
     }
-    <button type="button" [id]="id('add-rpc')" (click)="addRpc()">Add node</button>
+    <button mat-stroked-button type="button" [id]="id('add-rpc')" (click)="addRpc()">Add node</button>
 
     <label [attr.for]="id('operator')">Operator payout ({{ config().hrp }}1)</label>
     <input
@@ -84,9 +56,9 @@
       </fieldset>
     </app-defaults-fold>
 
-    <app-defaults-fold [foldId]="id('datum-fold')" title="DATUM Prime bind" [summary]="bindSummary(form.controls.datumHost.value, form.controls.datumPort.value)">
+    <app-defaults-fold [foldId]="id('datum-fold')" title="DATUM Prime Pool bind" [summary]="bindSummary(form.controls.datumHost.value, form.controls.datumPort.value)">
       <fieldset class="partition">
-        <legend>DATUM Prime bind</legend>
+        <legend>DATUM Prime Pool bind</legend>
         <label [attr.for]="id('datumHost')">Host</label>
         <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="datumHost" />
         <label [attr.for]="id('datumPort')">Port</label>
@@ -99,10 +71,9 @@
     }
 
     <div class="row">
-      <button type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
-      <button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+      <button mat-flat-button color="primary" type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
+      <button mat-stroked-button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
     </div>
-  }
 
   <dl>
     <dt>Status</dt>
@@ -125,7 +96,8 @@
       Fee is a percent of each miner’s window share (default 2%). Each proof is
       credited at its assigned share target. If the log is thinner than 8 × nDiff,
       miners split the full coinbase minus fee. Unfilled remainder is floor dust,
-      not an empty-window tax.
+      not an empty-window tax. Mining to the operator address is one coinbase
+      row: that line is their own work plus fees, not a second output.
     </p>
     <dl>
       <dt>Miner net</dt>

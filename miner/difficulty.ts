@@ -56,12 +56,12 @@ export function easierTarget(a: Uint8Array, b: Uint8Array): Uint8Array {
   return targetToBig(a) >= targetToBig(b) ? a : b;
 }
 
+/** Share hunt uses set_difficulty only. After accept, hunt block nBits. */
 export function grindTargetForShare(nBits: number, shareDiff: bigint): Uint8Array | null {
-  const block = targetFromCompact(nBits);
-  if (!block) {
+  if (!targetFromCompact(nBits)) {
     return null;
   }
-  return easierTarget(block, shareTargetFromDiff(shareDiff));
+  return shareTargetFromDiff(shareDiff);
 }
 
 /** After a share, hunt the block nBits, not the easier share target. */

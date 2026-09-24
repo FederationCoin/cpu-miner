@@ -1,4 +1,5 @@
 import type { GpuPick, NativeGpuDevice } from './gpu-catalog';
+import type { RegistryRequest, RegistryResponse } from './registry';
 
 export type MinerChain = 'main' | 'testnet';
 
@@ -64,6 +65,8 @@ export type WebGpuIpcProgress = {
   hashes: number;
 };
 
+export const STRATUM_PASSWORD = 'x';
+
 export type RpcAuthKind = 'cookie' | 'userpass';
 
 export type RpcAuthConnect =
@@ -83,28 +86,27 @@ export type StratumConnect = {
   password: string;
 };
 
-export type DatumConnect = {
-  host: string;
-  port: number;
-  worker: string;
-  rpc: RpcConnect;
-};
-
-export type DatumWebsocketConnect = {
-  url: string;
-};
-
+/** Web mill: WSS URL is the endpoint. Authorize password is always `x`. */
 export type MineTo =
   | { kind: 'node'; rpc: RpcConnect; payout: string }
   | { kind: 'stratum'; stratum: StratumConnect }
-  | { kind: 'stratumWebsocket'; stratumWebsocket: StratumConnect }
-  | { kind: 'datum'; datum: DatumConnect }
-  | { kind: 'datumWebsocket'; datumWebsocket: DatumWebsocketConnect }
-  | { kind: 'appPoolStratum'; worker: string; password: string }
-  | { kind: 'appPoolDatum'; worker: string; rpc: RpcConnect }
-  | { kind: 'hostedPoolStratum'; worker: string; password: string };
+  | { kind: 'datumGateway'; gateway: StratumConnect }
+  | { kind: 'stratumPoolWebsocket'; url: string; worker: string }
+  | { kind: 'datumGatewayWebsocket'; url: string; worker: string };
 
 export type MineToKind = MineTo['kind'];
+
+export type WebStratumKind = 'stratumPoolWebsocket' | 'datumGatewayWebsocket';
+
+export function isWebStratumKind(kind: MineToKind): kind is WebStratumKind {
+  return kind === 'stratumPoolWebsocket' || kind === 'datumGatewayWebsocket';
+}
+
+export function isWebStratumMineTo(
+  mineTo: MineTo,
+): mineTo is Extract<MineTo, { kind: WebStratumKind }> {
+  return isWebStratumKind(mineTo.kind);
+}
 
 export type MinerStartOpts = {
   chain: MinerChain;
@@ -152,6 +154,95 @@ export function tidesSatsField(raw: unknown): string {
   return '0';
 }
 
+export type ToastKind = 'ok' | 'error';
+
+export type MinerToast = {
+  message: string;
+  kind: ToastKind;
+};
+
+export type ExtrasProbe = {
+  node: boolean;
+  gateway: boolean;
+  pool: boolean;
+};
+
+export type PortLine = { label: string; port: number };
+export type PeerLine = { addr: string; bytesSent: number; bytesRecv: number };
+export type TxLine = { txid: string; amount: string; category: string };
+
+export type NodeStatusView = {
+  session: 'idle' | 'spawned' | 'attached';
+  chain: MinerChain | null;
+  height: number;
+  running: boolean;
+  lastError: string;
+  pid: number | null;
+  command: string;
+  datadir: string;
+  cpu: string;
+  rss: string;
+  otherCount: number;
+  ports: PortLine[];
+  logTail: string;
+  peers: PeerLine[];
+  trafficIn: string;
+  trafficOut: string;
+  transactions: TxLine[];
+  transactionsNote: string;
+};
+
+export const EMPTY_NODE_STATUS: NodeStatusView = {
+  session: 'idle',
+  chain: null,
+  height: 0,
+  running: false,
+  lastError: '',
+  pid: null,
+  command: '',
+  datadir: '',
+  cpu: '',
+  rss: '',
+  otherCount: 0,
+  ports: [],
+  logTail: '',
+  peers: [],
+  trafficIn: '',
+  trafficOut: '',
+  transactions: [],
+  transactionsNote: '',
+};
+
+export type GatewayStatusView = {
+  session: 'idle' | 'spawned';
+  running: boolean;
+  chain?: MinerChain | null;
+  lastError: string;
+  pid: number | null;
+  command: string;
+  configPath: string;
+  cpu: string;
+  rss: string;
+  otherCount: number;
+  ports: PortLine[];
+  logTail: string;
+};
+
+export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
+  session: 'idle',
+  running: false,
+  chain: null,
+  lastError: '',
+  pid: null,
+  command: '',
+  configPath: '',
+  cpu: '',
+  rss: '',
+  otherCount: 0,
+  ports: [],
+  logTail: '',
+};
+
 export type MinerApi = {
   start: (opts: MinerStartOpts) => Promise<{ ok: boolean; error?: string }>;
   stop: () => Promise<void>;
@@ -161,7 +252,7 @@ export type MinerApi = {
   logHistory: () => Promise<LogLine[]>;
   onStats: (cb: (s: MinerStats) => void) => () => void;
   onLog: (cb: (line: LogLine) => void) => () => void;
-  onToast: (cb: (message: string) => void) => () => void;
+  onToast: (cb: (toast: MinerToast) => void) => () => void;
   poolStart: (opts: PoolStartOpts) => Promise<{ ok: boolean; error?: string }>;
   poolStop: () => Promise<void>;
   poolRefresh: () => Promise<{ ok: boolean; error?: string }>;
@@ -171,6 +262,23 @@ export type MinerApi = {
   webGpuFound?: (msg: WebGpuIpcFound) => Promise<void>;
   webGpuProgress?: (msg: WebGpuIpcProgress) => Promise<void>;
   webGpuLog?: (message: string) => Promise<void>;
+  registryRequest?: (req: RegistryRequest) => Promise<RegistryResponse>;
+  extrasProbe?: () => Promise<ExtrasProbe>;
+  nodeStart?: (opts: { chain: MinerChain; datadir: string }) => Promise<{ ok: boolean; error?: string }>;
+  nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
+  nodeStatus?: (opts: { chain: MinerChain; datadir: string }) => Promise<NodeStatusView>;
+  gatewayStart?: (opts: {
+    chain: MinerChain;
+    poolAddress: string;
+    poolHost?: string;
+    poolPubkey?: string;
+    configPath?: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
+  gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
+  gatewayStatus?: (opts: { chain: MinerChain; configPath: string }) => Promise<GatewayStatusView>;
+  fetchPrimeKeys?: (url: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
+  walletLoad?: (chain: MinerChain) => Promise<string | null>;
+  walletSave?: (chain: MinerChain, blob: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
 declare global {

@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   authorizeLine,
+  fetchGatewayInfo,
+  isLoopbackWsHost,
   nextWsBackoff,
   parseNotify,
+  parseGatewayInfoNotify,
+  parseGatewayInfoRpc,
   parsePoolStats,
   parseSetDifficulty,
   parseSubscribeResult,
+  gatewayInfoLine,
+  peerStatusLabel,
   notifyIgnoreReason,
   shareBodyKey,
   isTcpStratumEndpoint,
@@ -289,6 +295,7 @@ describe('StratumWsClient outbox', () => {
     sockets[0]!.pushLine({ id: 12, error: [23, 'high-hash', null], result: false });
     expect(results).toHaveLength(2);
     expect(results[1]!.ok).toBe(false);
+    expect(results[1]!.err).toBe('Share was not hard enough');
     client.close();
   });
 
@@ -592,5 +599,135 @@ describe('PoolStatsClient', () => {
     });
     expect(heights).toEqual([2]);
     client.close();
+  });
+});
+
+describe('client.gateway_info', () => {
+  const withPrime = {
+    node: { status: 'healthy' },
+    pool: {
+      name: 'House',
+      coinbaseTag: 'TAG',
+      websiteUrl: 'https://ex.example',
+      prime: 'prime.example:28916',
+      status: 'healthy',
+    },
+  };
+  const withPrimeFields = {
+    nodeStatus: 'healthy' as const,
+    name: 'House',
+    coinbaseTag: 'TAG',
+    websiteUrl: 'https://ex.example',
+    prime: 'prime.example:28916',
+    poolStatus: 'healthy' as const,
+  };
+  const solo = {
+    node: { status: 'healthy' },
+    pool: { name: 'Local WSS test', coinbaseTag: 'DATUM Gateway', websiteUrl: 'https://mine.federationcoin.org' },
+  };
+
+  it('parses notify, result, JSON-RPC error, and rejects a flat old pool_info object', () => {
+    expect(
+      parseGatewayInfoNotify({
+        id: null,
+        method: 'client.gateway_info',
+        params: [withPrime],
+      }),
+    ).toEqual(withPrimeFields);
+    expect(parseGatewayInfoRpc({ id: 9, error: null, result: withPrime })).toEqual({
+      kind: 'provided',
+      fields: withPrimeFields,
+    });
+    expect(parseGatewayInfoRpc({ id: 9, error: [24, 'gateway info disabled', null], result: null })).toEqual({
+      kind: 'notProvided',
+    });
+    expect(parseGatewayInfoNotify({ id: null, method: 'client.gateway_info', params: [solo] })).toEqual({
+      nodeStatus: 'healthy',
+      name: 'Local WSS test',
+      coinbaseTag: 'DATUM Gateway',
+      websiteUrl: 'https://mine.federationcoin.org',
+    });
+    expect(
+      parseGatewayInfoRpc({
+        id: 9,
+        error: null,
+        result: { prime: 'p.example:28916', name: 'House', coinbaseTag: 'TAG', websiteUrl: '' },
+      }),
+    ).toEqual({ kind: 'notProvided' });
+    expect(JSON.parse(gatewayInfoLine())).toEqual({ id: 9, method: 'client.gateway_info', params: [] });
+    expect(peerStatusLabel('healthy')).toBe('Healthy');
+    expect(peerStatusLabel('not-healthy')).toBe('Not healthy');
+    expect(
+      parseGatewayInfoNotify({
+        id: null,
+        method: 'client.gateway_info',
+        params: [{ node: { status: 'healthy' }, pool: { name: 'House', status: 'healthy' } }],
+      }),
+    ).toBeNull();
+  });
+
+  it('treats localhost and loopback gateway URLs as loopback', () => {
+    expect(isLoopbackWsHost('ws://127.0.0.1:23335/stratum')).toBe(true);
+    expect(isLoopbackWsHost('ws://localhost:23335/stratum')).toBe(true);
+    expect(isLoopbackWsHost('ws://[::1]:23335/stratum')).toBe(true);
+    expect(isLoopbackWsHost('wss://pool.example/stratum')).toBe(false);
+  });
+
+  it('sends client.gateway_info on open when onGatewayInfo is set and accepts an error without dropping mining', () => {
+    const sockets: FakeWebSocket[] = [];
+    const infos: string[] = [];
+    const client = new StratumWsClient(
+      'ws://127.0.0.1:23335/stratum',
+      'tgfcn1abc.cpu',
+      'x',
+      silentHandlers({
+        onGatewayInfo: (info) => infos.push(info.kind),
+      }),
+      {
+        open: (url) => {
+          const ws = new FakeWebSocket(url);
+          sockets.push(ws);
+          return ws as unknown as WebSocket;
+        },
+      },
+    );
+    client.connect();
+    sockets[0]!.openNow();
+    expect(sockets[0]!.sent.some((l) => l.includes('client.gateway_info'))).toBe(true);
+    handshake(sockets[0]!);
+    sockets[0]!.pushLine({ id: 9, error: [24, 'gateway info disabled', null], result: null });
+    expect(infos).toEqual(['notProvided']);
+    expect(client.isOpen()).toBe(true);
+    client.requestGatewayInfo();
+    expect(sockets[0]!.sent.filter((l) => l.includes('client.gateway_info')).length).toBe(2);
+    client.close();
+  });
+
+  it('one-shot fetch closes after a result and does not subscribe', async () => {
+    const sockets: FakeWebSocket[] = [];
+    const pending = fetchGatewayInfo('ws://127.0.0.1:23335/stratum', {
+      open: (url) => {
+        const ws = new FakeWebSocket(url);
+        sockets.push(ws);
+        return ws as unknown as WebSocket;
+      },
+    });
+    sockets[0]!.openNow();
+    expect(sockets[0]!.sent.some((l) => l.includes('client.gateway_info'))).toBe(true);
+    expect(sockets[0]!.sent.some((l) => l.includes('mining.subscribe'))).toBe(false);
+    sockets[0]!.pushLine({
+      id: 9,
+      error: null,
+      result: solo,
+    });
+    await expect(pending).resolves.toEqual({
+      kind: 'provided',
+      fields: {
+        nodeStatus: 'healthy',
+        name: 'Local WSS test',
+        coinbaseTag: 'DATUM Gateway',
+        websiteUrl: 'https://mine.federationcoin.org',
+      },
+    });
   });
 });

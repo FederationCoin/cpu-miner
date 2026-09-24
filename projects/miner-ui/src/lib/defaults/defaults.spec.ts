@@ -2,15 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { APP_DEFAULTS, WEB_DEFAULTS } from './defaults';
 
 describe('miner defaults JSON', () => {
-  it('web testnet Stratum Websocket is the WSS host on 443', () => {
-    expect(WEB_DEFAULTS.chains.testnet.stratumWebsocket).toEqual({
-      host: 'pool.testnet.federationcoin.org',
-      port: 443,
-      password: 'x',
+  it('web testnet MineTo is pool WebSocket; gateway URL is local WSS', () => {
+    expect(WEB_DEFAULTS.chains.testnet.mineToKind).toBe('stratumPoolWebsocket');
+    expect(WEB_DEFAULTS.chains.testnet.stratumPoolWebsocket).toEqual({ url: '' });
+    expect(WEB_DEFAULTS.chains.testnet.datumGatewayWebsocket).toEqual({
+      url: 'ws://127.0.0.1:23335/stratum',
     });
     expect(WEB_DEFAULTS.hosted.stratumWss).toBe('wss://pool.testnet.federationcoin.org/stratum');
-    expect(WEB_DEFAULTS.chains.testnet.mineToKind).toBe('hostedPoolStratum');
-    expect(WEB_DEFAULTS.chains.testnet.datumWebsocket.url).toBe('wss://pool.testnet.federationcoin.org/datum');
+    expect(WEB_DEFAULTS.registryBaseUrl).toBe('https://pools.federationcoin.org');
   });
 
   it('app testnet Stratum is loopback TCP 23334', () => {
@@ -21,6 +20,6 @@ describe('miner defaults JSON', () => {
     });
     expect(APP_DEFAULTS.chains.testnet.mineToKind).toBe('node');
     expect(APP_DEFAULTS.chains.testnet.pool.stratumPort).toBe(23334);
-    expect(APP_DEFAULTS.chains.testnet.datumWebsocket.url).toBe('wss://pool.testnet.federationcoin.org/datum');
+    expect(APP_DEFAULTS.registryBaseUrl).toBe('https://pools.federationcoin.org');
   });
 });

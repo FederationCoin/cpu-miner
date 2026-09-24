@@ -20,7 +20,17 @@ describe('share targets', () => {
     expect(shareWorkFromTargetByte(8)).toBe(256n);
   });
 
-  it('prefers the easier share target over a harder block nBits', () => {
+  it('hunts share difficulty even when nBits is easier than the share', () => {
+    const nBits = 0x1e00ffff;
+    const block = targetFromCompact(nBits);
+    expect(block).toBeTruthy();
+    const grind = grindTargetForShare(nBits, 2n);
+    expect(grind).toBeTruthy();
+    expect(targetToBig(grind!)).toBe(targetToBig(shareTargetFromDiff(2n)));
+    expect(targetToBig(grind!)).toBeLessThan(targetToBig(block!));
+  });
+
+  it('maps difficulty 1 over a harder block nBits to powLimit', () => {
     const nBits = 0x1b095cae;
     const block = targetFromCompact(nBits);
     expect(block).toBeTruthy();

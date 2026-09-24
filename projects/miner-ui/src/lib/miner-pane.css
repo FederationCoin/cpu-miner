@@ -18,22 +18,50 @@ label {
   font-size: 0.9rem;
 }
 
-input:not([type='checkbox']):not([type='radio']) {
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
   box-sizing: border-box;
   width: 100%;
   padding: 0.45rem 0.55rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
-  background: #1a1d24;
-  color: #e8eaed;
+  background: #15202e;
+  color: #e8e4d9;
   font: inherit;
   user-select: text;
+}
+
+textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.prime-card {
+  margin: 0.85rem 0;
+}
+
+mat-radio-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+mat-form-field {
+  width: 100%;
 }
 
 .row {
   display: flex;
   gap: 0.6rem;
   margin: 1rem 0;
+}
+
+.row.toolbar-row {
+  margin: 0 0 0.75rem;
+  align-items: center;
 }
 
 .path-row {
@@ -57,24 +85,9 @@ input:not([type='checkbox']):not([type='radio']) {
 
 .hint {
   margin: -0.35rem 0 0.85rem;
-  color: #9aa0aa;
+  color: #c4bfb0;
   font-size: 0.82rem;
   line-height: 1.35;
-}
-
-button {
-  padding: 0.45rem 0.9rem;
-  border: 0;
-  border-radius: 4px;
-  background: #3d6ea8;
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 input:disabled,
@@ -91,7 +104,7 @@ dl {
 }
 
 dt {
-  color: #9aa0aa;
+  color: #c4bfb0;
 }
 
 dd {
@@ -113,8 +126,8 @@ dd {
 }
 
 .link-pill[data-link='up'] {
-  background: #1a3358;
-  color: #7eb6ff;
+  background: #15202e;
+  color: #c9a85a;
 }
 
 .link-pill[data-link='down'] {
@@ -123,8 +136,8 @@ dd {
 }
 
 .link-pill[data-link='idle'] {
-  background: #2a2d33;
-  color: #9aa0aa;
+  background: #15202e;
+  color: #c4bfb0;
 }
 
 .err,
@@ -149,25 +162,27 @@ code {
 }
 
 fieldset.mode {
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.4rem 0.75rem 0.55rem;
+  background: #15202e;
 }
 
 fieldset.mode legend,
 fieldset.gpus legend,
 fieldset.partition legend {
   padding: 0 0.35rem;
-  color: #9aa0aa;
+  color: #c4bfb0;
   font-size: 0.82rem;
 }
 
 fieldset.partition {
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.55rem 0.85rem 0.75rem;
+  background: #15202e;
 }
 
 app-defaults-fold {
@@ -197,10 +212,11 @@ fieldset.gpus {
   gap: 0.7rem;
   box-sizing: border-box;
   width: 100%;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
   margin: 0.85rem 0;
   padding: 0.75rem 0.9rem 0.9rem;
+  background: #15202e;
 }
 
 fieldset.gpus button {
@@ -219,19 +235,20 @@ fieldset.gpu-adapter {
   width: 100%;
   margin: 0;
   padding: 0.45rem 0.65rem 0.55rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
+  background: #15202e;
 }
 
 fieldset.gpu-adapter legend {
   display: block;
   padding: 0 0.35rem;
-  color: #e8eaed;
+  color: #e8e4d9;
   font-size: 0.9rem;
 }
 
 .hint-inline {
-  color: #9aa0aa;
+  color: #c4bfb0;
   font-size: 0.78rem;
 }
 
@@ -244,6 +261,122 @@ fieldset.gpu-adapter legend {
 .finder-list li {
   margin: 0 0 1rem;
   padding: 0.75rem 0.85rem;
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
+  background: #15202e;
+}
+
+.finder-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .finder-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.finder-subpane {
+  min-width: 0;
+}
+
+dialog.finder-attest {
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 1rem 1.1rem 1.2rem;
+  border: 1px solid #c9a85a;
+  border-radius: 6px;
+  background: #15202e;
+  color: #e8e4d9;
+}
+
+dialog.finder-attest::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.hodl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.35rem 0.75rem 0.35rem 0.35rem;
+  border: 1px solid #c9a85a;
+  border-radius: 999px;
+  background: #15202e;
+  color: #e8e4d9;
+  font-weight: 600;
+}
+
+.hodl-pill img {
+  display: block;
+  border-radius: 50%;
+}
+
+.connection-rows {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+}
+
+.connection-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.2rem 0;
+  border: 0;
+}
+
+.connection-edit {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.45fr) minmax(12rem, 1fr);
+  gap: 0.4rem;
+  align-items: start;
+}
+
+.connection-edit.has-remove {
+  grid-template-columns: minmax(14rem, 0.45fr) minmax(12rem, 1fr) auto;
+}
+
+.connection-edit .prime-pin {
+  grid-column: 1 / -1;
+}
+
+.stamp-muted {
+  opacity: 0.4;
+}
+
+.stamp-done {
+  color: #c9a85a;
+}
+
+.url-warn {
+  color: #c9a85a;
+  cursor: help;
+}
+
+.mine-to-card,
+.listing-card,
+.prime-card,
+.pool-info-card {
+  margin: 0.75rem 0;
+  background: #15202e;
+  --mdc-elevated-card-container-color: #15202e;
+  --mat-card-elevated-container-color: #15202e;
+}
+
+.docs-figure {
+  margin: 0.75rem 0 1.25rem;
+  max-width: 100%;
+}
+
+.docs-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #c9a85a;
+  border-radius: 6px;
+  background: #0e1824;
 }

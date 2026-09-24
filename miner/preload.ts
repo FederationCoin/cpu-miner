@@ -1,9 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { LogLine } from './log.js';
 import type { MinerStartOpts } from './mine-to.js';
+import type { MinerToast } from './toast.js';
 
 export type { MinerChain } from './chain.js';
-export type { MineTo, MineToKind, MinerStartOpts, RpcConnect, RpcAuthConnect, RpcAuthKind, StratumConnect, DatumConnect } from './mine-to.js';
+export type { MineTo, MineToKind, MinerStartOpts, RpcConnect, RpcAuthConnect, RpcAuthKind, StratumConnect } from './mine-to.js';
 
 export type MinerLink = 'idle' | 'up' | 'down';
 
@@ -93,7 +94,7 @@ contextBridge.exposeInMainWorld('miner', {
   logHistory: () => ipcRenderer.invoke('miner:logHistory') as Promise<LogLine[]>,
   onStats: (cb: (s: MinerStats) => void) => listen('miner:stats', cb),
   onLog: (cb: (line: LogLine) => void) => listen('miner:log', cb),
-  onToast: (cb: (message: string) => void) => listen('miner:toast', cb),
+  onToast: (cb: (toast: MinerToast) => void) => listen('miner:toast', cb),
   onWebGpuJob: (cb: (job: unknown) => void) => listen('miner:webgpu-job', cb),
   onWebGpuStop: (cb: (msg: { gen: number }) => void) => listen('miner:webgpu-stop', cb),
   webGpuFound: (msg: unknown) => ipcRenderer.invoke('miner:webgpu-found', msg),
@@ -103,4 +104,22 @@ contextBridge.exposeInMainWorld('miner', {
   poolStop: () => ipcRenderer.invoke('pool:stop'),
   poolRefresh: () => ipcRenderer.invoke('pool:refresh'),
   onPoolStats: (cb: (s: PoolStats) => void) => listen('pool:stats', cb),
+  registryRequest: (req: {
+    method: string;
+    path: string;
+    chain: 'main' | 'testnet';
+    body?: unknown;
+    authorization?: string;
+  }) => ipcRenderer.invoke('registry:request', req),
+  extrasProbe: () => ipcRenderer.invoke('extras:probe'),
+  nodeStart: (opts: { chain: import('./chain.js').MinerChain; datadir: string }) => ipcRenderer.invoke('node:start', opts),
+  nodeStop: () => ipcRenderer.invoke('node:stop'),
+  nodeStatus: (opts: { chain: import('./chain.js').MinerChain; datadir: string }) => ipcRenderer.invoke('node:status', opts),
+  gatewayStart: (opts: unknown) => ipcRenderer.invoke('gateway:start', opts),
+  gatewayStop: () => ipcRenderer.invoke('gateway:stop'),
+  gatewayStatus: (opts: { chain: import('./chain.js').MinerChain; configPath: string }) =>
+    ipcRenderer.invoke('gateway:status', opts),
+  fetchPrimeKeys: (url: string) => ipcRenderer.invoke('prime:fetchKeys', url),
+  walletLoad: (chain: import('./chain.js').MinerChain) => ipcRenderer.invoke('wallet:load', chain),
+  walletSave: (chain: import('./chain.js').MinerChain, blob: string) => ipcRenderer.invoke('wallet:save', chain, blob),
 });

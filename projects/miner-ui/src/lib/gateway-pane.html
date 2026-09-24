@@ -1,0 +1,96 @@
+<div class="pane">
+  @if (isWeb()) {
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title>Local gateway WebSocket</mat-card-title>
+      </mat-card-header>
+      <mat-card-content [formGroup]="webForm">
+        <p class="hint">
+          Point Mine at this URL if a desktop Big One (or laptop gateway) is already listening.
+          The browser cannot cookie-RPC.
+        </p>
+        <mat-form-field appearance="outline">
+          <mat-label>DATUM Gateway WebSocket URL</mat-label>
+          <input matInput [id]="chain() + '-gateway-wss'" type="text" [placeholder]="hints.gatewayWss" formControlName="url" />
+          <mat-hint>{{ hints.gatewayWss }}</mat-hint>
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+    <app-node-download-cta />
+  } @else if (!extraPresent()) {
+    <app-addon-missing-card label="DATUM Gateway" />
+  } @else {
+    @if (showMainWarning()) {
+      <p class="warn" data-main-warning>
+        Main is not live. The Big One will not start a gateway on dummy MAIN.
+      </p>
+    }
+    <mat-card [formGroup]="deskForm">
+      <mat-card-header>
+        <mat-card-title>Gateway settings</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="hint">
+          Default is solo. House Prime is opt-in. The hasher still speaks Stratum only.
+          Local binds are 127.0.0.1.
+        </p>
+        <mat-form-field appearance="outline">
+          <mat-label>Payout address for gateway coinbase</mat-label>
+          <input matInput [id]="chain() + '-gateway-payout'" type="text" formControlName="poolAddress" />
+          <mat-hint>Address the gateway writes in the coinbase. Use a wallet receive address.</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>House Prime host</mat-label>
+          <input matInput [id]="chain() + '-gateway-prime-host'" type="text" [placeholder]="hints.prime" formControlName="poolHost" />
+          <mat-hint>Empty means solo. {{ hints.prime }}</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Prime identity pubkey</mat-label>
+          <input matInput [id]="chain() + '-gateway-prime-pub'" type="text" formControlName="poolPubkey" />
+          <mat-hint>128 hex. Ed25519 public key then X25519 public key. Empty host stays solo.</mat-hint>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Prime keys URL</mat-label>
+          <input matInput [id]="chain() + '-gateway-keys-url'" type="text" placeholder="https://pool.example/.well-known/prime-keys.json" formControlName="keysUrl" />
+          <mat-hint>HTTPS JSON with ed25519 and x25519. Fetch shows the key. It does not connect.</mat-hint>
+        </mat-form-field>
+        <div class="row">
+          <button mat-stroked-button type="button" [id]="chain() + '-gateway-fetch-keys'" (click)="fetchKeys()">Fetch keys</button>
+          @if (fetchedKey() && !fetchMismatch()) {
+            <button mat-flat-button type="button" [id]="chain() + '-gateway-use-key'" (click)="useFetchedKey()">Use this key</button>
+          }
+        </div>
+        @if (fetchedKey()) {
+          <p class="mono" [attr.id]="chain() + '-gateway-fetched-key'">{{ fetchedKey() }}</p>
+        }
+      </mat-card-content>
+    </mat-card>
+    <app-process-card
+      [idPrefix]="chain() + '-gateway'"
+      title="DATUM Gateway"
+      pathLabel="Config path"
+      otherNoun="datum_gateway"
+      [showStart]="showStart()"
+      [showStop]="showStop()"
+      [path]="configPath.value"
+      [pathDisabled]="status().session !== 'idle'"
+      [command]="status().command"
+      [pid]="status().pid"
+      [cpu]="status().cpu"
+      [rss]="status().rss"
+      [otherCount]="status().otherCount"
+      [ports]="status().ports"
+      [logTail]="status().logTail"
+      [lastError]="status().lastError"
+      [session]="status().session"
+      [height]="null"
+      (poll)="refresh()"
+      (start)="start()"
+      (stop)="stop()"
+      (pathChange)="onPath($event)"
+    />
+    @if (error()) {
+      <p class="err">{{ error() }}</p>
+    }
+  }
+</div>

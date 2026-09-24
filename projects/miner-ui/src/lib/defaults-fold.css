@@ -3,17 +3,17 @@
 }
 
 .defaults-fold {
-  border: 1px solid #3a3f4b;
+  border: 1px solid #c9a85a;
   border-radius: 4px;
   margin: 0.85rem 0;
-  background: transparent;
+  background: #15202e;
 }
 
 .defaults-fold > summary {
   cursor: pointer;
   list-style: none;
   padding: 0.55rem 0.85rem;
-  color: #e8eaed;
+  color: #e8e4d9;
   font-size: 0.9rem;
   font-family: ui-monospace, monospace;
   word-break: break-all;
@@ -28,8 +28,8 @@
   display: inline-block;
   width: 0.45rem;
   height: 0.45rem;
-  border-right: 2px solid #9aa0aa;
-  border-bottom: 2px solid #9aa0aa;
+  border-right: 2px solid #c9a85a;
+  border-bottom: 2px solid #c9a85a;
   transform: rotate(-45deg);
   margin-right: 0.25rem;
 }

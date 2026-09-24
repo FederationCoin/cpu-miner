@@ -1,4 +1,5 @@
 {
+  "registryBaseUrl": "https://pools.federationcoin.org",
   "hosted": {
     "label": "FederationCoin testnet pool",
     "stratumTcp": { "host": "stratum.testnet.federationcoin.org", "port": 23334 },
@@ -9,26 +10,14 @@
   },
   "chains": {
     "testnet": {
-      "mineToKind": "hostedPoolStratum",
-      "stratumWebsocket": {
-        "host": "pool.testnet.federationcoin.org",
-        "port": 443,
-        "password": "x"
-      },
-      "datumWebsocket": {
-        "url": "wss://pool.testnet.federationcoin.org/datum"
-      }
+      "mineToKind": "stratumPoolWebsocket",
+      "stratumPoolWebsocket": { "url": "" },
+      "datumGatewayWebsocket": { "url": "ws://127.0.0.1:23335/stratum" }
     },
     "main": {
-      "mineToKind": "stratumWebsocket",
-      "stratumWebsocket": {
-        "host": "",
-        "port": 443,
-        "password": "x"
-      },
-      "datumWebsocket": {
-        "url": "wss://pool.testnet.federationcoin.org/datum"
-      }
+      "mineToKind": "stratumPoolWebsocket",
+      "stratumPoolWebsocket": { "url": "" },
+      "datumGatewayWebsocket": { "url": "ws://127.0.0.1:23335/stratum" }
     }
   }
 }

@@ -10,6 +10,7 @@
     "@angular/common": "^22.1.0",
     "@angular/core": "^22.1.0",
     "@angular/forms": "^22.1.0",
-    "@noble/hashes": "^2.4.0"
+    "@noble/hashes": "^2.4.0",
+    "canonicalize": "^2.1.0"
   }
 }

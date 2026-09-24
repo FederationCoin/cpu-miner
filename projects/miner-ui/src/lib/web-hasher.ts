@@ -4,24 +4,29 @@ import {
   datumWorkRoot,
   grindTargetForShare,
   hashMeetsTarget,
+  targetFromCompact,
   toHex,
   writeLe32,
 } from './asic-pow';
 import type { HasherHost } from './hasher-host';
 import {
   tidesSatsField,
+  isWebStratumMineTo,
+  STRATUM_PASSWORD,
   type GpuScan,
   type MinerInfo,
   type MinerStartOpts,
   type MinerStats,
+  type MinerToast,
   type PoolStartOpts,
   type PoolStats,
 } from './miner-api';
 import type { HostedEndpoints } from './miner-shell';
+import { CHAINS } from './chain';
 import {
-  PoolStatsClient,
   StratumWsClient,
-  stratumWsUrl,
+  fetchGatewayInfo,
+  type GatewayInfoRpc,
   type StratumNotify,
   type StratumWsTransport,
 } from './stratum-ws';
@@ -73,10 +78,10 @@ export class WebHasherHost implements HasherHost {
   private statsState: MinerStats = { ...IDLE_WEB_STATS };
   private poolState: PoolStats = { ...IDLE_WEB_POOL };
   private statsCbs: Array<(s: MinerStats) => void> = [];
-  private toastCbs: Array<(m: string) => void> = [];
+  private toastCbs: Array<(t: MinerToast) => void> = [];
   private poolCbs: Array<(s: PoolStats) => void> = [];
+  private gatewayInfoCbs: Array<(info: GatewayInfoRpc) => void> = [];
   private client: StratumWsClient | null = null;
-  private statsClient: PoolStatsClient | null = null;
   private hashes = 0;
   private lastRateAt = Date.now();
   private hashesWindow = 0;
@@ -88,35 +93,23 @@ export class WebHasherHost implements HasherHost {
   constructor(
     private readonly hosted: HostedEndpoints,
     private readonly wsTransport?: StratumWsTransport,
-  ) {
-    this.startStatsWatch();
-  }
+  ) {}
 
   async start(opts: MinerStartOpts): Promise<{ ok: boolean; error?: string }> {
-    if (opts.chain === 'main' && opts.mineTo.kind === 'hostedPoolStratum') {
-      return { ok: false, error: 'Federation pool is not offered on main' };
+    if (opts.chain === 'main' && !CHAINS.main.mainIsLive) {
+      return { ok: false, error: 'MAIN is not live' };
     }
     this.stopMining();
     this.stopStatsWatch();
     const url = this.stratumUrl(opts);
     if (!url) {
-      this.startStatsWatch();
       return { ok: false, error: this.startError(opts) };
     }
-    const worker =
-      opts.mineTo.kind === 'hostedPoolStratum'
-        ? opts.mineTo.worker
-        : opts.mineTo.kind === 'stratumWebsocket'
-          ? opts.mineTo.stratumWebsocket.worker
-          : '';
-    const password =
-      opts.mineTo.kind === 'hostedPoolStratum'
-        ? opts.mineTo.password
-        : opts.mineTo.kind === 'stratumWebsocket'
-          ? opts.mineTo.stratumWebsocket.password
-          : 'x';
+    if (!isWebStratumMineTo(opts.mineTo)) {
+      return { ok: false, error: this.startError(opts) };
+    }
+    const worker = opts.mineTo.worker;
     if (!worker.trim()) {
-      this.startStatsWatch();
       return { ok: false, error: 'worker is empty' };
     }
     this.gpuPicks = parseGpuPicks(opts.gpus);
@@ -138,7 +131,10 @@ export class WebHasherHost implements HasherHost {
     const threads = Math.max(1, Math.min(16, opts.threads | 0));
     let extraNonce1 = new Uint8Array(4);
     let shareDiff = 1n;
-    const client = new StratumWsClient(url, worker.trim(), password, {
+    let lastJob: StratumNotify | null = null;
+    const watchPoolStats = opts.mineTo.kind === 'stratumPoolWebsocket';
+    const watchGatewayInfo = opts.mineTo.kind === 'datumGatewayWebsocket';
+    const client = new StratumWsClient(url, worker.trim(), STRATUM_PASSWORD, {
       onSubscribed: (sub) => {
         extraNonce1 = new Uint8Array(sub.extraNonce1);
       },
@@ -154,6 +150,7 @@ export class WebHasherHost implements HasherHost {
         this.emitStats();
       },
       onNotify: (job) => {
+        lastJob = job;
         this.socketLive = true;
         this.cancelGrace();
         this.statsState.link = 'up';
@@ -175,9 +172,15 @@ export class WebHasherHost implements HasherHost {
           this.statsState.accepted++;
           this.statsState.status = 'share accepted';
           this.statsState.lastError = '';
+          if (lastJob) {
+            const block = targetFromCompact(lastJob.nBits);
+            if (block) {
+              this.beginGrind(client, lastJob, extraNonce1, block, threads);
+            }
+          }
         } else {
           this.statsState.rejected++;
-          this.statsState.lastError = error ?? 'share rejected';
+          this.statsState.lastError = error ?? 'Share rejected';
           this.toast(this.statsState.lastError);
         }
         this.emitStats();
@@ -206,9 +209,16 @@ export class WebHasherHost implements HasherHost {
           this.toast(reason);
         }
       },
-      onPoolStats: (stats) => {
-        this.applyPoolStats(stats);
-      },
+      onPoolStats: watchPoolStats
+        ? (stats) => {
+            this.applyPoolStats(stats);
+          }
+        : undefined,
+      onGatewayInfo: watchGatewayInfo
+        ? (info) => {
+            this.emitGatewayInfo(info);
+          }
+        : undefined,
     }, this.wsTransport);
     this.client = client;
     client.connect();
@@ -219,10 +229,9 @@ export class WebHasherHost implements HasherHost {
     this.stopMining();
     this.statsState = { ...IDLE_WEB_STATS };
     this.emitStats();
-    this.startStatsWatch();
   }
 
-  /** Tear down the idle stats socket. Tests and page unload. */
+  /** Tests and page unload. Idle house stats watch is gone. */
   stopWatch(): void {
     this.stopStatsWatch();
   }
@@ -253,7 +262,7 @@ export class WebHasherHost implements HasherHost {
     };
   }
 
-  onToast(cb: (message: string) => void): () => void {
+  onToast(cb: (toast: MinerToast) => void): () => void {
     this.toastCbs.push(cb);
     return () => {
       this.toastCbs = this.toastCbs.filter((c) => c !== cb);
@@ -276,12 +285,35 @@ export class WebHasherHost implements HasherHost {
     };
   }
 
-  private stratumUrl(opts: MinerStartOpts): string | null {
-    if (opts.mineTo.kind === 'hostedPoolStratum') {
-      return this.hosted.stratumWss;
+  miningSocketOpen(): boolean {
+    return this.client?.isOpen() ?? false;
+  }
+
+  requestGatewayInfo(): boolean {
+    return this.client?.requestGatewayInfo() ?? false;
+  }
+
+  fetchGatewayInfo(url: string): Promise<GatewayInfoRpc> {
+    return fetchGatewayInfo(url, this.wsTransport);
+  }
+
+  onGatewayInfo(cb: (info: GatewayInfoRpc) => void): () => void {
+    this.gatewayInfoCbs.push(cb);
+    return () => {
+      this.gatewayInfoCbs = this.gatewayInfoCbs.filter((c) => c !== cb);
+    };
+  }
+
+  private emitGatewayInfo(info: GatewayInfoRpc): void {
+    for (const cb of this.gatewayInfoCbs) {
+      cb(info);
     }
-    if (opts.mineTo.kind === 'stratumWebsocket') {
-      return stratumWsUrl(opts.mineTo.stratumWebsocket.host, opts.mineTo.stratumWebsocket.port);
+  }
+
+  private stratumUrl(opts: MinerStartOpts): string | null {
+    if (isWebStratumMineTo(opts.mineTo)) {
+      const url = opts.mineTo.url.trim();
+      return url || null;
     }
     return null;
   }
@@ -290,17 +322,8 @@ export class WebHasherHost implements HasherHost {
     if (opts.mineTo.kind === 'stratum') {
       return 'TCP Stratum is for the desktop app and firmware. This page uses Stratum Websocket.';
     }
-    if (opts.mineTo.kind === 'datum') {
-      return 'DATUM Prime is TCP to your node. Use the desktop app.';
-    }
-    if (opts.mineTo.kind === 'datumWebsocket') {
-      return 'DATUM Prime (Websocket) needs a websocket proxy to your node. We do not offer that.';
-    }
-    if (opts.mineTo.kind === 'node' || opts.mineTo.kind === 'appPoolDatum') {
-      return 'DATUM is bring your own node. Use the desktop app with your own node.';
-    }
-    if (opts.mineTo.kind === 'appPoolStratum') {
-      return 'App pool is desktop-only. Mine the hosted testnet pool or a Stratum Websocket URL.';
+    if (opts.mineTo.kind === 'node') {
+      return 'Node RPC is desktop-only. This page mines over WebSocket Stratum.';
     }
     return 'This web demo mines over WebSocket Stratum only.';
   }
@@ -316,22 +339,8 @@ export class WebHasherHost implements HasherHost {
     client?.close();
   }
 
-  private startStatsWatch(): void {
-    this.stopStatsWatch();
-    const url = this.hosted.stratumWss;
-    if (!url) {
-      return;
-    }
-    if (!this.wsTransport && typeof window === 'undefined') {
-      return;
-    }
-    this.statsClient = new PoolStatsClient(url, (stats) => this.applyPoolStats(stats), this.wsTransport);
-    this.statsClient.connect();
-  }
-
   private stopStatsWatch(): void {
-    this.statsClient?.close();
-    this.statsClient = null;
+    /* pool_stats arrive on the mining socket for stratumPoolWebsocket only */
   }
 
   private applyPoolStats(raw: PoolStats): void {
@@ -528,9 +537,14 @@ export class WebHasherHost implements HasherHost {
     }
   }
 
+  extrasProbe() {
+    return Promise.resolve({ node: false, gateway: false, pool: false });
+  }
+
   private toast(message: string): void {
+    const payload: MinerToast = { message, kind: 'error' };
     for (const cb of this.toastCbs) {
-      cb(message);
+      cb(payload);
     }
   }
 }
