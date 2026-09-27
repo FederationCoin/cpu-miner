@@ -167,13 +167,17 @@ describe('extras', () => {
     expect(parseExtrasManifest({ node: ok!.node })).toBeNull();
   });
 
-  it('loads extras-checksums.json as an empty-fetch pin', () => {
+  it('loads extras-checksums.json as the packaged daemon pin', () => {
     const raw = JSON.parse(readFileSync(new URL('../extras-checksums.json', import.meta.url), 'utf8'));
     const parsed = parseExtrasManifest(raw);
     expect(parsed).not.toBeNull();
     expect(parsed!.node.repo).toBe('FederationCoin/FederationCoin');
     expect(parsed!.gateway.repo).toBe('FederationCoin/datum_gateway');
-    expect(extraFetchReady(parsed!.node, 'linux-x64')).toBe(false);
+    expect(parsed!.node.tag).toBe('v29.5.0.federationcoin20260927.rc2');
+    expect(parsed!.gateway.tag).toBe('v0.4.1-federationcoin.0.rc5');
+    expect(extraFetchReady(parsed!.node, 'linux-x64')).toBe(true);
+    expect(extraFetchReady(parsed!.node, 'win-x64')).toBe(true);
+    expect(extraFetchReady(parsed!.gateway, 'linux-x64')).toBe(true);
     expect(extraFetchReady(parsed!.gateway, 'win-x64')).toBe(false);
   });
 });
