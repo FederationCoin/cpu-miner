@@ -77,9 +77,22 @@ async function fetchAsset(pin, artifact, token) {
 
 function unzipTo(zipPath, destDir) {
   mkdirSync(destDir, { recursive: true });
-  const r = spawnSync('tar', ['-xf', zipPath, '-C', destDir], { stdio: 'inherit' });
+  // GNU tar on the Linux Package runner does not read zip archives.
+  // Windows runners ship bsdtar, which does.
+  if (process.platform === 'win32') {
+    const r = spawnSync('tar', ['-xf', zipPath, '-C', destDir], { stdio: 'inherit' });
+    if (r.status !== 0) {
+      die('tar -xf failed');
+    }
+    return;
+  }
+  const r = spawnSync(
+    'python3',
+    ['-c', 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])', zipPath, destDir],
+    { stdio: 'inherit' },
+  );
   if (r.status !== 0) {
-    die('tar -xf failed');
+    die('python3 unzip failed');
   }
 }
 
