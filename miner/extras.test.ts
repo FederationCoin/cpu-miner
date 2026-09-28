@@ -174,7 +174,7 @@ describe('extras', () => {
     expect(parsed!.node.repo).toBe('FederationCoin/FederationCoin');
     expect(parsed!.gateway.repo).toBe('FederationCoin/datum_gateway');
     expect(parsed!.node.tag).toBe('v29.5.0.federationcoin20260927.rc2');
-    expect(parsed!.gateway.tag).toBe('v0.4.1-federationcoin.0.rc5');
+    expect(parsed!.gateway.tag).toBe('v0.4.1-federationcoin.0.rc6');
     expect(extraFetchReady(parsed!.node, 'linux-x64')).toBe(true);
     expect(extraFetchReady(parsed!.node, 'win-x64')).toBe(true);
     expect(extraFetchReady(parsed!.gateway, 'linux-x64')).toBe(true);
