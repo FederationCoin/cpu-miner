@@ -43,7 +43,7 @@ import {
   type RpcConnect,
 } from './mine-to.js';
 import type { MinerInfo, MinerStats } from './preload.js';
-import { registerProcessIpc, stopAllProcesses } from './process-ipc.js';
+import { finishChildren, registerProcessIpc, takeSpawnedChildren } from './process-ipc.js';
 import { registryOrigin, registryRequestWithFetch, type RegistryFetchReq } from './registry-fetch.js';
 import { StratumClient } from './stratum.js';
 import type { WorkerInit, WorkerMsg } from './worker.js';
@@ -966,12 +966,34 @@ app.whenReady().then(() => {
   }, 1000);
 });
 
-app.on('window-all-closed', () => {
+let shuttingDown = false;
+
+function shutdownEmbedded(): Promise<void> {
+  if (shuttingDown) {
+    return Promise.resolve();
+  }
+  shuttingDown = true;
   stopRequested = true;
   cancelSleep();
   protocolClient?.close();
   killWorkers();
-  stopPoolChild();
-  stopAllProcesses();
-  app.quit();
+  const pool = poolChild;
+  poolChild = null;
+  lastPoolOpts = null;
+  poolStatsState = { ...IDLE_POOL_STATS, status: 'stopped' };
+  emitPoolStats();
+  const children = pool ? [pool, ...takeSpawnedChildren()] : takeSpawnedChildren();
+  return finishChildren(children);
+}
+
+app.on('before-quit', (event) => {
+  if (shuttingDown) {
+    return;
+  }
+  event.preventDefault();
+  void shutdownEmbedded().finally(() => app.quit());
+});
+
+app.on('window-all-closed', () => {
+  void shutdownEmbedded().finally(() => app.quit());
 });

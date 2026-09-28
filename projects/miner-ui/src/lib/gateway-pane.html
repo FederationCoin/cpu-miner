@@ -25,6 +25,9 @@
         Main is not live. The Big One will not start a gateway on dummy MAIN.
       </p>
     }
+    @if (status().portTaken) {
+      <p class="warn" [attr.id]="chain() + '-gateway-port-taken'">{{ status().portTaken }}</p>
+    }
     <mat-card [formGroup]="deskForm">
       <mat-card-header>
         <mat-card-title>Gateway settings</mat-card-title>

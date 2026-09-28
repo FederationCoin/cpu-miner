@@ -192,6 +192,7 @@ export type NodeStatusView = {
   transactionsNote: string;
   connectHost: string;
   connectPort: number;
+  portTaken: string;
 };
 
 export const EMPTY_NODE_STATUS: NodeStatusView = {
@@ -215,6 +216,7 @@ export const EMPTY_NODE_STATUS: NodeStatusView = {
   transactionsNote: '',
   connectHost: '',
   connectPort: 0,
+  portTaken: '',
 };
 
 export type GatewayStatusView = {
@@ -232,6 +234,7 @@ export type GatewayStatusView = {
   logTail: string;
   connectHost: string;
   connectPort: number;
+  portTaken: string;
 };
 
 export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
@@ -249,6 +252,7 @@ export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
   logTail: '',
   connectHost: '',
   connectPort: 0,
+  portTaken: '',
 };
 
 export type MinerApi = {

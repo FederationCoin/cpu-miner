@@ -9,6 +9,9 @@
         Main is not live. The Big One will not start a node on dummy MAIN.
       </p>
     }
+    @if (status().portTaken) {
+      <p class="warn" [attr.id]="chain() + '-node-port-taken'">{{ status().portTaken }}</p>
+    }
     <app-process-card
       [idPrefix]="chain() + '-node'"
       title="Local node"

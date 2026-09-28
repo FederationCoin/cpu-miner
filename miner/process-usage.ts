@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, readlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { MinerChain } from './chain.js';
 import { redactSecret } from './log.js';
@@ -194,6 +194,109 @@ export function pidsFromLines(text: string): number[] {
 
 export function otherProcessCount(pids: number[], ownPid: number | null): number {
   return pids.filter((p) => p !== ownPid).length;
+}
+
+export type ListenHolder = { port: number; pid: number | null };
+
+export function preExistingProcessMessage(kind: 'node' | 'gateway'): string {
+  return `A pre-existing ${kind} process is already running. This may have been started externally or from a prior run of this application left orphaned. It must be shut down before we can spawn a new ${kind} process here.`;
+}
+
+export function tcpListenInodes(text: string, port: number): string[] {
+  const want = port.toString(16).toUpperCase().padStart(4, '0');
+  const inodes: string[] = [];
+  for (const line of text.split(/\n/)) {
+    const cols = line.trim().split(/\s+/);
+    if (cols.length < 10 || cols[3] !== '0A') {
+      continue;
+    }
+    const local = cols[1] ?? '';
+    const colon = local.lastIndexOf(':');
+    if (colon < 0 || local.slice(colon + 1).toUpperCase() !== want) {
+      continue;
+    }
+    const inode = cols[9] ?? '';
+    if (inode && inode !== '0') {
+      inodes.push(inode);
+    }
+  }
+  return inodes;
+}
+
+export function pidForSocketInodes(
+  root: string,
+  inodes: readonly string[],
+  readlink: (path: string) => string = (path) => readlinkSync(path),
+): number | null {
+  if (inodes.length === 0) {
+    return null;
+  }
+  const want = new Set(inodes.map((inode) => `socket:[${inode}]`));
+  let names: string[];
+  try {
+    names = readdirSync(root);
+  } catch {
+    return null;
+  }
+  for (const name of names) {
+    if (!/^\d+$/.test(name)) {
+      continue;
+    }
+    let fds: string[];
+    try {
+      fds = readdirSync(join(root, name, 'fd'));
+    } catch {
+      continue;
+    }
+    for (const fd of fds) {
+      try {
+        if (want.has(readlink(join(root, name, 'fd', fd)))) {
+          return Number(name);
+        }
+      } catch {
+        /* not a readable socket */
+      }
+    }
+  }
+  return null;
+}
+
+export function listenHolder(
+  port: number,
+  root = '/proc',
+  read: (path: string) => string = (path) => readFileSync(path, 'utf8'),
+  readlink: (path: string) => string = (path) => readlinkSync(path),
+): ListenHolder | null {
+  const inodes: string[] = [];
+  for (const name of ['net/tcp', 'net/tcp6']) {
+    try {
+      inodes.push(...tcpListenInodes(read(join(root, name)), port));
+    } catch {
+      /* table missing */
+    }
+  }
+  if (inodes.length === 0) {
+    return null;
+  }
+  return { port, pid: pidForSocketInodes(root, inodes, readlink) };
+}
+
+export function firstForeignListener(
+  ports: number[],
+  ownPid: number | null,
+  lookup: (port: number) => ListenHolder | null = (port) => listenHolder(port),
+): ListenHolder | null {
+  for (const port of ports) {
+    const holder = lookup(port);
+    if (!holder) {
+      continue;
+    }
+    if (ownPid != null && holder.pid === ownPid) {
+      continue;
+    }
+    return holder;
+  }
+  return null;
 }
 
 export function peersFromRpc(raw: unknown): PeerLine[] {

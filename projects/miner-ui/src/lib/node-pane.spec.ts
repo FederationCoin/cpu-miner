@@ -104,6 +104,21 @@ describe('NodePane', () => {
     await f.whenStable();
   });
 
+  it('hides Start when a node this app did not spawn holds the port', async () => {
+    const warning =
+      'A pre-existing node process is already running. This may have been started externally or from a prior run of this application left orphaned. It must be shut down before we can spawn a new node process here.';
+    const f = await render(
+      'desktop',
+      host({ node: true, gateway: false, pool: true }, {
+        nodeStatus: async () => ({ ...EMPTY_NODE_STATUS, portTaken: warning, pid: 42, height: 237 }),
+      }),
+    );
+    expect(f.nativeElement.querySelector('#testnet-node-port-taken')?.textContent).toContain('pre-existing node process');
+    expect(f.nativeElement.querySelector('#testnet-node-start')).toBeNull();
+    expect(f.nativeElement.querySelector('#testnet-node-stop')).toBeNull();
+    expect(f.nativeElement.querySelector('#testnet-node-pid')?.textContent).toContain('42');
+  });
+
   it('shows Start while idle', async () => {
     const f = await render('desktop', host({ node: true, gateway: false, pool: true }));
     expect(f.nativeElement.querySelector('#testnet-node-start')).toBeTruthy();

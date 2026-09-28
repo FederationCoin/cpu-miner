@@ -70,7 +70,7 @@ export class NodePane implements OnInit {
   }
 
   protected showStart(): boolean {
-    if (this.showMainWarning() || this.phase() === 'stopping') {
+    if (this.showMainWarning() || this.phase() === 'stopping' || this.status().portTaken) {
       return false;
     }
     if (this.phase() === 'starting') {

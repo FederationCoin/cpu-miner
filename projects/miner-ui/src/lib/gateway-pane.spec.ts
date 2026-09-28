@@ -108,6 +108,34 @@ describe('GatewayPane', () => {
     await f.whenStable();
   });
 
+  it('hides Start when a gateway this app did not spawn holds the port', async () => {
+    const warning =
+      'A pre-existing gateway process is already running. This may have been started externally or from a prior run of this application left orphaned. It must be shut down before we can spawn a new gateway process here.';
+    const f = await render('desktop', { node: false, gateway: true, pool: true });
+    const cmp = f.componentInstance as unknown as { status: { set: (v: unknown) => void } };
+    cmp.status.set({
+      session: 'idle',
+      running: false,
+      chain: null,
+      lastError: '',
+      pid: 77,
+      command: '',
+      configPath: '',
+      cpu: '',
+      rss: '',
+      otherCount: 1,
+      ports: [],
+      logTail: '',
+      connectHost: '',
+      connectPort: 0,
+      portTaken: warning,
+    });
+    f.detectChanges();
+    expect(f.nativeElement.querySelector('#testnet-gateway-port-taken')?.textContent).toContain('pre-existing gateway process');
+    expect(f.nativeElement.querySelector('#testnet-gateway-start')).toBeNull();
+    expect(f.nativeElement.querySelector('#testnet-gateway-stop')).toBeNull();
+  });
+
   it('shows House Prime as an opt-in form when the extra is present', async () => {
     const f = await render('desktop', { node: false, gateway: true, pool: true });
     expect(f.nativeElement.querySelector('#testnet-gateway-prime-host')).toBeTruthy();

@@ -39,6 +39,7 @@ export type NodeStatus = {
   transactionsNote: string;
   connectHost: string;
   connectPort: number;
+  portTaken: string;
 };
 
 export const IDLE_NODE_STATUS: NodeStatus = {
@@ -62,6 +63,7 @@ export const IDLE_NODE_STATUS: NodeStatus = {
   transactionsNote: '',
   connectHost: '',
   connectPort: 0,
+  portTaken: '',
 };
 
 export function nodeCommand(
