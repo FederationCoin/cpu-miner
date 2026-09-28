@@ -25,6 +25,9 @@
         Main is not live. The Big One will not start a gateway on dummy MAIN.
       </p>
     }
+    @if (status().portTaken) {
+      <p class="warn" [attr.id]="chain() + '-gateway-port-taken'">{{ status().portTaken }}</p>
+    }
     <mat-card [formGroup]="deskForm">
       <mat-card-header>
         <mat-card-title>Gateway settings</mat-card-title>
@@ -32,36 +35,35 @@
       <mat-card-content>
         <p class="hint">
           Default is solo. House Prime is opt-in. The hasher still speaks Stratum only.
-          Local binds are 127.0.0.1.
+          Listen on this computer, or on this network so another machine on the LAN can connect.
         </p>
-        <mat-form-field appearance="outline">
-          <mat-label>Payout address for gateway coinbase</mat-label>
-          <input matInput [id]="chain() + '-gateway-payout'" type="text" formControlName="poolAddress" />
-          <mat-hint>Address the gateway writes in the coinbase. Use a wallet receive address.</mat-hint>
-        </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>House Prime host</mat-label>
           <input matInput [id]="chain() + '-gateway-prime-host'" type="text" [placeholder]="hints.prime" formControlName="poolHost" />
           <mat-hint>Empty means solo. {{ hints.prime }}</mat-hint>
         </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Prime identity pubkey</mat-label>
-          <input matInput [id]="chain() + '-gateway-prime-pub'" type="text" formControlName="poolPubkey" />
-          <mat-hint>128 hex. Ed25519 public key then X25519 public key. Empty host stays solo.</mat-hint>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Prime keys URL</mat-label>
-          <input matInput [id]="chain() + '-gateway-keys-url'" type="text" placeholder="https://pool.example/.well-known/prime-keys.json" formControlName="keysUrl" />
-          <mat-hint>HTTPS JSON with ed25519 and x25519. Fetch shows the key. It does not connect.</mat-hint>
-        </mat-form-field>
-        <div class="row">
-          <button mat-stroked-button type="button" [id]="chain() + '-gateway-fetch-keys'" (click)="fetchKeys()">Fetch keys</button>
-          @if (fetchedKey() && !fetchMismatch()) {
-            <button mat-flat-button type="button" [id]="chain() + '-gateway-use-key'" (click)="useFetchedKey()">Use this key</button>
+        <mat-radio-group formControlName="primeIdentity" [attr.id]="chain() + '-gateway-identity'">
+          <mat-radio-button value="pubkey" [id]="chain() + '-gateway-identity-pubkey'">Public key</mat-radio-button>
+          <mat-radio-button value="url" [id]="chain() + '-gateway-identity-url'">Keys URL</mat-radio-button>
+        </mat-radio-group>
+        @if (identityKind() === 'pubkey') {
+          <mat-form-field appearance="outline">
+            <mat-label>Prime identity pubkey</mat-label>
+            <input matInput [id]="chain() + '-gateway-prime-pub'" type="text" formControlName="poolPubkey" />
+            <mat-hint>128 hex. Ed25519 public key then X25519 public key.</mat-hint>
+          </mat-form-field>
+        } @else {
+          <mat-form-field appearance="outline">
+            <mat-label>Prime keys URL</mat-label>
+            <input matInput [id]="chain() + '-gateway-keys-url'" type="text" placeholder="https://pool.example/.well-known/prime-keys.json" formControlName="keysUrl" />
+            <mat-hint>HTTPS JSON with ed25519 and x25519. Fetch shows the key. It does not connect.</mat-hint>
+          </mat-form-field>
+          <div class="row">
+            <button mat-stroked-button type="button" [id]="chain() + '-gateway-fetch-keys'" (click)="fetchKeys()">Fetch keys</button>
+          </div>
+          @if (fetchedKey()) {
+            <p class="mono" [attr.id]="chain() + '-gateway-fetched-key'">{{ fetchedKey() }}</p>
           }
-        </div>
-        @if (fetchedKey()) {
-          <p class="mono" [attr.id]="chain() + '-gateway-fetched-key'">{{ fetchedKey() }}</p>
         }
       </mat-card-content>
     </mat-card>
@@ -72,6 +74,10 @@
       otherNoun="datum_gateway"
       [showStart]="showStart()"
       [showStop]="showStop()"
+      [startLabel]="startLabel()"
+      [stopLabel]="stopLabel()"
+      [startDisabled]="phase() === 'starting'"
+      [stopDisabled]="phase() === 'stopping'"
       [path]="configPath.value"
       [pathDisabled]="status().session !== 'idle'"
       [command]="status().command"
@@ -88,7 +94,9 @@
       (start)="start()"
       (stop)="stop()"
       (pathChange)="onPath($event)"
-    />
+    >
+      <app-listen-reach [fieldId]="chain() + '-gateway-listen'" [control]="deskForm.controls.listenReach" />
+    </app-process-card>
     @if (error()) {
       <p class="err">{{ error() }}</p>
     }

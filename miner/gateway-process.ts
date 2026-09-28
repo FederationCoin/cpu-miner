@@ -3,11 +3,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { MAIN_IS_LIVE, type MinerChain } from './chain.js';
 import type { AddonPresence } from './extras.js';
+import { listenBindAddr, type ListenReach } from './listen-reach.js';
 import { formatCommand } from './process-usage.js';
 
 export type GatewaySession =
   | { kind: 'idle' }
-  | { kind: 'spawned'; child: ChildProcess; chain: MinerChain; command: string; configPath: string };
+  | { kind: 'spawned'; child: ChildProcess; chain: MinerChain; command: string; configPath: string; listenReach: ListenReach };
 
 export function gatewayCommand(binPath: string, configPath: string): string {
   return formatCommand(binPath, ['-c', configPath]);
@@ -18,16 +19,17 @@ export type GatewayStartOpts = {
   rpcUrl: string;
   rpcUser: string;
   rpcPassword: string;
-  poolAddress: string;
   poolHost: string;
   poolPubkey: string;
   configPath: string;
+  listenReach?: ListenReach;
 };
 
 export function gatewayConfig(opts: GatewayStartOpts): Record<string, unknown> {
   if (opts.chain === 'main' && !MAIN_IS_LIVE) {
     throw new Error('MAIN is not live');
   }
+  const bind = listenBindAddr(opts.listenReach ?? 'computer');
   return {
     bitcoind: {
       rpcuser: opts.rpcUser,
@@ -36,14 +38,13 @@ export function gatewayConfig(opts: GatewayStartOpts): Record<string, unknown> {
       notify_fallback: true,
     },
     stratum: {
-      listen_addr: '127.0.0.1',
+      listen_addr: bind,
       listen_port: 23334,
-      ws_listen_addr: '127.0.0.1',
+      ws_listen_addr: bind,
       ws_listen_port: 23335,
       ws_gateway_info: true,
     },
     mining: {
-      pool_address: opts.poolAddress,
       coinbase_tag_primary: 'DATUM Gateway',
       pool_name: '',
       pool_website: '',
@@ -62,8 +63,8 @@ export function gatewayConfig(opts: GatewayStartOpts): Record<string, unknown> {
     datum: {
       pool_host: opts.poolHost.trim(),
       pool_pubkey: opts.poolPubkey.trim(),
-      pool_pass_workers: true,
-      pool_pass_full_users: true,
+      pool_pass_workers: false,
+      pool_pass_full_users: false,
       pooled_mining_only: false,
     },
   };

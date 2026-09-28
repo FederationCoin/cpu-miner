@@ -190,6 +190,9 @@ export type NodeStatusView = {
   trafficOut: string;
   transactions: TxLine[];
   transactionsNote: string;
+  connectHost: string;
+  connectPort: number;
+  portTaken: string;
 };
 
 export const EMPTY_NODE_STATUS: NodeStatusView = {
@@ -211,6 +214,9 @@ export const EMPTY_NODE_STATUS: NodeStatusView = {
   trafficOut: '',
   transactions: [],
   transactionsNote: '',
+  connectHost: '',
+  connectPort: 0,
+  portTaken: '',
 };
 
 export type GatewayStatusView = {
@@ -226,6 +232,9 @@ export type GatewayStatusView = {
   otherCount: number;
   ports: PortLine[];
   logTail: string;
+  connectHost: string;
+  connectPort: number;
+  portTaken: string;
 };
 
 export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
@@ -241,6 +250,9 @@ export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
   otherCount: 0,
   ports: [],
   logTail: '',
+  connectHost: '',
+  connectPort: 0,
+  portTaken: '',
 };
 
 export type MinerApi = {
@@ -264,15 +276,25 @@ export type MinerApi = {
   webGpuLog?: (message: string) => Promise<void>;
   registryRequest?: (req: RegistryRequest) => Promise<RegistryResponse>;
   extrasProbe?: () => Promise<ExtrasProbe>;
-  nodeStart?: (opts: { chain: MinerChain; datadir: string }) => Promise<{ ok: boolean; error?: string }>;
+  nodeStart?: (opts: {
+    chain: MinerChain;
+    datadir: string;
+    listenReach?: 'computer' | 'network';
+    rpc?: boolean;
+  }) => Promise<{ ok: boolean; error?: string }>;
   nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
-  nodeStatus?: (opts: { chain: MinerChain; datadir: string }) => Promise<NodeStatusView>;
+  nodeStatus?: (opts: {
+    chain: MinerChain;
+    datadir: string;
+    listenReach?: 'computer' | 'network';
+    rpc?: boolean;
+  }) => Promise<NodeStatusView>;
   gatewayStart?: (opts: {
     chain: MinerChain;
-    poolAddress: string;
     poolHost?: string;
     poolPubkey?: string;
     configPath?: string;
+    listenReach?: 'computer' | 'network';
   }) => Promise<{ ok: boolean; error?: string }>;
   gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
   gatewayStatus?: (opts: { chain: MinerChain; configPath: string }) => Promise<GatewayStatusView>;

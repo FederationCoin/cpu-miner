@@ -87,6 +87,7 @@ import { HOUSE_HINTS } from './house-hints';
         }
         @case ('datumGateway') {
           <p class="hint">Hasher speaks Stratum v1 to your local gateway. Password is <code>x</code>.</p>
+          <p class="hint">If the gateway is in solo mode, each distinct worker address gets its own coinbase. Multiple workers can mine to the same recipient. Different recipients work different payouts, and the first block wins.</p>
           <div class="mine-fields" formGroupName="gateway">
             <mat-form-field appearance="outline">
               <mat-label>Host</mat-label>

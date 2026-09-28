@@ -1,7 +1,10 @@
 import { spawnSync, type ChildProcess } from 'node:child_process';
+import { connect as netConnect } from 'node:net';
 import type { IpcMain } from 'electron';
 import { join } from 'node:path';
-import { MAIN_IS_LIVE, parseChain, RPC_PORT_TESTNET, defaultRpcPort, type MinerChain } from './chain.js';
+import { networkInterfaces } from 'node:os';
+import { MAIN_IS_LIVE, parseChain, defaultRpcPort, type MinerChain } from './chain.js';
+import { connectHostForReach, parseListenReach, privateIpv4, type ListenReach } from './listen-reach.js';
 import { probeExtras, resolveGatewayBin, resolveNodeBin, type ExtrasProbe } from './extras.js';
 import { gatewayCommand, spawnGateway, type GatewaySession } from './gateway-process.js';
 import {
@@ -18,8 +21,11 @@ import { cookiePath, defaultDatadir, loadCookie, rpcCall } from './rpc.js';
 import { loadWalletBlob, saveWalletBlob } from './wallet-store.js';
 import { fetchHttpsText } from './prime-keys.js';
 import {
+  firstForeignListener,
   gatewayPorts,
+  listenHolder,
   nodeDebugLogPath,
+  preExistingProcessMessage,
   otherProcessCount,
   peersFromRpc,
   pidsFromLines,
@@ -48,12 +54,15 @@ export type GatewayStatus = {
   lastError: string;
   pid: number | null;
   command: string;
+  connectHost: string;
+  connectPort: number;
   configPath: string;
   cpu: string;
   rss: string;
   otherCount: number;
   ports: { label: string; port: number }[];
   logTail: string;
+  portTaken: string;
 };
 
 let nodeSession: NodeSession = { kind: 'idle' };
@@ -64,16 +73,59 @@ let gatewayLog: string[] = [];
 const cpuPrev = new Map<number, TickSample>();
 const winPrev = new Map<number, { cpu: number; at: number }>();
 
-export function stopAllProcesses(): void {
+export function takeSpawnedChildren(): ChildProcess[] {
+  const children: ChildProcess[] = [];
   if (nodeSession.kind === 'spawned') {
-    nodeSession.child.kill();
+    children.push(nodeSession.child);
+  }
+  if (gatewaySession.kind === 'spawned') {
+    children.push(gatewaySession.child);
   }
   nodeSession = { kind: 'idle' };
-  if (gatewaySession.kind === 'spawned') {
-    gatewaySession.child.kill();
-  }
   gatewaySession = { kind: 'idle' };
   gatewayLog = [];
+  return children;
+}
+
+export function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const GRACEFUL_SHUTDOWN_MS = 30_000;
+
+function childStillRunning(child: ChildProcess, alive: (pid: number) => boolean): boolean {
+  return child.exitCode == null && child.signalCode == null && !!child.pid && alive(child.pid);
+}
+
+export async function finishChildren(
+  children: ChildProcess[],
+  waitMs = GRACEFUL_SHUTDOWN_MS,
+  alive: (pid: number) => boolean = pidAlive,
+): Promise<void> {
+  for (const child of children) {
+    if (child.exitCode != null || child.signalCode != null) {
+      continue;
+    }
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      /* already gone */
+    }
+  }
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline && children.some((child) => childStillRunning(child, alive))) {
+    const slice = Math.min(200, Math.max(0, deadline - Date.now()));
+    await new Promise((resolve) => setTimeout(resolve, slice));
+  }
+}
+
+export function stopAllProcesses(): Promise<void> {
+  return finishChildren(takeSpawnedChildren());
 }
 
 export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void {
@@ -113,16 +165,14 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     } catch {
       height = -1;
     }
-    const listening = height >= 0;
-    if (listening && nodeSession.kind === 'idle') {
-      nodeSession = { kind: 'attached', chain, datadir };
-    }
-    if (!listening && nodeSession.kind === 'attached' && nodeSession.chain === chain) {
-      nodeSession = { kind: 'idle' };
-    }
     const bin = resolveNodeBin(process.env, deps.here, deps.resourcesPath());
     const session = nodeSession.kind !== 'idle' && nodeSession.chain === chain ? nodeSession.kind : 'idle';
+    const foreign = await foreignListener('node', nodeBindPorts(chain, rpcFrom(raw)), owned?.child.pid ?? null);
     const running = session !== 'idle';
+    const reach = running ? nodeReach(chain) : null;
+    const rpcOn = running && nodeRpc(chain);
+    const connectHost = reach && rpcOn ? connectHostForReach(reach, privateIpv4(networkInterfaces())) : '';
+    const connectPort = reach && rpcOn ? defaultRpcPort(chain) : 0;
     let secret = '';
     try {
       secret = loadCookie(cookiePath(datadir, chain)).password;
@@ -136,14 +186,26 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
       height: height >= 0 ? height : 0,
       running,
       lastError: nodeError,
-      pid,
-      command: nodeCommandLine(chain, datadir, owned, bin.kind === 'present' ? bin.path : ''),
+      pid: pid ?? foreign?.pid ?? null,
+      portTaken: foreign?.message ?? '',
+      command: nodeCommandLine(
+        chain,
+        datadir,
+        owned,
+        bin.kind === 'present' ? bin.path : '',
+        listenFrom(raw),
+        rpcFrom(raw),
+      ),
+      connectHost,
+      connectPort,
       datadir,
       cpu: usage.cpu,
       rss: usage.rss,
       otherCount: countNamed('federationcoind', pid),
       ports: nodePortLines(chain),
-      logTail: readLogTail(nodeDebugLogPath(datadir, chain), secret),
+      logTail: [!running && nodeError ? nodeError : '', readLogTail(nodeDebugLogPath(datadir, chain), secret)]
+        .filter(Boolean)
+        .join('\n'),
       peers,
       trafficIn,
       trafficOut,
@@ -158,20 +220,23 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
       if (chain === 'main' && !MAIN_IS_LIVE) {
         throw new Error('MAIN is not live');
       }
-      const height = await nodeHeight(chain, datadir).catch(() => -1);
-      if (height >= 0) {
-        nodeSession = { kind: 'attached', chain, datadir };
-        nodeError = '';
-        deps.emitLog('node', `attach ${chain} height ${height}`, 'ok');
-        return { ok: true as const };
+      const listenReach = listenFrom(raw);
+      const rpc = rpcFrom(raw);
+      const foreign = await foreignListener(
+        'node',
+        nodeBindPorts(chain, rpc),
+        nodeSession.kind === 'spawned' ? nodeSession.child.pid ?? null : null,
+      );
+      if (foreign) {
+        throw new Error(foreign.message);
       }
       const bin = resolveNodeBin(process.env, deps.here, deps.resourcesPath());
       if (bin.kind !== 'present') {
         throw new Error('federationcoind addon was not included in this build');
       }
-      const command = nodeCommand(bin.path, chain, datadir);
-      const child = spawnNode(bin, chain, datadir);
-      nodeSession = { kind: 'spawned', child, chain, command, datadir };
+      const command = nodeCommand(bin.path, chain, datadir, listenReach, rpc);
+      const child = spawnNode(bin, chain, datadir, listenReach, rpc);
+      nodeSession = { kind: 'spawned', child, chain, command, datadir, listenReach, rpc };
       nodeError = '';
       watchChild(child, 'node', () => {
         if (nodeSession.kind === 'spawned' && nodeSession.child === child) {
@@ -198,7 +263,7 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     return { ok: true as const };
   });
 
-  ipcMain.handle('gateway:status', (_e, raw: unknown): GatewayStatus => {
+  ipcMain.handle('gateway:status', async (_e, raw: unknown): Promise<GatewayStatus> => {
     const chain = chainOf(raw);
     const owned = gatewaySession.kind === 'spawned' && gatewaySession.chain === chain ? gatewaySession : null;
     const pid = owned?.child.pid ?? null;
@@ -208,19 +273,28 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     const command =
       owned?.command ||
       (bin.kind === 'present' ? gatewayCommand(bin.path, configPath) : '');
+    const gatewayReach = owned?.listenReach ?? null;
+    const foreign = await foreignListener(
+      'gateway',
+      gatewayPorts().map((line) => line.port),
+      pid,
+    );
     return {
       session: owned ? 'spawned' : 'idle',
       running: !!owned,
       chain: owned?.chain ?? null,
       lastError: gatewayError,
-      pid,
+      pid: pid ?? foreign?.pid ?? null,
+      portTaken: foreign?.message ?? '',
       command,
+      connectHost: gatewayReach ? connectHostForReach(gatewayReach, privateIpv4(networkInterfaces())) : '',
+      connectPort: gatewayReach ? 23334 : 0,
       configPath,
       cpu: usage.cpu,
       rss: usage.rss,
       otherCount: countNamed('datum_gateway', pid),
       ports: gatewayPorts(),
-      logTail: gatewayLog.join('\n'),
+      logTail: [!owned && gatewayError ? gatewayError : '', gatewayLog.join('\n')].filter(Boolean).join('\n'),
     };
   });
 
@@ -228,7 +302,7 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     'gateway:start',
     async (
       _e,
-      opts: { chain: unknown; poolAddress: string; poolHost?: string; poolPubkey?: string; configPath?: string },
+      opts: { chain: unknown; poolHost?: string; poolPubkey?: string; configPath?: string },
     ) => {
       try {
         const chain = parseChain(opts.chain);
@@ -240,17 +314,26 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
         const bin = resolveGatewayBin(process.env, deps.here, deps.resourcesPath());
         const configPath = String(opts.configPath ?? '').trim() || join(deps.userData(), 'datum-gateway', `${chain}.json`);
         const command = bin.kind === 'present' ? gatewayCommand(bin.path, configPath) : '';
+        const listenReach = listenFrom(opts);
+        const foreign = await foreignListener(
+          'gateway',
+          gatewayPorts().map((line) => line.port),
+          gatewaySession.kind === 'spawned' ? gatewaySession.child.pid ?? null : null,
+        );
+        if (foreign) {
+          throw new Error(foreign.message);
+        }
         const child = spawnGateway(bin, {
           chain,
-          rpcUrl: `http://127.0.0.1:${RPC_PORT_TESTNET}`,
+          rpcUrl: `http://127.0.0.1:${defaultRpcPort(chain)}`,
           rpcUser: auth.user,
           rpcPassword: auth.password,
-          poolAddress: String(opts.poolAddress ?? '').trim(),
           poolHost: String(opts.poolHost ?? '').trim(),
           poolPubkey: String(opts.poolPubkey ?? '').trim(),
           configPath,
+          listenReach,
         });
-        gatewaySession = { kind: 'spawned', child, chain, command, configPath };
+        gatewaySession = { kind: 'spawned', child, chain, command, configPath, listenReach };
         gatewayError = '';
         gatewayLog = [];
         watchChild(child, 'gateway', () => {
@@ -296,15 +379,14 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
   });
 
   function watchChild(child: ChildProcess, mode: 'node' | 'gateway', onExit: (code: number | null) => void): void {
+    let detail = '';
     const onChunk = (chunk: string) => {
       const msg = chunk.trim();
       if (!msg) {
         return;
       }
-      if (mode === 'node') {
-        nodeError = msg.slice(0, 400);
-      } else {
-        gatewayError = msg.slice(0, 400);
+      detail = msg.slice(0, 400);
+      if (mode === 'gateway') {
         gatewayLog = pushRing(gatewayLog, msg);
       }
       deps.emitLog(mode, msg);
@@ -314,12 +396,19 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     child.stdout?.setEncoding('utf8');
     child.stdout?.on('data', onChunk);
     child.on('exit', (code) => {
+      const failed = code !== 0 && code !== null;
+      const msg = failed
+        ? `Could not start ${mode}${detail ? `: ${detail}` : ` (exit ${code})`}`
+        : `exit ${code ?? 0}`;
       if (mode === 'node') {
-        nodeError = `exited ${code ?? 0}`;
+        nodeError = failed ? msg : '';
       } else {
-        gatewayError = `exited ${code ?? 0}`;
+        gatewayError = failed ? msg : '';
+        if (failed) {
+          gatewayLog = pushRing(gatewayLog, msg);
+        }
       }
-      deps.emitLog(mode, `exit ${code ?? 0}`);
+      deps.emitLog(mode, msg, failed ? 'error' : undefined);
       onExit(code);
     });
   }
@@ -356,6 +445,8 @@ function nodeCommandLine(
   datadir: string,
   owned: Extract<NodeSession, { kind: 'spawned' }> | null,
   binPath: string,
+  reach: ListenReach,
+  rpc: boolean,
 ): string {
   if (owned) {
     return owned.command;
@@ -363,7 +454,35 @@ function nodeCommandLine(
   if (!binPath || (chain === 'main' && !MAIN_IS_LIVE)) {
     return '';
   }
-  return nodeCommand(binPath, chain, datadir);
+  return nodeCommand(binPath, chain, datadir, reach, rpc);
+}
+
+function listenFrom(raw: unknown): ListenReach {
+  if (raw && typeof raw === 'object' && 'listenReach' in raw) {
+    return parseListenReach((raw as { listenReach?: unknown }).listenReach);
+  }
+  return 'computer';
+}
+
+function nodeReach(chain: MinerChain): ListenReach {
+  if (nodeSession.kind === 'spawned' && nodeSession.chain === chain) {
+    return nodeSession.listenReach;
+  }
+  return 'computer';
+}
+
+function rpcFrom(raw: unknown): boolean {
+  if (raw && typeof raw === 'object' && 'rpc' in raw) {
+    return (raw as { rpc?: unknown }).rpc !== false;
+  }
+  return true;
+}
+
+function nodeRpc(chain: MinerChain): boolean {
+  if (nodeSession.kind === 'spawned' && nodeSession.chain === chain) {
+    return nodeSession.rpc;
+  }
+  return true;
 }
 
 function gatewayConfigPath(userData: string, chain: MinerChain, raw: unknown): string {
@@ -399,6 +518,55 @@ function countNamed(comm: string, own: number | null): number {
     return otherProcessCount(pidsFromLines(String(r.stdout ?? '')), own);
   }
   return 0;
+}
+
+function nodeBindPorts(chain: MinerChain, rpc: boolean): number[] {
+  return nodePortLines(chain)
+    .filter((line) => line.label !== 'RPC' || rpc)
+    .map((line) => line.port);
+}
+
+function portAccepts(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = netConnect({ host: '127.0.0.1', port });
+    const done = (listening: boolean) => {
+      socket.removeAllListeners();
+      socket.destroy();
+      resolve(listening);
+    };
+    socket.setTimeout(200);
+    socket.once('connect', () => done(true));
+    socket.once('timeout', () => done(false));
+    socket.once('error', (err: NodeJS.ErrnoException) => {
+      done(err.code !== 'ECONNREFUSED' && err.code !== 'ETIMEDOUT');
+    });
+  });
+}
+
+async function foreignListener(
+  kind: 'node' | 'gateway',
+  ports: number[],
+  ownPid: number | null,
+): Promise<{ message: string; pid: number | null } | null> {
+  let holder = firstForeignListener(ports, ownPid, (port) => {
+    const found = listenHolder(port);
+    if (found && ownPid != null && found.pid == null) {
+      return null;
+    }
+    return found;
+  });
+  if (!holder && ownPid == null && process.platform !== 'linux') {
+    for (const port of ports) {
+      if (await portAccepts(port)) {
+        holder = { port, pid: null };
+        break;
+      }
+    }
+  }
+  if (!holder) {
+    return null;
+  }
+  return { message: preExistingProcessMessage(kind), pid: holder.pid };
 }
 
 function samplePid(pid: number | null): { cpu: string; rss: string } {

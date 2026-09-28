@@ -16,6 +16,10 @@ export class ProcessCard {
   readonly otherNoun = input.required<string>();
   readonly showStart = input(false);
   readonly showStop = input(false);
+  readonly startLabel = input('Start');
+  readonly stopLabel = input('Stop');
+  readonly startDisabled = input(false);
+  readonly stopDisabled = input(false);
   readonly showBrowse = input(false);
   readonly path = input('');
   readonly pathDisabled = input(false);

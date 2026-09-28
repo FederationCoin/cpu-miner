@@ -1,6 +1,7 @@
 import { Component, DestroyRef, OnInit, inject, input, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { CHAINS, type MinerChain } from './chain';
 import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
@@ -8,6 +9,7 @@ import { mainIsNotLive } from './miner-format';
 import { AddonMissingCard } from './addon-missing-card';
 import { NodeDownloadCta } from './node-download-cta';
 import { ExtrasService } from './extras.service';
+import { ListenReachField, type ListenReach } from './listen-reach';
 import { ProcessCard } from './process-card';
 import { EMPTY_NODE_STATUS, type NodeStatusView } from './miner-api';
 
@@ -15,7 +17,15 @@ const POLL_MS = 3000;
 
 @Component({
   selector: 'app-node-pane',
-  imports: [ReactiveFormsModule, MatCardModule, AddonMissingCard, NodeDownloadCta, ProcessCard],
+  imports: [
+    ReactiveFormsModule,
+    MatCardModule,
+    MatSlideToggleModule,
+    AddonMissingCard,
+    NodeDownloadCta,
+    ProcessCard,
+    ListenReachField,
+  ],
   templateUrl: './node-pane.html',
   host: { '[attr.data-chain]': 'chain()' },
 })
@@ -28,8 +38,20 @@ export class NodePane implements OnInit {
   protected readonly status = signal<NodeStatusView>(EMPTY_NODE_STATUS);
   protected readonly error = signal('');
   protected readonly datadir = new FormControl('', { nonNullable: true });
+  protected readonly listenReach = new FormControl<ListenReach>('computer', { nonNullable: true });
+  protected readonly rpc = new FormControl(true, { nonNullable: true });
+  protected readonly phase = signal<'idle' | 'starting' | 'stopping'>('idle');
 
   ngOnInit(): void {
+    const saved = localStorage.getItem(this.listenKey());
+    if (saved === 'network' || saved === 'computer') {
+      this.listenReach.setValue(saved);
+    }
+    if (localStorage.getItem(this.rpcKey()) === '0') {
+      this.rpc.setValue(false);
+    }
+    this.listenReach.valueChanges.subscribe((value) => localStorage.setItem(this.listenKey(), value));
+    this.rpc.valueChanges.subscribe((value) => localStorage.setItem(this.rpcKey(), value ? '1' : '0'));
     void this.refresh();
     const timer = setInterval(() => void this.refresh(), POLL_MS);
     this.destroyRef.onDestroy(() => clearInterval(timer));
@@ -48,51 +70,105 @@ export class NodePane implements OnInit {
   }
 
   protected showStart(): boolean {
-    return this.status().session === 'idle' && !this.showMainWarning();
+    if (this.showMainWarning() || this.phase() === 'stopping' || this.status().portTaken) {
+      return false;
+    }
+    if (this.phase() === 'starting') {
+      return true;
+    }
+    return this.status().session === 'idle';
   }
 
   protected showStop(): boolean {
-    return this.status().session === 'spawned';
+    if (this.phase() === 'starting') {
+      return false;
+    }
+    return this.phase() === 'stopping' || this.status().session === 'spawned';
+  }
+
+  protected startLabel(): string {
+    return this.phase() === 'starting' ? 'Starting' : 'Start';
+  }
+
+  protected stopLabel(): string {
+    return this.phase() === 'stopping' ? 'Stopping' : 'Stop';
   }
 
   protected async refresh(): Promise<void> {
     if (!this.host.nodeStatus) {
       return;
     }
-    const next = { ...EMPTY_NODE_STATUS, ...(await this.host.nodeStatus({ chain: this.chain(), datadir: this.datadir.value })) };
+    const next = {
+      ...EMPTY_NODE_STATUS,
+      ...(await this.host.nodeStatus({
+        chain: this.chain(),
+        datadir: this.datadir.value,
+        listenReach: this.listenReach.getRawValue(),
+        rpc: this.rpc.getRawValue(),
+      })),
+    };
     this.status.set(next);
-    if (next.session !== 'idle') {
+    if (next.session !== 'idle' || this.phase() !== 'idle') {
       this.datadir.setValue(next.datadir, { emitEvent: false });
       this.datadir.disable({ emitEvent: false });
+      this.listenReach.disable({ emitEvent: false });
+      this.rpc.disable({ emitEvent: false });
       return;
     }
     this.datadir.enable({ emitEvent: false });
+    if (this.listenReach.disabled) {
+      this.listenReach.enable({ emitEvent: false });
+    }
+    if (this.rpc.disabled) {
+      this.rpc.enable({ emitEvent: false });
+    }
     if (!this.datadir.dirty && next.datadir) {
       this.datadir.setValue(next.datadir, { emitEvent: false });
     }
   }
 
   protected async start(): Promise<void> {
-    this.error.set('');
-    if (!this.host.nodeStart) {
-      this.error.set('Node start is desktop only.');
+    if (this.phase() !== 'idle') {
       return;
     }
-    const r = await this.host.nodeStart({ chain: this.chain(), datadir: this.datadir.value.trim() });
-    if (!r.ok) {
-      this.error.set(r.error ?? 'start failed');
+    this.error.set('');
+    this.phase.set('starting');
+    try {
+      if (!this.host.nodeStart) {
+        this.error.set('Node start is desktop only.');
+        return;
+      }
+      const r = await this.host.nodeStart({
+        chain: this.chain(),
+        datadir: this.datadir.value.trim(),
+        listenReach: this.listenReach.getRawValue(),
+        rpc: this.rpc.getRawValue(),
+      });
+      if (!r.ok) {
+        this.error.set(r.error ?? 'start failed');
+      }
+      this.datadir.markAsPristine();
+    } finally {
+      await this.refresh();
+      this.phase.set('idle');
     }
-    this.datadir.markAsPristine();
-    await this.refresh();
   }
 
   protected async stop(): Promise<void> {
-    this.error.set('');
-    const r = await this.host.nodeStop?.();
-    if (r && !r.ok) {
-      this.error.set(r.error ?? 'stop failed');
+    if (this.phase() !== 'idle') {
+      return;
     }
-    await this.refresh();
+    this.error.set('');
+    this.phase.set('stopping');
+    try {
+      const r = await this.host.nodeStop?.();
+      if (r && !r.ok) {
+        this.error.set(r.error ?? 'stop failed');
+      }
+    } finally {
+      await this.refresh();
+      this.phase.set('idle');
+    }
   }
 
   protected async browse(): Promise<void> {
@@ -101,6 +177,14 @@ export class NodePane implements OnInit {
       this.datadir.setValue(picked);
       this.datadir.markAsDirty();
     }
+  }
+
+  private listenKey(): string {
+    return `fc.${this.chain()}.node.listen`;
+  }
+
+  private rpcKey(): string {
+    return `fc.${this.chain()}.node.rpc`;
   }
 
   protected onPath(value: string): void {

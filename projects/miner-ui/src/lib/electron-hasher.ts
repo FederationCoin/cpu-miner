@@ -93,7 +93,12 @@ export class ElectronHasherHost implements HasherHost {
     return window.miner?.extrasProbe?.() ?? Promise.resolve({ node: false, gateway: false, pool: false });
   }
 
-  nodeStart(opts: { chain: import('./miner-api').MinerChain; datadir: string }) {
+  nodeStart(opts: {
+    chain: import('./miner-api').MinerChain;
+    datadir: string;
+    listenReach?: 'computer' | 'network';
+    rpc?: boolean;
+  }) {
     return window.miner?.nodeStart?.(opts) ?? Promise.resolve({ ok: false, error: 'no node module' });
   }
 
@@ -101,16 +106,21 @@ export class ElectronHasherHost implements HasherHost {
     return window.miner?.nodeStop?.() ?? Promise.resolve({ ok: false, error: 'no node module' });
   }
 
-  nodeStatus(opts: { chain: import('./miner-api').MinerChain; datadir: string }) {
+  nodeStatus(opts: {
+    chain: import('./miner-api').MinerChain;
+    datadir: string;
+    listenReach?: 'computer' | 'network';
+    rpc?: boolean;
+  }) {
     return window.miner?.nodeStatus?.(opts) ?? Promise.resolve(EMPTY_NODE_STATUS);
   }
 
   gatewayStart(opts: {
     chain: import('./miner-api').MinerChain;
-    poolAddress: string;
     poolHost?: string;
     poolPubkey?: string;
     configPath?: string;
+    listenReach?: 'computer' | 'network';
   }) {
     return window.miner?.gatewayStart?.(opts) ?? Promise.resolve({ ok: false, error: 'no gateway module' });
   }

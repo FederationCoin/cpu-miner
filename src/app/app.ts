@@ -1,12 +1,14 @@
 import { Component, effect, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { CHAINS, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, WalletService, type MinerChain } from '@federationcoin/miner-ui';
+import { CHAINS, ListenerChips, MinerFooter, MiningService, NetworkContext, NetworkWorkspace, PoolService, WalletService, type MinerChain } from '@federationcoin/miner-ui';
 
 @Component({
   selector: 'app-root',
-  imports: [NetworkWorkspace, MinerFooter, MatToolbarModule, MatFormFieldModule, MatSelectModule],
+  imports: [NetworkWorkspace, MinerFooter, ListenerChips, MatToolbarModule, MatFormFieldModule, MatSelectModule, MatButtonModule, MatIconModule],
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
@@ -20,6 +22,13 @@ export class App {
     effect(() => {
       void this.wallet.load(this.network.chain());
     });
+  }
+
+  protected copyWallet(): void {
+    const address = this.wallet.receive();
+    if (address) {
+      void navigator.clipboard?.writeText(address);
+    }
   }
 
   protected selectNetwork(id: MinerChain): void {

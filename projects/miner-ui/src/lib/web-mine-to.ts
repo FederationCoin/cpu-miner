@@ -131,6 +131,7 @@ const LOOPBACK_GATEWAY_TOOLTIP =
               }
             </mat-card-content>
           </mat-card>
+          <p class="hint">If the gateway is in solo mode, each distinct worker address gets its own coinbase. Multiple workers can mine to the same recipient. Different recipients work different payouts, and the first block wins.</p>
           <mat-form-field appearance="outline">
             <mat-label>Worker</mat-label>
             <input matInput [id]="id('datumGatewayWebsocketWorker')" type="text" [placeholder]="hrp() + '1….cpu'" formControlName="worker" />

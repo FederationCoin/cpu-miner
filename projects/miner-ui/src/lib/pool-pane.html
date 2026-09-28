@@ -46,21 +46,19 @@
     <label [attr.for]="id('fee')">Fee percent</label>
     <input [id]="id('fee')" type="text" inputmode="decimal" formControlName="feePercent" />
 
-    <app-defaults-fold [foldId]="id('stratum-fold')" title="Stratum bind" [summary]="bindSummary(form.controls.stratumHost.value, form.controls.stratumPort.value)">
+    <app-defaults-fold [foldId]="id('stratum-fold')" title="Stratum bind" [summary]="bindSummary(form.controls.stratumReach.value, form.controls.stratumPort.value)">
       <fieldset class="partition">
         <legend>Stratum bind</legend>
-        <label [attr.for]="id('stratumHost')">Host</label>
-        <input [id]="id('stratumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="stratumHost" />
+        <app-listen-reach [fieldId]="id('stratum-listen')" [control]="form.controls.stratumReach" />
         <label [attr.for]="id('stratumPort')">Port</label>
         <input [id]="id('stratumPort')" type="number" min="1" max="65535" formControlName="stratumPort" />
       </fieldset>
     </app-defaults-fold>
 
-    <app-defaults-fold [foldId]="id('datum-fold')" title="DATUM Prime Pool bind" [summary]="bindSummary(form.controls.datumHost.value, form.controls.datumPort.value)">
+    <app-defaults-fold [foldId]="id('datum-fold')" title="DATUM Prime Pool bind" [summary]="bindSummary(form.controls.datumReach.value, form.controls.datumPort.value)">
       <fieldset class="partition">
         <legend>DATUM Prime Pool bind</legend>
-        <label [attr.for]="id('datumHost')">Host</label>
-        <input [id]="id('datumHost')" type="text" autocomplete="off" spellcheck="false" formControlName="datumHost" />
+        <app-listen-reach [fieldId]="id('datum-listen')" [control]="form.controls.datumReach" />
         <label [attr.for]="id('datumPort')">Port</label>
         <input [id]="id('datumPort')" type="number" min="1" max="65535" formControlName="datumPort" />
       </fieldset>
@@ -71,8 +69,8 @@
     }
 
     <div class="row">
-      <button mat-flat-button color="primary" type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">Start</button>
-      <button mat-stroked-button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+      <button mat-flat-button color="primary" type="button" [id]="id('start')" [disabled]="startDisabled()" (click)="start()">{{ startLabel() }}</button>
+      <button mat-stroked-button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">{{ stopLabel() }}</button>
     </div>
 
   <dl>
