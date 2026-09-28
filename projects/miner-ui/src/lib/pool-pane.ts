@@ -9,10 +9,11 @@ import { MiningService } from './mining.service';
 import { IDLE_POOL_STATS, PoolService } from './pool.service';
 import { RpcConnect, rpcConnectGroup, rpcConnectValue, type RpcConnectForm } from './rpc-connect';
 import { DefaultsFold } from './defaults-fold';
+import { ListenReachField, listenBindAddr, listenLabel, type ListenReach } from './listen-reach';
 
 @Component({
   selector: 'app-pool-pane',
-  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold, MatButtonModule],
+  imports: [ReactiveFormsModule, RpcConnect, DefaultsFold, MatButtonModule, ListenReachField],
   styleUrl: './miner-pane.css',
   templateUrl: './pool-pane.html',
 })
@@ -22,19 +23,29 @@ export class PoolPane implements OnInit {
   protected readonly pool = inject(PoolService);
   protected readonly shell = inject(MINER_SHELL);
   protected readonly formError = signal('');
+  protected readonly phase = signal<'idle' | 'starting' | 'stopping'>('idle');
 
   protected readonly form = new FormGroup({
     rpc: new FormArray<RpcConnectForm>([rpcConnectGroup(35332)]),
     operator: new FormControl('', { nonNullable: true }),
     feePercent: new FormControl('2', { nonNullable: true }),
-    stratumHost: new FormControl('127.0.0.1', { nonNullable: true }),
+    stratumReach: new FormControl<ListenReach>('computer', { nonNullable: true }),
     stratumPort: new FormControl(23334, { nonNullable: true }),
-    datumHost: new FormControl('127.0.0.1', { nonNullable: true }),
+    datumReach: new FormControl<ListenReach>('computer', { nonNullable: true }),
     datumPort: new FormControl(28916, { nonNullable: true }),
   });
 
   constructor() {
     effect(() => {
+      const running = this.pool.stats().running && this.pool.stats().chain === this.chain();
+      const opts = { emitEvent: false } as const;
+      if (running) {
+        this.form.controls.stratumReach.disable(opts);
+        this.form.controls.datumReach.disable(opts);
+      } else if (this.form.controls.stratumReach.disabled) {
+        this.form.controls.stratumReach.enable(opts);
+        this.form.controls.datumReach.enable(opts);
+      }
       const inf = this.mining.info();
       if (!inf) {
         return;
@@ -56,9 +67,9 @@ export class PoolPane implements OnInit {
     this.form.patchValue({
       operator: localStorage.getItem(this.key('operator')) ?? '',
       feePercent: localStorage.getItem(this.key('feePercent')) ?? d.pool.feePercent,
-      stratumHost: localStorage.getItem(this.key('stratumHost'))?.trim() || d.pool.stratumHost,
+      stratumReach: this.savedReach('stratum', d.pool.stratumHost),
       stratumPort: this.loadNum('stratumPort', d.pool.stratumPort),
-      datumHost: localStorage.getItem(this.key('datumHost'))?.trim() || d.pool.datumHost,
+      datumReach: this.savedReach('datum', d.pool.datumHost),
       datumPort: this.loadNum('datumPort', d.pool.datumPort),
     });
     this.form.valueChanges.subscribe(() => this.persist());
@@ -111,24 +122,54 @@ export class PoolPane implements OnInit {
     return formatSats(sats);
   }
 
+  protected startLabel(): string {
+    return this.phase() === 'starting' ? 'Starting' : 'Start';
+  }
+
+  protected stopLabel(): string {
+    return this.phase() === 'stopping' ? 'Stopping' : 'Stop';
+  }
+
   protected startDisabled(): boolean {
-    return !this.mining.inElectron() || this.pool.stats().running;
+    return this.phase() !== 'idle' || !this.mining.inElectron() || this.pool.stats().running;
   }
 
   protected stopDisabled(): boolean {
-    return !this.mining.inElectron() || !this.pool.stats().running || this.pool.stats().chain !== this.chain();
+    return (
+      this.phase() !== 'idle' ||
+      !this.mining.inElectron() ||
+      !this.pool.stats().running ||
+      this.pool.stats().chain !== this.chain()
+    );
   }
 
   protected async start(): Promise<void> {
+    if (this.phase() !== 'idle') {
+      return;
+    }
     this.formError.set('');
-    const err = await this.pool.start(this.startOpts());
-    if (err) {
-      this.formError.set(err);
+    this.phase.set('starting');
+    try {
+      const err = await this.pool.start(this.startOpts());
+      if (err) {
+        this.formError.set(err);
+        this.mining.warn(err);
+      }
+    } finally {
+      this.phase.set('idle');
     }
   }
 
   protected async stop(): Promise<void> {
-    await this.pool.stop();
+    if (this.phase() !== 'idle') {
+      return;
+    }
+    this.phase.set('stopping');
+    try {
+      await this.pool.stop();
+    } finally {
+      this.phase.set('idle');
+    }
   }
 
   private key(suffix: string): string {
@@ -145,9 +186,9 @@ export class PoolPane implements OnInit {
     localStorage.setItem(this.key('rpcList'), JSON.stringify(v.rpc));
     localStorage.setItem(this.key('operator'), v.operator);
     localStorage.setItem(this.key('feePercent'), v.feePercent);
-    localStorage.setItem(this.key('stratumHost'), v.stratumHost);
+    localStorage.setItem(this.key('stratumReach'), v.stratumReach);
     localStorage.setItem(this.key('stratumPort'), String(v.stratumPort));
-    localStorage.setItem(this.key('datumHost'), v.datumHost);
+    localStorage.setItem(this.key('datumReach'), v.datumReach);
     localStorage.setItem(this.key('datumPort'), String(v.datumPort));
   }
 
@@ -160,9 +201,9 @@ export class PoolPane implements OnInit {
       rpc: this.form.controls.rpc.controls.map((g) => rpcConnectValue(g)),
       operator: v.operator,
       feeBps,
-      stratumHost: v.stratumHost,
+      stratumHost: listenBindAddr(v.stratumReach),
       stratumPort: v.stratumPort,
-      datumHost: v.datumHost,
+      datumHost: listenBindAddr(v.datumReach),
       datumPort: v.datumPort,
     };
   }
@@ -176,8 +217,17 @@ export class PoolPane implements OnInit {
     return `${v.host}:${v.port}`;
   }
 
-  protected bindSummary(host: string, port: number): string {
-    return `${host}:${port}`;
+  protected bindSummary(reach: ListenReach, port: number): string {
+    return `${listenLabel(reach)} · ${port}`;
+  }
+
+  private savedReach(name: 'stratum' | 'datum', defaultHost: string): ListenReach {
+    const saved = localStorage.getItem(this.key(`${name}Reach`));
+    if (saved === 'network' || saved === 'computer') {
+      return saved;
+    }
+    const host = localStorage.getItem(this.key(`${name}Host`))?.trim() || defaultHost;
+    return host === '0.0.0.0' ? 'network' : 'computer';
   }
 
   private savedRpcRows(defaultHost: string, defaultPort: number): Record<string, unknown>[] {

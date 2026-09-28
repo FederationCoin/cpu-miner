@@ -34,15 +34,25 @@ export type HasherHost = {
   fetchGatewayInfo?: (url: string) => Promise<GatewayInfoRpc>;
   onGatewayInfo?: (cb: (info: GatewayInfoRpc) => void) => () => void;
   extrasProbe?: () => Promise<ExtrasProbe>;
-  nodeStart?: (opts: { chain: MinerChain; datadir: string }) => Promise<{ ok: boolean; error?: string }>;
+  nodeStart?: (opts: {
+    chain: MinerChain;
+    datadir: string;
+    listenReach?: 'computer' | 'network';
+    rpc?: boolean;
+  }) => Promise<{ ok: boolean; error?: string }>;
   nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
-  nodeStatus?: (opts: { chain: MinerChain; datadir: string }) => Promise<NodeStatusView>;
+  nodeStatus?: (opts: {
+    chain: MinerChain;
+    datadir: string;
+    listenReach?: 'computer' | 'network';
+    rpc?: boolean;
+  }) => Promise<NodeStatusView>;
   gatewayStart?: (opts: {
     chain: MinerChain;
-    poolAddress: string;
     poolHost?: string;
     poolPubkey?: string;
     configPath?: string;
+    listenReach?: 'computer' | 'network';
   }) => Promise<{ ok: boolean; error?: string }>;
   gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
   gatewayStatus?: (opts: { chain: MinerChain; configPath: string }) => Promise<GatewayStatusView>;

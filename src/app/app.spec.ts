@@ -452,8 +452,8 @@ describe('App', () => {
       expect(datum.open).toBe(false);
       expect(rpc.querySelector('summary')?.textContent).toContain('127.0.0.1:35332');
       expect(rpc.querySelector('summary')?.textContent).not.toContain('/tmp/x');
-      expect(stratum.querySelector('summary')?.textContent).toContain('127.0.0.1:23334');
-      expect(datum.querySelector('summary')?.textContent).toContain('127.0.0.1:28916');
+      expect(stratum.querySelector('summary')?.textContent).toContain('This computer · 23334');
+      expect(datum.querySelector('summary')?.textContent).toContain('This computer · 28916');
       expect(rpc.contains(queryEl(f, '#testnet-pool-operator'))).toBe(false);
       setInput(f, '#testnet-pool-rpcHost', '10.0.0.7');
       expect(queryEl<HTMLInputElement>(f, '#testnet-pool-rpcHost').value).toBe('10.0.0.7');

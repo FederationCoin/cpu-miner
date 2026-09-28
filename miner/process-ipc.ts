@@ -1,7 +1,9 @@
 import { spawnSync, type ChildProcess } from 'node:child_process';
 import type { IpcMain } from 'electron';
 import { join } from 'node:path';
-import { MAIN_IS_LIVE, parseChain, RPC_PORT_TESTNET, defaultRpcPort, type MinerChain } from './chain.js';
+import { networkInterfaces } from 'node:os';
+import { MAIN_IS_LIVE, parseChain, defaultRpcPort, type MinerChain } from './chain.js';
+import { connectHostForReach, parseListenReach, privateIpv4, type ListenReach } from './listen-reach.js';
 import { probeExtras, resolveGatewayBin, resolveNodeBin, type ExtrasProbe } from './extras.js';
 import { gatewayCommand, spawnGateway, type GatewaySession } from './gateway-process.js';
 import {
@@ -48,6 +50,8 @@ export type GatewayStatus = {
   lastError: string;
   pid: number | null;
   command: string;
+  connectHost: string;
+  connectPort: number;
   configPath: string;
   cpu: string;
   rss: string;
@@ -123,6 +127,10 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     const bin = resolveNodeBin(process.env, deps.here, deps.resourcesPath());
     const session = nodeSession.kind !== 'idle' && nodeSession.chain === chain ? nodeSession.kind : 'idle';
     const running = session !== 'idle';
+    const reach = running ? nodeReach(chain) : null;
+    const rpcOn = running && nodeRpc(chain);
+    const connectHost = reach && rpcOn ? connectHostForReach(reach, privateIpv4(networkInterfaces())) : '';
+    const connectPort = reach && rpcOn ? defaultRpcPort(chain) : 0;
     let secret = '';
     try {
       secret = loadCookie(cookiePath(datadir, chain)).password;
@@ -137,13 +145,24 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
       running,
       lastError: nodeError,
       pid,
-      command: nodeCommandLine(chain, datadir, owned, bin.kind === 'present' ? bin.path : ''),
+      command: nodeCommandLine(
+        chain,
+        datadir,
+        owned,
+        bin.kind === 'present' ? bin.path : '',
+        listenFrom(raw),
+        rpcFrom(raw),
+      ),
+      connectHost,
+      connectPort,
       datadir,
       cpu: usage.cpu,
       rss: usage.rss,
       otherCount: countNamed('federationcoind', pid),
       ports: nodePortLines(chain),
-      logTail: readLogTail(nodeDebugLogPath(datadir, chain), secret),
+      logTail: [!running && nodeError ? nodeError : '', readLogTail(nodeDebugLogPath(datadir, chain), secret)]
+        .filter(Boolean)
+        .join('\n'),
       peers,
       trafficIn,
       trafficOut,
@@ -169,9 +188,11 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
       if (bin.kind !== 'present') {
         throw new Error('federationcoind addon was not included in this build');
       }
-      const command = nodeCommand(bin.path, chain, datadir);
-      const child = spawnNode(bin, chain, datadir);
-      nodeSession = { kind: 'spawned', child, chain, command, datadir };
+      const listenReach = listenFrom(raw);
+      const rpc = rpcFrom(raw);
+      const command = nodeCommand(bin.path, chain, datadir, listenReach, rpc);
+      const child = spawnNode(bin, chain, datadir, listenReach, rpc);
+      nodeSession = { kind: 'spawned', child, chain, command, datadir, listenReach, rpc };
       nodeError = '';
       watchChild(child, 'node', () => {
         if (nodeSession.kind === 'spawned' && nodeSession.child === child) {
@@ -208,6 +229,7 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     const command =
       owned?.command ||
       (bin.kind === 'present' ? gatewayCommand(bin.path, configPath) : '');
+    const gatewayReach = owned?.listenReach ?? null;
     return {
       session: owned ? 'spawned' : 'idle',
       running: !!owned,
@@ -215,12 +237,14 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
       lastError: gatewayError,
       pid,
       command,
+      connectHost: gatewayReach ? connectHostForReach(gatewayReach, privateIpv4(networkInterfaces())) : '',
+      connectPort: gatewayReach ? 23334 : 0,
       configPath,
       cpu: usage.cpu,
       rss: usage.rss,
       otherCount: countNamed('datum_gateway', pid),
       ports: gatewayPorts(),
-      logTail: gatewayLog.join('\n'),
+      logTail: [!owned && gatewayError ? gatewayError : '', gatewayLog.join('\n')].filter(Boolean).join('\n'),
     };
   });
 
@@ -228,7 +252,7 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     'gateway:start',
     async (
       _e,
-      opts: { chain: unknown; poolAddress: string; poolHost?: string; poolPubkey?: string; configPath?: string },
+      opts: { chain: unknown; poolHost?: string; poolPubkey?: string; configPath?: string },
     ) => {
       try {
         const chain = parseChain(opts.chain);
@@ -240,17 +264,18 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
         const bin = resolveGatewayBin(process.env, deps.here, deps.resourcesPath());
         const configPath = String(opts.configPath ?? '').trim() || join(deps.userData(), 'datum-gateway', `${chain}.json`);
         const command = bin.kind === 'present' ? gatewayCommand(bin.path, configPath) : '';
+        const listenReach = listenFrom(opts);
         const child = spawnGateway(bin, {
           chain,
-          rpcUrl: `http://127.0.0.1:${RPC_PORT_TESTNET}`,
+          rpcUrl: `http://127.0.0.1:${defaultRpcPort(chain)}`,
           rpcUser: auth.user,
           rpcPassword: auth.password,
-          poolAddress: String(opts.poolAddress ?? '').trim(),
           poolHost: String(opts.poolHost ?? '').trim(),
           poolPubkey: String(opts.poolPubkey ?? '').trim(),
           configPath,
+          listenReach,
         });
-        gatewaySession = { kind: 'spawned', child, chain, command, configPath };
+        gatewaySession = { kind: 'spawned', child, chain, command, configPath, listenReach };
         gatewayError = '';
         gatewayLog = [];
         watchChild(child, 'gateway', () => {
@@ -296,15 +321,14 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
   });
 
   function watchChild(child: ChildProcess, mode: 'node' | 'gateway', onExit: (code: number | null) => void): void {
+    let detail = '';
     const onChunk = (chunk: string) => {
       const msg = chunk.trim();
       if (!msg) {
         return;
       }
-      if (mode === 'node') {
-        nodeError = msg.slice(0, 400);
-      } else {
-        gatewayError = msg.slice(0, 400);
+      detail = msg.slice(0, 400);
+      if (mode === 'gateway') {
         gatewayLog = pushRing(gatewayLog, msg);
       }
       deps.emitLog(mode, msg);
@@ -314,12 +338,19 @@ export function registerProcessIpc(ipcMain: IpcMain, deps: ProcessIpcDeps): void
     child.stdout?.setEncoding('utf8');
     child.stdout?.on('data', onChunk);
     child.on('exit', (code) => {
+      const failed = code !== 0 && code !== null;
+      const msg = failed
+        ? `Could not start ${mode}${detail ? `: ${detail}` : ` (exit ${code})`}`
+        : `exit ${code ?? 0}`;
       if (mode === 'node') {
-        nodeError = `exited ${code ?? 0}`;
+        nodeError = failed ? msg : '';
       } else {
-        gatewayError = `exited ${code ?? 0}`;
+        gatewayError = failed ? msg : '';
+        if (failed) {
+          gatewayLog = pushRing(gatewayLog, msg);
+        }
       }
-      deps.emitLog(mode, `exit ${code ?? 0}`);
+      deps.emitLog(mode, msg, failed ? 'error' : undefined);
       onExit(code);
     });
   }
@@ -356,6 +387,8 @@ function nodeCommandLine(
   datadir: string,
   owned: Extract<NodeSession, { kind: 'spawned' }> | null,
   binPath: string,
+  reach: ListenReach,
+  rpc: boolean,
 ): string {
   if (owned) {
     return owned.command;
@@ -363,7 +396,35 @@ function nodeCommandLine(
   if (!binPath || (chain === 'main' && !MAIN_IS_LIVE)) {
     return '';
   }
-  return nodeCommand(binPath, chain, datadir);
+  return nodeCommand(binPath, chain, datadir, reach, rpc);
+}
+
+function listenFrom(raw: unknown): ListenReach {
+  if (raw && typeof raw === 'object' && 'listenReach' in raw) {
+    return parseListenReach((raw as { listenReach?: unknown }).listenReach);
+  }
+  return 'computer';
+}
+
+function nodeReach(chain: MinerChain): ListenReach {
+  if (nodeSession.kind === 'spawned' && nodeSession.chain === chain) {
+    return nodeSession.listenReach;
+  }
+  return 'computer';
+}
+
+function rpcFrom(raw: unknown): boolean {
+  if (raw && typeof raw === 'object' && 'rpc' in raw) {
+    return (raw as { rpc?: unknown }).rpc !== false;
+  }
+  return true;
+}
+
+function nodeRpc(chain: MinerChain): boolean {
+  if (nodeSession.kind === 'spawned' && nodeSession.chain === chain) {
+    return nodeSession.rpc;
+  }
+  return true;
 }
 
 function gatewayConfigPath(userData: string, chain: MinerChain, raw: unknown): string {

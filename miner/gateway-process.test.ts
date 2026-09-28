@@ -10,7 +10,6 @@ const base = {
   rpcUrl: 'http://127.0.0.1:35332',
   rpcUser: 'u',
   rpcPassword: 'p',
-  poolAddress: 'tgfcn1qqq',
   poolHost: '',
   poolPubkey: '',
   configPath: '',
@@ -19,13 +18,22 @@ const base = {
 describe('gateway-process', () => {
   it('writes solo config with empty pool_host and loopback WSS', () => {
     const cfg = gatewayConfig(base) as {
-      datum: { pool_host: string; pool_pubkey: string };
+      datum: { pool_host: string; pool_pubkey: string; pool_pass_workers: boolean; pool_pass_full_users: boolean };
       stratum: { ws_listen_addr: string; ws_listen_port: number };
     };
     expect(cfg.datum.pool_host).toBe('');
     expect(cfg.datum.pool_pubkey).toBe('');
+    expect(cfg.datum.pool_pass_workers).toBe(false);
+    expect(cfg.datum.pool_pass_full_users).toBe(false);
     expect(cfg.stratum.ws_listen_addr).toBe('127.0.0.1');
     expect(cfg.stratum.ws_listen_port).toBe(23335);
+    const lan = gatewayConfig({ ...base, listenReach: 'network' }) as {
+      stratum: { listen_addr: string; ws_listen_addr: string };
+      bitcoind: { rpcurl: string };
+    };
+    expect(lan.stratum.listen_addr).toBe('0.0.0.0');
+    expect(lan.stratum.ws_listen_addr).toBe('0.0.0.0');
+    expect(lan.bitcoind.rpcurl).toBe('http://127.0.0.1:35332');
     expect(gatewayCommand('/usr/bin/datum_gateway', '/tmp/g.json')).toBe('/usr/bin/datum_gateway -c /tmp/g.json');
     expect(gatewayCommand('  ', '/tmp/g.json')).toBe('');
   });
@@ -55,6 +63,7 @@ describe('gateway-process', () => {
     const body = readFileSync(configPath, 'utf8');
     expect(body).toContain('"rpcpassword": "p"');
     expect(body).toContain('"pool_host": ""');
+    expect(body).not.toContain('pool_address');
     expect(() => spawnGateway({ kind: 'missing' }, { ...base, configPath })).toThrow(/addon/);
     const child = spawnGateway({ kind: 'present', path: process.execPath }, { ...base, configPath });
     expect(child.pid).toBeTruthy();

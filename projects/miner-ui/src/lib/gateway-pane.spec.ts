@@ -65,17 +65,67 @@ describe('GatewayPane', () => {
     expect(f.nativeElement.querySelector('[data-addon-missing="DATUM Gateway"]')).toBeTruthy();
   });
 
+  it('shows Starting and hides Stop until the gateway start finishes', async () => {
+    let release: (value: { ok: boolean }) => void = () => undefined;
+    let calls = 0;
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [GatewayPane],
+      providers: [
+        provideAnimations(),
+        {
+          provide: HASHER_HOST,
+          useValue: {
+            ...host({ node: false, gateway: true, pool: true }),
+            gatewayStart: () => {
+              calls += 1;
+              return new Promise((resolve) => {
+                release = resolve;
+              });
+            },
+          },
+        },
+        { provide: MINER_SHELL, useValue: desktopShell() },
+        ExtrasService,
+      ],
+    }).compileComponents();
+    await TestBed.inject(ExtrasService).refresh();
+    const f = TestBed.createComponent(GatewayPane);
+    f.componentRef.setInput('chain', 'testnet');
+    f.detectChanges();
+    await f.whenStable();
+    f.detectChanges();
+    f.detectChanges();
+    (f.nativeElement.querySelector('#testnet-gateway-start') as HTMLButtonElement).click();
+    f.detectChanges();
+    const starting = f.nativeElement.querySelector('#testnet-gateway-start') as HTMLButtonElement;
+    expect(starting.disabled).toBe(true);
+    expect(starting.textContent).toContain('Starting');
+    expect(f.nativeElement.querySelector('#testnet-gateway-stop')).toBeNull();
+    starting.click();
+    expect(calls).toBe(1);
+    release({ ok: true });
+    await f.whenStable();
+  });
+
   it('shows House Prime as an opt-in form when the extra is present', async () => {
     const f = await render('desktop', { node: false, gateway: true, pool: true });
     expect(f.nativeElement.querySelector('#testnet-gateway-prime-host')).toBeTruthy();
     expect(f.nativeElement.textContent).toMatch(/opt-in/i);
+    expect(f.nativeElement.querySelector('#testnet-gateway-prime-pub')).toBeTruthy();
+    expect(f.nativeElement.querySelector('#testnet-gateway-keys-url')).toBeNull();
+    const cmp = f.componentInstance as unknown as {
+      deskForm: { controls: { primeIdentity: { setValue: (v: string) => void } } };
+    };
+    cmp.deskForm.controls.primeIdentity.setValue('url');
+    f.detectChanges();
     expect(f.nativeElement.querySelector('#testnet-gateway-keys-url')).toBeTruthy();
+    expect(f.nativeElement.querySelector('#testnet-gateway-prime-pub')).toBeNull();
   });
 
-  it('does not overwrite a pubkey when the fetched document disagrees', async () => {
+  it('shows the fetched keys document on the URL partition', async () => {
     const ed = 'ab'.repeat(32);
     const x = 'cd'.repeat(32);
-    const other = '11'.repeat(64);
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
       imports: [GatewayPane],
@@ -98,15 +148,14 @@ describe('GatewayPane', () => {
     f.detectChanges();
     await f.whenStable();
     const cmp = f.componentInstance as unknown as {
-      deskForm: { controls: { poolPubkey: { value: string; setValue: (v: string) => void }; keysUrl: { setValue: (v: string) => void } } };
+      deskForm: { controls: { primeIdentity: { setValue: (v: string) => void }; keysUrl: { setValue: (v: string) => void } } };
       fetchKeys: () => Promise<void>;
     };
-    cmp.deskForm.controls.poolPubkey.setValue(other);
+    cmp.deskForm.controls.primeIdentity.setValue('url');
     cmp.deskForm.controls.keysUrl.setValue('https://pool.example/keys.json');
+    f.detectChanges();
     await cmp.fetchKeys();
     f.detectChanges();
-    expect(cmp.deskForm.controls.poolPubkey.value).toBe(other);
-    expect(f.nativeElement.textContent).toMatch(/left unchanged/);
-    expect(f.nativeElement.querySelector('#testnet-gateway-use-key')).toBeNull();
+    expect(f.nativeElement.textContent).toContain(ed + x);
   });
 });

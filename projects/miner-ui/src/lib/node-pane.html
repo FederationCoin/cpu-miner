@@ -16,6 +16,10 @@
       otherNoun="federationcoind"
       [showStart]="showStart()"
       [showStop]="showStop()"
+      [startLabel]="startLabel()"
+      [stopLabel]="stopLabel()"
+      [startDisabled]="phase() === 'starting'"
+      [stopDisabled]="phase() === 'stopping'"
       [showBrowse]="true"
       [path]="datadir.value"
       [pathDisabled]="status().session !== 'idle'"
@@ -34,7 +38,10 @@
       (stop)="stop()"
       (browse)="browse()"
       (pathChange)="onPath($event)"
-    />
+    >
+      <app-listen-reach [fieldId]="chain() + '-node-listen'" [control]="listenReach" />
+      <mat-slide-toggle [id]="chain() + '-node-rpc'" [formControl]="rpc">RPC</mat-slide-toggle>
+    </app-process-card>
     @if (error()) {
       <p class="err">{{ error() }}</p>
     }

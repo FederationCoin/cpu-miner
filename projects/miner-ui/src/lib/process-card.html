@@ -59,11 +59,29 @@
       <p class="err">{{ lastError() }}</p>
     }
     <div class="row">
+      <ng-content />
       @if (showStart()) {
-        <button mat-flat-button color="primary" type="button" [id]="idPrefix() + '-start'" (click)="start.emit()">Start</button>
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          [id]="idPrefix() + '-start'"
+          [disabled]="startDisabled()"
+          (click)="start.emit()"
+        >
+          {{ startLabel() }}
+        </button>
       }
       @if (showStop()) {
-        <button mat-stroked-button type="button" [id]="idPrefix() + '-stop'" (click)="stop.emit()">Stop</button>
+        <button
+          mat-stroked-button
+          type="button"
+          [id]="idPrefix() + '-stop'"
+          [disabled]="stopDisabled()"
+          (click)="stop.emit()"
+        >
+          {{ stopLabel() }}
+        </button>
       }
       <button mat-stroked-button type="button" [id]="idPrefix() + '-poll'" (click)="poll.emit()">Poll now</button>
     </div>
