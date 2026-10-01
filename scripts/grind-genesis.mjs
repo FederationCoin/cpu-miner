@@ -3,13 +3,14 @@
 // (same GetHash as the node). Do not run from CI. CI checks compiled-in
 // hashes and BLOCKINFO rows; it never searches for a block.
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const miner = join(here, '../out-electron');
 
-const HEADLINE = '09/Sep/2026 FederationCoin: time is the unit, not the state';
 const TESTNET_BITS = 0x1c03a830;
 const LOCKTIME_THRESHOLD = 500000000;
 
@@ -62,12 +63,8 @@ function compactSize(n) {
 }
 
 function coinbaseScriptSig() {
-  const hl = Buffer.from(HEADLINE, 'utf8');
-  return Buffer.concat([
-    pushInt(486604799),
-    compactPush(scriptNum(4)),
-    compactPush(hl),
-  ]);
+  // Height 0 is OP_0, plus OP_0 so the scriptSig is two bytes.
+  return Buffer.from([0x00, 0x00]);
 }
 
 function genesisTx() {
@@ -113,7 +110,6 @@ const {
   serializeHeader,
 } = await import(pathToFileURL(join(miner, 'pow.js')).href);
 const { toHex } = await import(pathToFileURL(join(miner, 'bytes.js')).href);
-const { listGpus, startGpuGrind, stopGpu } = await import(pathToFileURL(join(miner, 'gpu.js')).href);
 
 function oldV1Merkle(timestamp) {
   const ts = Buffer.from(timestamp, 'utf8');
@@ -187,9 +183,18 @@ function grindCpu(h, target) {
   throw new Error('cpu nonce space');
 }
 
+function loadGpuAddon() {
+  const require = createRequire(pathToFileURL(join(here, '../package.json')));
+  const dist = join(here, '../native/gpu-hasher/dist');
+  const native = require(join(dist, 'gpu-hasher.node'));
+  native.setKernelSource(readFileSync(join(dist, 'asic_pow.cl'), 'utf8'));
+  native.setPtxSource(readFileSync(join(dist, 'asic_pow.ptx'), 'utf8'));
+  return native;
+}
+
 function grindGpu(h, target) {
-  const devices = listGpus();
-  const gpu = devices.find((d) => d.backend === 'cuda');
+  const native = loadGpuAddon();
+  const gpu = (native.listDevices() ?? []).find((d) => d.kind === 'cuda' || d.backend === 'cuda');
   if (!gpu) {
     throw new Error('no CUDA GPU');
   }
@@ -199,18 +204,19 @@ function grindGpu(h, target) {
     let hashes = 0n;
     let lastLog = 0;
     const timer = setTimeout(() => {
-      stopGpu();
+      native.stopGrind();
       reject(new Error('gpu grind timeout'));
     }, 3600_000);
-    const ok = startGpuGrind({
-      deviceId: gpu.id,
-      work,
-      target,
-      xorKey: new Uint8Array(16),
-      xorClear: 0,
-      extraNonce2: new Uint8Array(8),
-      gen: 1,
-      onProgress: (n) => {
+    try {
+      native.startGrind({
+        deviceId: gpu.id,
+        work: Buffer.from(work),
+        target: Buffer.from(target),
+        xorKey: Buffer.alloc(16),
+        xorClear: 0,
+        extraNonce2: Buffer.alloc(8),
+        gen: 1,
+      }, (n) => {
         hashes += BigInt(n);
         const now = Date.now();
         if (now - lastLog < 5000) {
@@ -220,26 +226,25 @@ function grindGpu(h, target) {
         const dt = (now - t0) / 1000;
         const hs = dt > 0 ? Number(hashes) / dt : 0;
         process.stderr.write(` gpu ${(hs / 1e9).toFixed(2)} GH/s hashes=${hashes}\n`);
-      },
-      onFound: (msg) => {
+      }, (msg) => {
         clearTimeout(timer);
         h.nNonce = msg.nonce >>> 0;
         h.nonce2 = msg.nonce2 >>> 0;
-        stopGpu();
+        native.stopGrind();
         resolve();
-      },
-      onLog: (m) => {
+      }, (m) => {
         process.stderr.write(` ${m}\n`);
-        if (m.startsWith('gpu: ')) {
+        const text = String(m);
+        if (text.startsWith('gpu: ') && !text.startsWith('gpu: hashing on ')) {
           clearTimeout(timer);
-          stopGpu();
-          reject(new Error(m));
+          native.stopGrind();
+          reject(new Error(text));
         }
-      },
-    });
-    if (!ok) {
+      });
+    } catch (err) {
       clearTimeout(timer);
-      reject(new Error('startGpuGrind failed'));
+      native.stopGrind();
+      reject(err);
     }
   });
 }
@@ -255,28 +260,28 @@ const nets = [
   {
     name: 'testnet3',
     timestamp: '09/Sep/2026 FederationCoin testnet3: time is the unit, not the state',
-    nTime: Math.floor(Date.now() / 1000),
+    nTime: 1789600816,
     nBits: TESTNET_BITS,
     gpu: true,
   },
   {
     name: 'testnet4',
     timestamp: '09/Sep/2026 FederationCoin testnet4: time is the unit, not the state',
-    nTime: Math.floor(Date.now() / 1000) + 1,
+    nTime: 1789600817,
     nBits: TESTNET_BITS,
     gpu: true,
   },
   {
     name: 'signet',
     timestamp: '09/Sep/2026 FederationCoin signet: time is the unit, not the state',
-    nTime: Math.floor(Date.now() / 1000) + 2,
+    nTime: 1789600818,
     nBits: 0x1e0377ae,
     gpu: true,
   },
   {
     name: 'regtest',
     timestamp: '09/Sep/2026 FederationCoin regtest: time is the unit, not the state',
-    nTime: Math.floor(Date.now() / 1000) + 3,
+    nTime: 1789600819,
     nBits: 0x207fffff,
     gpu: true,
   },
