@@ -16,7 +16,7 @@ describe('wallet-derive', () => {
     expect(phraseWordCount('one two')).toBeNull();
   });
 
-  it('derives native-segwit receive addresses per chain HRP', () => {
+  it('derives witness v0/32 ML-DSA receive addresses per chain HRP', () => {
     const seed = seedFromPhrase(TWELVE);
     expect(deriveReceive(seed, 'testnet')).toMatch(/^tgfcn1/);
     expect(deriveReceive(seed, 'main')).toMatch(/^gfcn1/);

@@ -18,6 +18,8 @@ export default defineConfig({
       'projects/miner-ui/src/lib/finder-sign.spec.ts',
       'projects/miner-ui/src/lib/radar-frame.spec.ts',
       'projects/miner-ui/src/lib/wallet-file.spec.ts',
+      'projects/miner-ui/src/lib/wallet-mldsa.spec.ts',
+      'projects/miner-ui/src/lib/stall-policy.spec.ts',
     ],
     environment: 'node',
     coverage: {
@@ -32,6 +34,8 @@ export default defineConfig({
         'projects/miner-ui/src/lib/wallet-file.ts',
         'projects/miner-ui/src/lib/wallet-crypto.ts',
         'projects/miner-ui/src/lib/wallet-derive.ts',
+        'projects/miner-ui/src/lib/wallet-mldsa.ts',
+        'projects/miner-ui/src/lib/stall-policy.ts',
         'projects/miner-ui/src/lib/electrum-sign.ts',
         'projects/miner-ui/src/lib/finder-sign.ts',
         'projects/miner-ui/src/lib/radar-frame.ts',
