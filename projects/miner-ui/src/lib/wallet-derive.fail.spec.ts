@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@scure/bip32', () => ({
-  HDKey: {
-    fromMasterSeed: () => ({
-      derive: () => ({}),
-    }),
+vi.mock('./wallet-mldsa', () => ({
+  childSeed: () => new Uint8Array(32),
+  keyHash: () => new Uint8Array(32),
+  keygen: () => {
+    throw new Error('derive failed');
   },
 }));
 
@@ -13,10 +13,9 @@ describe('wallet-derive failures', () => {
     vi.resetModules();
   });
 
-  it('throws when HD derive omits keys', async () => {
-    const { deriveReceive, derivePrivateKey } = await import('./wallet-derive');
+  it('throws when ML-DSA keygen fails', async () => {
+    const { deriveReceive } = await import('./wallet-derive');
     const seed = new Uint8Array(64);
     expect(() => deriveReceive(seed, 'testnet')).toThrow(/derive failed/);
-    expect(() => derivePrivateKey(seed, 'testnet')).toThrow(/derive failed/);
   });
 });

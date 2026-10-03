@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { encodeAddress, addressToScript, payoutScript } from './bech32.js';
-import { BLAKE2B_HEADLINE, coinbaseScriptSig } from './coinbase.js';
+import { coinbaseScriptSig } from './coinbase.js';
 import { toHex, u128FromHexReversed, u256FromHex, u256ToHex } from './bytes.js';
 import { blake2b32, sha256 } from './hash.js';
 import { asicPreimage, deserializeHeader, emptyHeader, headerHash, serializeHeader, type HeaderV2 } from './pow.js';
@@ -78,10 +78,8 @@ describe('header-v2 vectors', () => {
 });
 
 describe('coinbase scriptSig', () => {
-  it('height 1 includes the Blake2b headline', () => {
-    const sig = coinbaseScriptSig(1);
-    const want = '51003b' + toHex(new TextEncoder().encode(BLAKE2B_HEADLINE));
-    expect(toHex(sig)).toBe(want);
+  it('height 1 is the height push and OP_0', () => {
+    expect(toHex(coinbaseScriptSig(1))).toBe('5100');
   });
 
   it('height 17 is 011100', () => {
