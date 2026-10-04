@@ -1,0 +1,17 @@
+@startuml public-validate-seq
+title Check a block
+participant Block
+participant Cap
+participant Kind
+participant Sig
+participant Fee
+
+Block -> Cap : does this fit the current room?
+Cap --> Block : too heavy, refuse
+Block -> Kind : named layout only
+Kind --> Block : extra junk or wrong length, refuse
+Block -> Sig : secp or Dilithium 44 or Dilithium 87
+Sig --> Block : bad signature, refuse
+Block -> Fee : at least floor(vsize / 12)
+Fee --> Block : short the floor, refuse
+@enduml
