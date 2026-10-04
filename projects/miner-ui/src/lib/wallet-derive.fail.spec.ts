@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./wallet-mldsa', () => ({
-  childSeed: () => new Uint8Array(32),
-  keyHash: () => new Uint8Array(32),
-  keygen: () => {
+vi.mock('./wallet-mldsa87', () => ({
+  childSeed87: () => new Uint8Array(32),
+  keyHash87: () => new Uint8Array(32),
+  keygen87: () => {
     throw new Error('derive failed');
   },
 }));

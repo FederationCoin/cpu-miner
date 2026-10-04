@@ -36,5 +36,7 @@ describe('wallet-mldsa', () => {
     ]);
     expect(multi).toHaveLength(5);
     expect(multi[4]).toEqual(keyHash(c.publicKey));
+    const tied = new Uint8Array(32).fill(9);
+    expect(policyProgram(1, [tied, tied]).length).toBe(32);
   });
 });

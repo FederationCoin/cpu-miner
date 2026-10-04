@@ -10,6 +10,17 @@
     <p class="hint">Type the same {{ wordCount() }} words. Paste is blocked.</p>
     <app-word-grid [words]="confirmWords()" />
     <mat-form-field appearance="outline">
+      <mat-label>Receive kind</mat-label>
+      <mat-select [formControl]="kind">
+        <mat-option value="mldsa87">Dilithium 87</mat-option>
+        <mat-option value="mldsa44">Dilithium 44</mat-option>
+        <mat-option value="secp">secp (cheap-out)</mat-option>
+      </mat-select>
+    </mat-form-field>
+    @if (kind.value === 'secp') {
+      <p class="err">{{ secpWarning }}</p>
+    }
+    <mat-form-field appearance="outline">
       <mat-label>Password (wraps the stored seed)</mat-label>
       <input matInput type="password" [formControl]="password" />
     </mat-form-field>

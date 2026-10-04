@@ -31,6 +31,8 @@ type ImportApi = {
   password: { setValue: (v: string) => void };
   save: () => Promise<void>;
   error: () => string;
+  kind: { value: string; setValue: (v: string) => void };
+  secpWarning: string;
 };
 
 describe('WalletImport', () => {
@@ -52,6 +54,10 @@ describe('WalletImport', () => {
     f.componentRef.setInput('chain', 'testnet');
     f.detectChanges();
     const api = f.componentInstance as unknown as ImportApi;
+    expect(api.kind.value).toBe('mldsa87');
+    expect(api.secpWarning).toMatch(/not quantum-safe/);
+    api.kind.setValue('secp');
+    expect(api.kind.value).toBe('secp');
     await api.save();
     expect(api.error()).toMatch(/invalid phrase/);
     TWELVE.split(' ').forEach((word, i) => api.boxes[i]?.setValue(word));

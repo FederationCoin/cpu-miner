@@ -3,9 +3,11 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import type { MinerChain } from './chain';
 import { WalletService } from './wallet.service';
-import { isValidPhrase } from './wallet-derive';
+import { isValidPhrase, type ReceiveKind } from './wallet-derive';
+import { SECP_WARNING } from './wallet-secp';
 import { WordGrid } from './word-grid';
 
 function wordControls(count: number): FormControl<string>[] {
@@ -14,7 +16,7 @@ function wordControls(count: number): FormControl<string>[] {
 
 @Component({
   selector: 'app-wallet-import',
-  imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, WordGrid],
+  imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, WordGrid],
   styles: [
     `
       mat-form-field {
@@ -27,6 +29,17 @@ function wordControls(count: number): FormControl<string>[] {
   template: `
     <p class="hint">{{ wordCount() }} English BIP39 words. Paste is blocked.</p>
     <app-word-grid [words]="activeBoxes()" />
+    <mat-form-field appearance="outline">
+      <mat-label>Receive kind</mat-label>
+      <mat-select [formControl]="kind">
+        <mat-option value="mldsa87">Dilithium 87</mat-option>
+        <mat-option value="mldsa44">Dilithium 44</mat-option>
+        <mat-option value="secp">secp (cheap-out)</mat-option>
+      </mat-select>
+    </mat-form-field>
+    @if (kind.value === 'secp') {
+      <p class="err">{{ secpWarning }}</p>
+    }
     <mat-form-field appearance="outline">
       <mat-label>Password (wraps the stored seed)</mat-label>
       <input matInput type="password" [formControl]="password" />
@@ -45,6 +58,8 @@ export class WalletImport {
   protected readonly error = signal('');
   protected readonly boxes = wordControls(24);
   protected readonly password = new FormControl('', { nonNullable: true });
+  protected readonly kind = new FormControl<ReceiveKind>('mldsa87', { nonNullable: true });
+  protected readonly secpWarning = SECP_WARNING;
 
   protected activeBoxes(): FormControl<string>[] {
     return this.boxes.slice(0, this.wordCount());
@@ -65,7 +80,7 @@ export class WalletImport {
       return;
     }
     try {
-      await this.wallet.persistPhrase(phrase, this.password.value, this.chain());
+      await this.wallet.persistPhrase(phrase, this.password.value, this.chain(), this.kind.value);
       this.done.emit();
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : String(e));

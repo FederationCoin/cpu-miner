@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { createPhrase, derivePrivateKey, deriveReceive, isValidPhrase, phraseWordCount, seedFromPhrase } from './wallet-derive';
+import {
+  createPhrase,
+  derivePrivateKey,
+  derivePrivateKey44,
+  derivePrivateKeySecp,
+  deriveReceive,
+  deriveReceive44,
+  deriveReceiveSecp,
+  isValidPhrase,
+  phraseWordCount,
+  seedFromPhrase,
+} from './wallet-derive';
 
 const TWELVE =
   'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
@@ -16,12 +27,18 @@ describe('wallet-derive', () => {
     expect(phraseWordCount('one two')).toBeNull();
   });
 
-  it('derives witness v0/32 ML-DSA receive addresses per chain HRP', () => {
+  it('derives Dilithium 87 by default and keeps 44 and secp as other kinds', () => {
     const seed = seedFromPhrase(TWELVE);
     expect(deriveReceive(seed, 'testnet')).toMatch(/^tgfcn1/);
     expect(deriveReceive(seed, 'main')).toMatch(/^gfcn1/);
+    expect(deriveReceive(seed, 'testnet')).toBe(deriveReceive(seed, 'testnet'));
+    expect(deriveReceive(seed, 'testnet')).not.toBe(deriveReceive44(seed, 'testnet'));
+    expect(deriveReceive(seed, 'testnet')).not.toBe(deriveReceiveSecp(seed, 'testnet'));
     expect(deriveReceive(seed, 'testnet')).not.toBe(deriveReceive(seed, 'main'));
     expect(derivePrivateKey(seed, 'testnet').length).toBe(32);
-    expect(derivePrivateKey(seed, 'main').length).toBe(32);
+    expect(derivePrivateKey44(seed, 'testnet').length).toBe(32);
+    expect(derivePrivateKeySecp(seed, 'testnet').length).toBe(32);
+    expect(derivePrivateKey(seed, 'testnet')).not.toEqual(derivePrivateKey44(seed, 'testnet'));
+    expect(deriveReceiveSecp(seed, 'testnet')).toMatch(/^tgfcn1q/);
   });
 });

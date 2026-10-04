@@ -1,4 +1,4 @@
-import { keygen, sign } from './wallet-mldsa';
+import { keygen87, sign87 } from './wallet-mldsa87';
 
 export const MESSAGE_MAGIC = 'FederationCoin Signed Message:\n';
 
@@ -28,8 +28,8 @@ export function magicHash(message: string): Uint8Array {
 
 export function signElectrum(message: string, seed32: Uint8Array): string {
   const payload = magicHash(message);
-  const { secretKey } = keygen(seed32);
-  const sig = sign(payload, secretKey);
+  const { secretKey } = keygen87(seed32);
+  const sig = sign87(payload, secretKey);
   let bin = '';
   for (const b of sig) {
     bin += String.fromCharCode(b);
