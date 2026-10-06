@@ -1,13 +1,14 @@
 import { generateMnemonic, mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import { HDKey } from '@scure/bip32';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { ripemd160 } from '@noble/hashes/legacy.js';
 import { CHAINS, type MinerChain } from './chain';
 import { encodeAddress } from './wallet-bech32';
 import { normalizePhrase } from './wallet-crypto';
+import { childSeed, keyHash, keygen } from './wallet-mldsa';
+import { childSeed87, keyHash87, keygen87 } from './wallet-mldsa87';
+import { childSeedSecp, compressedPubkey, hash160 } from './wallet-secp';
 
 export type PhraseStrength = 128 | 256;
+export type ReceiveKind = 'mldsa87' | 'mldsa44' | 'secp';
 
 export function createPhrase(strength: PhraseStrength): string {
   return generateMnemonic(wordlist, strength);
@@ -26,30 +27,46 @@ export function seedFromPhrase(phrase: string): Uint8Array {
   return mnemonicToSeedSync(normalizePhrase(phrase));
 }
 
-export function deriveReceive(seed: Uint8Array, chain: MinerChain): string {
-  const coin = chain === 'main' ? 0 : 1;
-  const hd = HDKey.fromMasterSeed(seed).derive(`m/84'/${coin}'/0'/0/0`);
-  if (!hd.publicKey) {
-    throw new Error('derive failed');
-  }
+function encodeV0(program: Uint8Array, chain: MinerChain): string {
   const hrp = CHAINS[chain].hrp;
-  const prog = hash160(hd.publicKey);
-  const addr = encodeAddress(hrp, 0, prog);
+  const addr = encodeAddress(hrp, 0, program);
   if (!addr) {
     throw new Error('encode failed');
   }
   return addr;
 }
 
-export function derivePrivateKey(seed: Uint8Array, chain: MinerChain): Uint8Array {
-  const coin = chain === 'main' ? 0 : 1;
-  const hd = HDKey.fromMasterSeed(seed).derive(`m/84'/${coin}'/0'/0/0`);
-  if (!hd.privateKey) {
-    throw new Error('derive failed');
-  }
-  return hd.privateKey;
+export function deriveReceive87(seed: Uint8Array, chain: MinerChain): string {
+  const { publicKey } = keygen87(childSeed87(seed, 0));
+  return encodeV0(keyHash87(publicKey), chain);
 }
 
-function hash160(pub: Uint8Array): Uint8Array {
-  return ripemd160(sha256(pub));
+export function deriveReceive44(seed: Uint8Array, chain: MinerChain): string {
+  const { publicKey } = keygen(childSeed(seed, 0));
+  return encodeV0(keyHash(publicKey), chain);
+}
+
+export function deriveReceiveSecp(seed: Uint8Array, chain: MinerChain): string {
+  const pub = compressedPubkey(childSeedSecp(seed, 0));
+  return encodeV0(hash160(pub), chain);
+}
+
+/** Default receive is Dilithium 87. */
+export function deriveReceive(seed: Uint8Array, chain: MinerChain): string {
+  return deriveReceive87(seed, chain);
+}
+
+export function derivePrivateKey(seed: Uint8Array, chain: MinerChain): Uint8Array {
+  void chain;
+  return childSeed87(seed, 0);
+}
+
+export function derivePrivateKey44(seed: Uint8Array, chain: MinerChain): Uint8Array {
+  void chain;
+  return childSeed(seed, 0);
+}
+
+export function derivePrivateKeySecp(seed: Uint8Array, chain: MinerChain): Uint8Array {
+  void chain;
+  return childSeedSecp(seed, 0);
 }

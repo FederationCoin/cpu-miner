@@ -32,6 +32,8 @@ type CreateApi = {
   shownWords: () => { value: string; setValue: (v: string) => void }[];
   confirmWords: () => { setValue: (v: string) => void }[];
   password: { setValue: (v: string) => void };
+  kind: { value: string; setValue: (v: string) => void };
+  secpWarning: string;
 };
 
 async function render(word: 12 | 24): Promise<CreateApi> {
@@ -68,6 +70,16 @@ describe('WalletCreate', () => {
     await api.save();
     expect(api.error()).toMatch(/Re-enter/);
     expect(localStorage.getItem('fc.keystore.testnet')).toBeNull();
+  });
+
+  it('defaults receive to Dilithium 87 and warns on secp', async () => {
+    const api = await render(12);
+    api.generate();
+    api.saved();
+    expect(api.kind.value).toBe('mldsa87');
+    expect(api.secpWarning).toMatch(/not quantum-safe/);
+    api.kind.setValue('secp');
+    expect(api.kind.value).toBe('secp');
   });
 
   it('saves 24 words after a matching re-enter', async () => {

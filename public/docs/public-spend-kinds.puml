@@ -1,0 +1,13 @@
+@startuml public-spend-kinds
+title Spend menu
+left to right direction
+rectangle "secp\ncheap, warned" as Secp
+rectangle "Dilithium 44" as D44
+rectangle "Dilithium 87\ndefault" as D87
+Secp --> D44
+D44 --> D87
+note bottom of D87
+  Weight is the price.
+  We do not force.
+end note
+@enduml

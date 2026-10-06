@@ -1,5 +1,4 @@
-import { secp256k1 } from '@noble/curves/secp256k1.js';
-import { sha256 } from '@noble/hashes/sha2.js';
+import { keygen87, sign87 } from './wallet-mldsa87';
 
 export const MESSAGE_MAGIC = 'FederationCoin Signed Message:\n';
 
@@ -24,17 +23,15 @@ export function magicHash(message: string): Uint8Array {
     ...serString(enc.encode(MESSAGE_MAGIC)),
     ...serString(enc.encode(message)),
   ]);
-  return sha256(sha256(payload));
+  return payload;
 }
 
-export function signElectrum(message: string, priv: Uint8Array): string {
-  const hash = magicHash(message);
-  const sig = secp256k1.sign(hash, priv, { prehash: false, format: 'recovered', lowS: true });
-  const compact = new Uint8Array(65);
-  compact[0] = 27 + 4 + sig[0];
-  compact.set(sig.subarray(1), 1);
+export function signElectrum(message: string, seed32: Uint8Array): string {
+  const payload = magicHash(message);
+  const { secretKey } = keygen87(seed32);
+  const sig = sign87(payload, secretKey);
   let bin = '';
-  for (const b of compact) {
+  for (const b of sig) {
     bin += String.fromCharCode(b);
   }
   return btoa(bin);

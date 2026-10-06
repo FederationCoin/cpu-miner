@@ -3,9 +3,11 @@ import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import type { MinerChain } from './chain';
 import { WalletService } from './wallet.service';
-import { createPhrase, isValidPhrase } from './wallet-derive';
+import { createPhrase, isValidPhrase, type ReceiveKind } from './wallet-derive';
+import { SECP_WARNING } from './wallet-secp';
 import { phrasesEqual } from './wallet-crypto';
 import { WordGrid } from './word-grid';
 
@@ -15,7 +17,7 @@ function wordControls(count: number): FormControl<string>[] {
 
 @Component({
   selector: 'app-wallet-create',
-  imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, WordGrid],
+  imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule, WordGrid],
   styles: [
     `
       .phrase-region {
@@ -45,6 +47,8 @@ export class WalletCreate {
   protected readonly shown = wordControls(24);
   protected readonly confirm = wordControls(24);
   protected readonly password = new FormControl('', { nonNullable: true });
+  protected readonly kind = new FormControl<ReceiveKind>('mldsa87', { nonNullable: true });
+  protected readonly secpWarning = SECP_WARNING;
   private phrase = '';
 
   protected shownWords(): FormControl<string>[] {
@@ -93,7 +97,7 @@ export class WalletCreate {
       return;
     }
     try {
-      await this.wallet.persistPhrase(this.phrase, this.password.value, this.chain());
+      await this.wallet.persistPhrase(this.phrase, this.password.value, this.chain(), this.kind.value);
       this.done.emit();
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : String(e));

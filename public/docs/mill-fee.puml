@@ -1,0 +1,9 @@
+@startuml mill-fee
+title Fee after the subsidy
+left to right direction
+rectangle "Subsidy halves\nnew coins toward zero" as Subsidy
+rectangle "Minimum fee\nfloor(vsize / 12)" as Rate
+rectangle "Proof of work\nstays" as Pow
+Subsidy --> Rate
+Rate --> Pow
+@enduml

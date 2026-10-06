@@ -19,6 +19,47 @@
     </figure>
   }
 
+  <h3>Spend menu</h3>
+  <p class="hint" data-spend-menu>
+    Dilithium 87 is the default. Dilithium 44 is the middle. secp is cheap
+    and warned. Weight is the price. We do not force.
+  </p>
+  <figure class="docs-figure">
+    <img src="docs/public-spend-kinds.svg" width="461" height="168" alt="Spend menu: secp cheap and warned, Dilithium 44, Dilithium 87 default" />
+  </figure>
+
+  <h3>Check a block</h3>
+  <p class="hint" data-check-block>
+    Room, named layout, signature, then the fee floor. Extra junk or a
+    short fee is refused.
+  </p>
+  <figure class="docs-figure">
+    <img src="docs/public-validate-seq.svg" width="429" height="361" alt="Validation loop: room, named layout, signature, fee floor" />
+  </figure>
+
+  <h3>Room</h3>
+  <p class="hint">
+    Sixteen windows. Grow by half if thirteen are hot. Shrink by half if
+    the epoch is quiet. Floor 2.4M. The number can move. The anti-data
+    rules do not.
+  </p>
+  <figure class="docs-figure">
+    <img src="docs/public-flex-cap.svg" width="346" height="324" alt="Flex cap: sixteen windows grow, shrink, or stay. Floor 2.4M." />
+  </figure>
+
+  <h3>After the subsidy</h3>
+  <p class="hint" data-after-subsidy>
+    New coins fall toward zero. Every payment pays at least floor(vsize / 12)
+    tokens. A token is the smallest unit. A virtual byte is the size of
+    the transaction, not the amount of coin. The rate stays while the
+    subsidy halves. It is a small charge beside a 50-coin block and is still
+    required when new coins stop. Miners do not work for free. Proof of work
+    stays.
+  </p>
+  <figure class="docs-figure">
+    <img src="docs/mill-fee.svg" width="720" height="300" alt="The subsidy falls in steps. The minimum fee stays at floor(vsize / 12)." />
+  </figure>
+
   <h3>WebSocket protocol</h3>
   <p class="hint">
     Newline JSON-RPC. Password <code>x</code>. Path <code>/stratum</code>.

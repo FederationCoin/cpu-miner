@@ -3,7 +3,15 @@ import { HASHER_HOST } from './hasher-host';
 import { MINER_SHELL } from './miner-shell';
 import type { MinerChain } from './chain';
 import { unwrapSeed, wrapSeed } from './wallet-crypto';
-import { derivePrivateKey, deriveReceive, isValidPhrase, seedFromPhrase } from './wallet-derive';
+import {
+  derivePrivateKey,
+  deriveReceive,
+  deriveReceive44,
+  deriveReceiveSecp,
+  isValidPhrase,
+  seedFromPhrase,
+  type ReceiveKind,
+} from './wallet-derive';
 import { signElectrum } from './electrum-sign';
 import { newWalletId, parseWalletStore, storeWasList, type WalletRecord, type WalletStoreFile } from './wallet-file';
 
@@ -161,7 +169,17 @@ export class WalletService {
     return this.seed;
   }
 
-  async persistPhrase(phrase: string, password: string, chain: MinerChain): Promise<void> {
+  private receiveFor(seed: Uint8Array, chain: MinerChain, kind: ReceiveKind): string {
+    if (kind === 'mldsa44') {
+      return deriveReceive44(seed, chain);
+    }
+    if (kind === 'secp') {
+      return deriveReceiveSecp(seed, chain);
+    }
+    return deriveReceive(seed, chain);
+  }
+
+  async persistPhrase(phrase: string, password: string, chain: MinerChain, kind: ReceiveKind = 'mldsa87'): Promise<void> {
     if (!isValidPhrase(phrase)) {
       throw new Error('invalid phrase');
     }
@@ -169,7 +187,7 @@ export class WalletService {
       await this.load(chain);
     }
     const seed = seedFromPhrase(phrase);
-    const receive = deriveReceive(seed, chain);
+    const receive = this.receiveFor(seed, chain, kind);
     const blob = await wrapSeed(seed, password, receive);
     const id = newWalletId();
     this.store.wallets = [...this.store.wallets, { id, blob }];

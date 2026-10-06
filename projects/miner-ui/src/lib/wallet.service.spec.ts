@@ -3,8 +3,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { HASHER_HOST, type HasherHost } from './hasher-host';
 import { MINER_SHELL, webDemoShell } from './miner-shell';
 import { WALLET_LOCK_MS, WalletService } from './wallet.service';
-import { createPhrase } from './wallet-derive';
+import { createPhrase, seedFromPhrase, deriveReceive, deriveReceive44, deriveReceiveSecp } from './wallet-derive';
 import { installMemoryStorage } from './test-storage';
+
+const TWELVE =
+  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
 function host(): HasherHost {
   return {
@@ -69,6 +72,18 @@ describe('WalletService', () => {
     vi.advanceTimersByTime(WALLET_LOCK_MS + 1);
     expect(() => w.signMessage('ab'.repeat(32))).toThrow(/locked/);
     vi.useRealTimers();
+  });
+
+  it('defaults persist to Dilithium 87 and can store 44 and secp', async () => {
+    const w = await setup();
+    const seed = seedFromPhrase(TWELVE);
+    await w.persistPhrase(TWELVE, 'secret', 'testnet');
+    expect(w.receive()).toBe(deriveReceive(seed, 'testnet'));
+    expect(w.receive()).not.toBe(deriveReceive44(seed, 'testnet'));
+    await w.persistPhrase(TWELVE, 'secret', 'testnet', 'mldsa44');
+    expect(w.receive()).toBe(deriveReceive44(seed, 'testnet'));
+    await w.persistPhrase(TWELVE, 'secret', 'testnet', 'secp');
+    expect(w.receive()).toBe(deriveReceiveSecp(seed, 'testnet'));
   });
 
   it('uses a different HRP on main', async () => {
