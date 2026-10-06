@@ -1,26 +1,26 @@
 {
   "node": {
-    "gitSha": "93608a816fc1fbe88febea076b0cda92bf2f5bc7",
-    "tag": "v29.5.0.federationcoin20260927.rc2",
+    "gitSha": "cad03a8d8959fb4f7180fbcd13de3601a0fffd9f",
+    "tag": "v29.5.0.federationcoin20261005.rc2",
     "repo": "FederationCoin/FederationCoin",
     "assets": {
-      "linux-x64": { "name": "federationcoind-linux-x64.zip", "sha256": "66e632b1b03616fbe2e34069deddbe50785f64d4a508d6ae1fb32af08bb57147" },
-      "linux-arm64": { "name": "federationcoind-linux-arm64.zip", "sha256": "c1717a3928cef5d3edcfda1b4f89673724e09c52023ff03efb6b002de46a0dcf" },
-      "win-x64": { "name": "federationcoind-win-x64.zip", "sha256": "a81320fffa4141bb209e4b21bd22c870f1613d9664d85f8cc613672f436ae94e" },
-      "macos-arm64": { "name": "federationcoind-macos-arm64.zip", "sha256": "b8a845ce069459e82b69f34f8dbf7dae41f27a7e8ec2fcb41d22b5d9383bd118" },
-      "macos-x64": { "name": "federationcoind-macos-x64.zip", "sha256": "aa7a3ec5d818cca8b52ae19f18b1820aa2b3d4740903e64361f141f05e142e32" }
+      "linux-x64": { "name": "federationcoind-linux-x64.zip", "sha256": "a9106e5ef6ec879ad6c26fec98b01ed3662fb165f17828ba35efb2688ce8956f" },
+      "linux-arm64": { "name": "federationcoind-linux-arm64.zip", "sha256": "60270b461e36308c53e963d956a07c536d4353554d48c3a4cb4a6428d813d790" },
+      "win-x64": { "name": "federationcoind-win-x64.zip", "sha256": "8446644743208adf911dca44852b74cc186c60bf57c8ed1b3be9b2c1e3c83bb1" },
+      "macos-arm64": { "name": "federationcoind-macos-arm64.zip", "sha256": "c12af46882e71d1cd298cd644e373866301ac36691fe1d747cbb4c26846141ca" },
+      "macos-x64": { "name": "federationcoind-macos-x64.zip", "sha256": "34e2f9ef5d3699e5ca635b8eafe7bbdfd98c7fd682fd8fa94b94ca60b2cd8411" }
     }
   },
   "gateway": {
-    "gitSha": "6da12bb05d2c8df00ef3e739b54510755fdb857b",
-    "tag": "v0.4.1-federationcoin.0.rc6",
+    "gitSha": "41c896af3c4556a937c046308fc7e1cbf80204e9",
+    "tag": "v0.4.1-federationcoin.0.rc7",
     "repo": "FederationCoin/datum_gateway",
     "assets": {
-      "linux-x64": { "name": "datum_gateway-linux-x64.zip", "sha256": "91c68e1b38f15283bce2c5d4774ed47352daaa2054bf61c742a2a2df519b3c86" },
-      "linux-arm64": { "name": "datum_gateway-linux-arm64.zip", "sha256": "d51a3a0058b8c4269f2dd8d7849eabe9fd5594c587f1de0e4f47cb8c188aca95" },
+      "linux-x64": { "name": "datum_gateway-linux-x64.zip", "sha256": "bbde111bec5abc41ba361f3ed40f49bcb8c8804f880b8b8c84c4240546729604" },
+      "linux-arm64": { "name": "datum_gateway-linux-arm64.zip", "sha256": "6f03c2460c26b9ef7b9d71a5f698e8b8c4f510ed77f69d1aaaa66ce978bef7c1" },
       "win-x64": { "name": "datum_gateway-win-x64.zip", "sha256": "" },
-      "macos-arm64": { "name": "datum_gateway-macos-arm64.zip", "sha256": "99f7c89741601b11006544238e1c96c6a62d20a08fd4c7b6b3f2e6f1a19d0d4e" },
-      "macos-x64": { "name": "datum_gateway-macos-x64.zip", "sha256": "2f27c786faf6f6b35a19c3d0fbfc511b9a85c5a8273b0239443eec0a8ddd1708" }
+      "macos-arm64": { "name": "datum_gateway-macos-arm64.zip", "sha256": "40811a1cf13b141d846015ac5b85a8200e67ded548497c4408dbd462a5b79c31" },
+      "macos-x64": { "name": "datum_gateway-macos-x64.zip", "sha256": "a785842b7ad4071e522bbe244bf96563211a4095ab333758537e27e18c99a2e7" }
     }
   }
 }
