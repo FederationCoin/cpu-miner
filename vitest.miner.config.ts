@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: [
       'miner/**/*.test.ts',
+      'scripts/fetch-extras-lib.test.ts',
       'projects/miner-ui/src/lib/asic-pow.spec.ts',
       'projects/miner-ui/src/lib/stratum-ws.spec.ts',
       'projects/miner-ui/src/lib/web-hasher.spec.ts',
@@ -28,6 +29,7 @@ export default defineConfig({
       enabled: true,
       include: [
         'miner/extras.ts',
+        'scripts/fetch-extras-lib.mjs',
         'miner/node-process.ts',
         'miner/gateway-process.ts',
         'miner/wallet-store.ts',
