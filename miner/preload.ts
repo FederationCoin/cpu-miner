@@ -114,9 +114,11 @@ contextBridge.exposeInMainWorld('miner', {
   extrasProbe: () => ipcRenderer.invoke('extras:probe'),
   nodeStart: (opts: { chain: import('./chain.js').MinerChain; datadir: string }) => ipcRenderer.invoke('node:start', opts),
   nodeStop: () => ipcRenderer.invoke('node:stop'),
+  nodeKillForeign: (pid: number) => ipcRenderer.invoke('node:killForeign', { pid }),
   nodeStatus: (opts: { chain: import('./chain.js').MinerChain; datadir: string }) => ipcRenderer.invoke('node:status', opts),
   gatewayStart: (opts: unknown) => ipcRenderer.invoke('gateway:start', opts),
   gatewayStop: () => ipcRenderer.invoke('gateway:stop'),
+  gatewayKillForeign: (pid: number) => ipcRenderer.invoke('gateway:killForeign', { pid }),
   gatewayStatus: (opts: { chain: import('./chain.js').MinerChain; configPath: string }) =>
     ipcRenderer.invoke('gateway:status', opts),
   fetchPrimeKeys: (url: string) => ipcRenderer.invoke('prime:fetchKeys', url),

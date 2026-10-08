@@ -41,6 +41,7 @@ export type HasherHost = {
     rpc?: boolean;
   }) => Promise<{ ok: boolean; error?: string }>;
   nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
+  nodeKillForeign?: (pid: number) => Promise<{ ok: boolean; error?: string }>;
   nodeStatus?: (opts: {
     chain: MinerChain;
     datadir: string;
@@ -55,6 +56,7 @@ export type HasherHost = {
     listenReach?: 'computer' | 'network';
   }) => Promise<{ ok: boolean; error?: string }>;
   gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
+  gatewayKillForeign?: (pid: number) => Promise<{ ok: boolean; error?: string }>;
   gatewayStatus?: (opts: { chain: MinerChain; configPath: string }) => Promise<GatewayStatusView>;
   fetchPrimeKeys?: (url: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
   walletLoad?: (chain: MinerChain) => Promise<string | null>;

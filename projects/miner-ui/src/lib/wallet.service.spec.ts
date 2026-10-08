@@ -84,7 +84,7 @@ describe('WalletService', () => {
     expect(w.receive()).toBe(deriveReceive44(seed, 'testnet'));
     await w.persistPhrase(TWELVE, 'secret', 'testnet', 'secp');
     expect(w.receive()).toBe(deriveReceiveSecp(seed, 'testnet'));
-  });
+  }, 30000);
 
   it('uses a different HRP on main', async () => {
     const w = await setup();

@@ -106,6 +106,10 @@ export class ElectronHasherHost implements HasherHost {
     return window.miner?.nodeStop?.() ?? Promise.resolve({ ok: false, error: 'no node module' });
   }
 
+  nodeKillForeign(pid: number) {
+    return window.miner?.nodeKillForeign?.(pid) ?? Promise.resolve({ ok: false, error: 'no node module' });
+  }
+
   nodeStatus(opts: {
     chain: import('./miner-api').MinerChain;
     datadir: string;
@@ -127,6 +131,10 @@ export class ElectronHasherHost implements HasherHost {
 
   gatewayStop() {
     return window.miner?.gatewayStop?.() ?? Promise.resolve({ ok: false, error: 'no gateway module' });
+  }
+
+  gatewayKillForeign(pid: number) {
+    return window.miner?.gatewayKillForeign?.(pid) ?? Promise.resolve({ ok: false, error: 'no gateway module' });
   }
 
   gatewayStatus(opts: { chain: import('./miner-api').MinerChain; configPath: string }) {

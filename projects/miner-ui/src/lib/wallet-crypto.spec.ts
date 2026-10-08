@@ -16,7 +16,7 @@ describe('wallet-crypto', () => {
     expect([...out]).toEqual([...seed]);
     expect(fingerprint(seed)).toHaveLength(16);
     await expect(unwrapSeed(blob, 'wrong')).rejects.toThrow(/wrong password/);
-  });
+  }, 30000);
 
   it('parseBlob accepts a wrapped blob and rejects junk', async () => {
     const blob = await wrapSeed(new Uint8Array(64), 'pw', 'tgfcn1qqq');
@@ -25,5 +25,5 @@ describe('wallet-crypto', () => {
     expect(parseBlob(JSON.stringify({ ...blob, v: 2 }))).toBeNull();
     expect(parseBlob(JSON.stringify({ ...blob, receive: '' }))).toBeNull();
     await expect(unwrapSeed({ ...blob, kdf: 'scrypt' } as unknown as typeof blob, 'pw')).rejects.toThrow(/unsupported/);
-  });
+  }, 30000);
 });

@@ -83,6 +83,19 @@
           {{ stopLabel() }}
         </button>
       }
+      @if (showKill()) {
+        @for (pid of killPids(); track pid) {
+          <button
+            mat-stroked-button
+            color="warn"
+            type="button"
+            [id]="idPrefix() + '-kill-' + pid"
+            (click)="kill.emit(pid)"
+          >
+            Kill {{ pid }}
+          </button>
+        }
+      }
       <button mat-stroked-button type="button" [id]="idPrefix() + '-poll'" (click)="poll.emit()">Poll now</button>
     </div>
     <p class="hint">Poll now re-reads height, peers, and the process this app owns.</p>

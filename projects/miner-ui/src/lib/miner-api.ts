@@ -193,6 +193,7 @@ export type NodeStatusView = {
   connectHost: string;
   connectPort: number;
   portTaken: string;
+  foreignPids: number[];
 };
 
 export const EMPTY_NODE_STATUS: NodeStatusView = {
@@ -217,6 +218,7 @@ export const EMPTY_NODE_STATUS: NodeStatusView = {
   connectHost: '',
   connectPort: 0,
   portTaken: '',
+  foreignPids: [],
 };
 
 export type GatewayStatusView = {
@@ -235,6 +237,7 @@ export type GatewayStatusView = {
   connectHost: string;
   connectPort: number;
   portTaken: string;
+  foreignPids: number[];
 };
 
 export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
@@ -253,6 +256,7 @@ export const EMPTY_GATEWAY_STATUS: GatewayStatusView = {
   connectHost: '',
   connectPort: 0,
   portTaken: '',
+  foreignPids: [],
 };
 
 export type MinerApi = {
@@ -283,6 +287,7 @@ export type MinerApi = {
     rpc?: boolean;
   }) => Promise<{ ok: boolean; error?: string }>;
   nodeStop?: () => Promise<{ ok: boolean; error?: string }>;
+  nodeKillForeign?: (pid: number) => Promise<{ ok: boolean; error?: string }>;
   nodeStatus?: (opts: {
     chain: MinerChain;
     datadir: string;
@@ -297,6 +302,7 @@ export type MinerApi = {
     listenReach?: 'computer' | 'network';
   }) => Promise<{ ok: boolean; error?: string }>;
   gatewayStop?: () => Promise<{ ok: boolean; error?: string }>;
+  gatewayKillForeign?: (pid: number) => Promise<{ ok: boolean; error?: string }>;
   gatewayStatus?: (opts: { chain: MinerChain; configPath: string }) => Promise<GatewayStatusView>;
   fetchPrimeKeys?: (url: string) => Promise<{ ok: boolean; text?: string; error?: string }>;
   walletLoad?: (chain: MinerChain) => Promise<string | null>;

@@ -119,13 +119,17 @@ export class GatewayPane implements OnInit {
   }
 
   protected showStart(): boolean {
-    if (this.showMainWarning() || this.phase() === 'stopping' || this.status().portTaken) {
+    if (this.showMainWarning() || this.phase() === 'stopping') {
       return false;
     }
     if (this.phase() === 'starting') {
       return true;
     }
     return this.status().session === 'idle';
+  }
+
+  protected showKill(): boolean {
+    return this.status().portTaken !== '' || this.status().otherCount > 0 || this.status().foreignPids.length > 0;
   }
 
   protected showStop(): boolean {
@@ -232,6 +236,15 @@ export class GatewayPane implements OnInit {
       await this.refresh();
       this.phase.set('idle');
     }
+  }
+
+  protected async kill(pid: number): Promise<void> {
+    this.error.set('');
+    const r = await this.host.gatewayKillForeign?.(pid);
+    if (r && !r.ok) {
+      this.error.set(r.error ?? 'kill failed');
+    }
+    await this.refresh();
   }
 
   protected onPath(value: string): void {

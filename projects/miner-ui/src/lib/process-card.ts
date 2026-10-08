@@ -16,6 +16,8 @@ export class ProcessCard {
   readonly otherNoun = input.required<string>();
   readonly showStart = input(false);
   readonly showStop = input(false);
+  readonly showKill = input(false);
+  readonly killPids = input<number[]>([]);
   readonly startLabel = input('Start');
   readonly stopLabel = input('Stop');
   readonly startDisabled = input(false);
@@ -36,6 +38,7 @@ export class ProcessCard {
   readonly poll = output<void>();
   readonly start = output<void>();
   readonly stop = output<void>();
+  readonly kill = output<number>();
   readonly browse = output<void>();
   readonly pathChange = output<string>();
 

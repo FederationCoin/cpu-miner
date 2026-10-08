@@ -14,9 +14,11 @@ import {
   otherProcessCount,
   peersFromRpc,
   pidForSocketInodes,
+  listedDaemonPid,
   pidsFromLines,
   pidsWithCommIn,
   preExistingProcessMessage,
+  stickyPortTaken,
   pushRing,
   readLogTail,
   readUsage,
@@ -143,5 +145,10 @@ describe('tcp listeners', () => {
     expect(txsFromRpc('no')).toEqual([]);
     expect(txNote(true)).toMatch(/wallet/);
     expect(txNote(false)).toMatch(/off/);
+    expect(listedDaemonPid(7, [7, 9])).toBe(7);
+    expect(() => listedDaemonPid(8, [7, 9])).toThrow(/listed/);
+    expect(stickyPortTaken('held', '', 1)).toEqual({ message: 'held', streak: 0 });
+    expect(stickyPortTaken('', 'held', 0)).toEqual({ message: 'held', streak: 1 });
+    expect(stickyPortTaken('', 'held', 1)).toEqual({ message: '', streak: 2 });
   });
 });
