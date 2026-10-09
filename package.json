@@ -133,12 +133,12 @@
       "target": [
         "portable",
         "zip"
-      ],
-      "portable": {
-        "artifactName": "federationcoin-cpu-miner-${version}-${os}-${arch}.${ext}",
-        "unpackDirName": "FederationCoinCPUMiner",
-        "splashImage": "build/splash.bmp"
-      }
+      ]
+    },
+    "portable": {
+      "artifactName": "federationcoin-cpu-miner-${version}-${os}-${arch}.${ext}",
+      "unpackDirName": "FederationCoinCPUMiner",
+      "splashImage": "build/splash.bmp"
     },
     "mac": {
       "identity": null,
