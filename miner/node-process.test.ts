@@ -1,9 +1,9 @@
 import type { ChildProcess } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { canStopNode, nodeArgv, nodeCommand, nodePortLines, spawnNode } from './node-process.js';
+import { canStopNode, ensureDir, nodeArgv, nodeCommand, nodePortLines, spawnNode } from './node-process.js';
 
 describe('node-process', () => {
   it('builds loopback testnet argv and refuses dummy MAIN', () => {
@@ -64,5 +64,15 @@ describe('node-process', () => {
     const proc = spawnNode({ kind: 'present', path: process.execPath }, 'testnet', mkdtempSync(join(tmpdir(), 'fc-node-')));
     expect(proc.pid).toBeTruthy();
     proc.kill();
+  });
+
+  it('creates a missing datadir and leaves an existing one alone', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fc-dir-'));
+    const missing = join(root, 'new-datadir');
+    expect(existsSync(missing)).toBe(false);
+    expect(ensureDir(missing)).toBe(missing);
+    expect(existsSync(missing)).toBe(true);
+    expect(ensureDir(missing)).toBe(missing);
+    expect(() => ensureDir('')).toThrow(/empty/);
   });
 });

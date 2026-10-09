@@ -104,18 +104,25 @@ describe('NodePane', () => {
     await f.whenStable();
   });
 
-  it('hides Start when a node this app did not spawn holds the port', async () => {
+  it('shows Kill and keeps Start when a node this app did not spawn holds the port', async () => {
     const warning =
       'A pre-existing node process is already running. This may have been started externally or from a prior run of this application left orphaned. It must be shut down before we can spawn a new node process here.';
     const f = await render(
       'desktop',
       host({ node: true, gateway: false, pool: true }, {
-        nodeStatus: async () => ({ ...EMPTY_NODE_STATUS, portTaken: warning, pid: 42, height: 237 }),
+        nodeStatus: async () => ({
+          ...EMPTY_NODE_STATUS,
+          portTaken: warning,
+          pid: 42,
+          height: 237,
+          foreignPids: [42],
+        }),
       }),
     );
     expect(f.nativeElement.querySelector('#testnet-node-port-taken')?.textContent).toContain('pre-existing node process');
-    expect(f.nativeElement.querySelector('#testnet-node-start')).toBeNull();
+    expect(f.nativeElement.querySelector('#testnet-node-start')).toBeTruthy();
     expect(f.nativeElement.querySelector('#testnet-node-stop')).toBeNull();
+    expect(f.nativeElement.querySelector('#testnet-node-kill-42')?.textContent).toContain('42');
     expect(f.nativeElement.querySelector('#testnet-node-pid')?.textContent).toContain('42');
   });
 
@@ -123,5 +130,33 @@ describe('NodePane', () => {
     const f = await render('desktop', host({ node: true, gateway: false, pool: true }));
     expect(f.nativeElement.querySelector('#testnet-node-start')).toBeTruthy();
     expect(f.nativeElement.querySelector('#testnet-node-stop')).toBeNull();
+  });
+
+  it('restores a saved datadir on init and does not overwrite it with status', async () => {
+    localStorage.setItem('fc.testnet.node.datadir', 'D:\\saved-node');
+    const f = await render(
+      'desktop',
+      host({ node: true, gateway: false, pool: true }, {
+        nodeStatus: async () => ({ ...EMPTY_NODE_STATUS, datadir: 'C:\\default' }),
+      }),
+    );
+    expect((f.nativeElement.querySelector('#testnet-node-path') as HTMLInputElement).value).toBe('D:\\saved-node');
+  });
+
+  it('kills a listed foreign pid', async () => {
+    let killed = 0;
+    const f = await render(
+      'desktop',
+      host({ node: true, gateway: false, pool: true }, {
+        nodeStatus: async () => ({ ...EMPTY_NODE_STATUS, portTaken: 'held', foreignPids: [99] }),
+        nodeKillForeign: async (pid) => {
+          killed = pid;
+          return { ok: true };
+        },
+      }),
+    );
+    (f.nativeElement.querySelector('#testnet-node-kill-99') as HTMLButtonElement).click();
+    await f.whenStable();
+    expect(killed).toBe(99);
   });
 });

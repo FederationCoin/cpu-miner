@@ -43,6 +43,10 @@ export class NodePane implements OnInit {
   protected readonly phase = signal<'idle' | 'starting' | 'stopping'>('idle');
 
   ngOnInit(): void {
+    const savedDir = localStorage.getItem(this.datadirKey());
+    if (savedDir) {
+      this.datadir.setValue(savedDir);
+    }
     const saved = localStorage.getItem(this.listenKey());
     if (saved === 'network' || saved === 'computer') {
       this.listenReach.setValue(saved);
@@ -50,6 +54,7 @@ export class NodePane implements OnInit {
     if (localStorage.getItem(this.rpcKey()) === '0') {
       this.rpc.setValue(false);
     }
+    this.datadir.valueChanges.subscribe((value) => localStorage.setItem(this.datadirKey(), value));
     this.listenReach.valueChanges.subscribe((value) => localStorage.setItem(this.listenKey(), value));
     this.rpc.valueChanges.subscribe((value) => localStorage.setItem(this.rpcKey(), value ? '1' : '0'));
     void this.refresh();
@@ -70,13 +75,17 @@ export class NodePane implements OnInit {
   }
 
   protected showStart(): boolean {
-    if (this.showMainWarning() || this.phase() === 'stopping' || this.status().portTaken) {
+    if (this.showMainWarning() || this.phase() === 'stopping') {
       return false;
     }
     if (this.phase() === 'starting') {
       return true;
     }
     return this.status().session === 'idle';
+  }
+
+  protected showKill(): boolean {
+    return this.status().portTaken !== '' || this.status().otherCount > 0 || this.status().foreignPids.length > 0;
   }
 
   protected showStop(): boolean {
@@ -122,7 +131,7 @@ export class NodePane implements OnInit {
     if (this.rpc.disabled) {
       this.rpc.enable({ emitEvent: false });
     }
-    if (!this.datadir.dirty && next.datadir) {
+    if (!this.datadir.dirty && !localStorage.getItem(this.datadirKey()) && next.datadir) {
       this.datadir.setValue(next.datadir, { emitEvent: false });
     }
   }
@@ -177,6 +186,19 @@ export class NodePane implements OnInit {
       this.datadir.setValue(picked);
       this.datadir.markAsDirty();
     }
+  }
+
+  protected async kill(pid: number): Promise<void> {
+    this.error.set('');
+    const r = await this.host.nodeKillForeign?.(pid);
+    if (r && !r.ok) {
+      this.error.set(r.error ?? 'kill failed');
+    }
+    await this.refresh();
+  }
+
+  private datadirKey(): string {
+    return `fc.${this.chain()}.node.datadir`;
   }
 
   private listenKey(): string {

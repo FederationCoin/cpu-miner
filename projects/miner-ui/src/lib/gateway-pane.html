@@ -74,6 +74,8 @@
       otherNoun="datum_gateway"
       [showStart]="showStart()"
       [showStop]="showStop()"
+      [showKill]="showKill()"
+      [killPids]="status().foreignPids"
       [startLabel]="startLabel()"
       [stopLabel]="stopLabel()"
       [startDisabled]="phase() === 'starting'"
@@ -93,6 +95,7 @@
       (poll)="refresh()"
       (start)="start()"
       (stop)="stop()"
+      (kill)="kill($event)"
       (pathChange)="onPath($event)"
     >
       <app-listen-reach [fieldId]="chain() + '-gateway-listen'" [control]="deskForm.controls.listenReach" />

@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import { MAIN_IS_LIVE, defaultRpcPort, type MinerChain } from './chain.js';
 import { defaultDatadir } from './rpc.js';
 import type { AddonPresence } from './extras.js';
@@ -40,6 +41,7 @@ export type NodeStatus = {
   connectHost: string;
   connectPort: number;
   portTaken: string;
+  foreignPids: number[];
 };
 
 export const IDLE_NODE_STATUS: NodeStatus = {
@@ -64,6 +66,7 @@ export const IDLE_NODE_STATUS: NodeStatus = {
   connectHost: '',
   connectPort: 0,
   portTaken: '',
+  foreignPids: [],
 };
 
 export function nodeCommand(
@@ -102,6 +105,15 @@ export function nodeArgv(
   }
   args.push('-natpmp=0', '-upnp=0');
   return args;
+}
+
+export function ensureDir(path: string): string {
+  const dir = path.trim();
+  if (!dir) {
+    throw new Error('data directory is empty');
+  }
+  mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 export function spawnNode(

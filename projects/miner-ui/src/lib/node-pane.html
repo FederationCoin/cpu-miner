@@ -19,6 +19,8 @@
       otherNoun="federationcoind"
       [showStart]="showStart()"
       [showStop]="showStop()"
+      [showKill]="showKill()"
+      [killPids]="status().foreignPids"
       [startLabel]="startLabel()"
       [stopLabel]="stopLabel()"
       [startDisabled]="phase() === 'starting'"
@@ -39,6 +41,7 @@
       (poll)="refresh()"
       (start)="start()"
       (stop)="stop()"
+      (kill)="kill($event)"
       (browse)="browse()"
       (pathChange)="onPath($event)"
     >

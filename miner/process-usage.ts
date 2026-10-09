@@ -196,6 +196,28 @@ export function otherProcessCount(pids: number[], ownPid: number | null): number
   return pids.filter((p) => p !== ownPid).length;
 }
 
+export function listedDaemonPid(pid: number, listed: readonly number[]): number {
+  if (!Number.isInteger(pid) || pid <= 0 || !listed.includes(pid)) {
+    throw new Error('not a listed daemon pid');
+  }
+  return pid;
+}
+
+export function stickyPortTaken(
+  current: string,
+  previous: string,
+  freeStreak: number,
+): { message: string; streak: number } {
+  if (current) {
+    return { message: current, streak: 0 };
+  }
+  const streak = freeStreak + 1;
+  if (streak >= 2) {
+    return { message: '', streak };
+  }
+  return { message: previous, streak };
+}
+
 export type ListenHolder = { port: number; pid: number | null };
 
 export function preExistingProcessMessage(kind: 'node' | 'gateway'): string {

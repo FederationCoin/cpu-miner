@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net } from 'electron';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -665,12 +666,18 @@ async function runMiner(opts: MinerStartOpts): Promise<void> {
   }
 }
 
+function windowIcon(): string | undefined {
+  const icon = join(here, 'icon.png');
+  return existsSync(icon) ? icon : undefined;
+}
+
 function createWindow(): void {
   win = new BrowserWindow({
     width: 1280,
     height: 860,
     backgroundColor: '#111318',
-    icon: join(here, 'icon.png'),
+    title: 'FederationCoin CPU Miner',
+    icon: windowIcon(),
     webPreferences: {
       preload: join(here, 'preload.js'),
       contextIsolation: true,
@@ -694,8 +701,8 @@ function openLogWindow(): void {
     width: 720,
     height: 480,
     backgroundColor: '#111318',
-    title: 'Error log',
-    icon: join(here, 'icon.png'),
+    title: 'FederationCoin CPU Miner — Error log',
+    icon: windowIcon(),
     webPreferences: {
       preload: join(here, 'preload.js'),
       contextIsolation: true,
@@ -956,7 +963,20 @@ ipcMain.handle('miner:stop', async () => {
   emitStats();
 });
 
+if (process.platform === 'win32') {
+  app.setAppUserModelId('org.federationcoin.cpuminer');
+}
+
 app.whenReady().then(() => {
+  const icon = windowIcon();
+  if (process.platform === 'darwin' && icon) {
+    app.dock?.setIcon(icon);
+  }
+  app.setAboutPanelOptions({
+    applicationName: 'FederationCoin CPU Miner',
+    applicationVersion: app.getVersion(),
+    ...(icon ? { iconPath: icon } : {}),
+  });
   installMenu();
   createWindow();
   setInterval(() => {
