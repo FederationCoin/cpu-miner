@@ -1,4 +1,4 @@
-/** BIP173 bech32 / BIP350 bech32m decode. Witness v0/v1 scriptPubKey. */
+/** BIP173 bech32 / BIP350 bech32m decode. Payouts are witness v0 only. */
 
 const CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
@@ -160,13 +160,13 @@ export function bech32Decode(addr: string): { hrp: string; witver: number; progr
   return { hrp, witver, program };
 }
 
-/** Witness v0/v1 scriptPubKey. Accepts tfcn / fcn HRPs; caller refuses fcn for this app. */
+/** Witness scriptPubKey codec. Accepts tgfcn / gfcn HRPs; payoutScript allows v0 only. */
 export function addressToScript(addr: string): { hrp: string; script: Uint8Array } | null {
   const d = bech32Decode(addr);
   if (!d) {
     return null;
   }
-  if (d.hrp !== 'tfcn' && d.hrp !== 'fcn') {
+  if (d.hrp !== 'tgfcn' && d.hrp !== 'gfcn') {
     return null;
   }
   const script = new Uint8Array(2 + d.program.length);
@@ -182,13 +182,21 @@ export function addressToScript(addr: string): { hrp: string; script: Uint8Array
   return { hrp: d.hrp, script };
 }
 
-export function testnetPayoutScript(addr: string): Uint8Array {
+export function payoutScript(addr: string, chain: 'main' | 'testnet'): Uint8Array {
   const decoded = addressToScript(addr.trim());
+  const want = chain === 'main' ? 'gfcn' : 'tgfcn';
+  const label = chain === 'main' ? 'gfcn1' : 'tgfcn1';
+  const other = chain === 'main' ? 'tgfcn1' : 'gfcn1';
   if (!decoded) {
-    throw new Error('payout must be a tfcn1 bech32 address');
+    throw new Error(`payout must be a ${label} bech32 address`);
   }
-  if (decoded.hrp !== 'tfcn') {
-    throw new Error('dummy MAIN is off; payout must be tfcn1, not fcn1');
+  if (decoded.hrp !== want) {
+    throw new Error(`payout must be ${label}, not ${other}`);
+  }
+  if (decoded.script[0] !== 0x00) {
+    throw new Error(
+      `payout must be witness v0 bech32 (P2WPKH/P2WSH). Witness v1 / bech32m (Taproot) is not supported`,
+    );
   }
   return decoded.script;
 }

@@ -1,0 +1,26 @@
+{
+  "node": {
+    "gitSha": "dc4b459594db8b0133fb07657294346457310111",
+    "tag": "v29.5.0.federationcoin20261009.rc1",
+    "repo": "FederationCoin/FederationCoin",
+    "assets": {
+      "linux-x64": { "name": "federationcoind-linux-x64.zip", "sha256": "2a0d3c5cd57c75a970d5dfecbbf5c39c94c8aa6f35f2ebd094ed5703ada6b996" },
+      "linux-arm64": { "name": "federationcoind-linux-arm64.zip", "sha256": "395b2a522c064e1e2e519c4f7d90be0857fc05ae15972794aa77773dd3534171" },
+      "win-x64": { "name": "federationcoind-win-x64.zip", "sha256": "1c184b831c0ad15570f8f48aec0ffe6071b64c5fb362c0494c3f3b28bbddc2f0" },
+      "macos-arm64": { "name": "federationcoind-macos-arm64.zip", "sha256": "8d5bcda601e7d896fe4522e5e6e877ada15c88eaa616c7c6321d132593cf5df5" },
+      "macos-x64": { "name": "federationcoind-macos-x64.zip", "sha256": "04da3946c44a11722bb60383d9c1876cae0760454f5f6e9d5eff3099dfb44884" }
+    }
+  },
+  "gateway": {
+    "gitSha": "41c896af3c4556a937c046308fc7e1cbf80204e9",
+    "tag": "v0.4.1-federationcoin.0.rc7",
+    "repo": "FederationCoin/datum_gateway",
+    "assets": {
+      "linux-x64": { "name": "datum_gateway-linux-x64.zip", "sha256": "bbde111bec5abc41ba361f3ed40f49bcb8c8804f880b8b8c84c4240546729604" },
+      "linux-arm64": { "name": "datum_gateway-linux-arm64.zip", "sha256": "6f03c2460c26b9ef7b9d71a5f698e8b8c4f510ed77f69d1aaaa66ce978bef7c1" },
+      "win-x64": { "name": "datum_gateway-win-x64.zip", "sha256": "" },
+      "macos-arm64": { "name": "datum_gateway-macos-arm64.zip", "sha256": "40811a1cf13b141d846015ac5b85a8200e67ded548497c4408dbd462a5b79c31" },
+      "macos-x64": { "name": "datum_gateway-macos-x64.zip", "sha256": "a785842b7ad4071e522bbe244bf96563211a4095ab333758537e27e18c99a2e7" }
+    }
+  }
+}

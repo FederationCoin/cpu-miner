@@ -1,0 +1,16 @@
+@startuml public-flex-cap
+title Room at an epoch
+left to right direction
+rectangle "16 windows" as Windows
+rectangle "Grow +50%\n13 windows hot" as Grow
+rectangle "Shrink /2\nepoch quiet" as Shrink
+rectangle "Stay\nmid band" as Stay
+Windows --> Grow
+Windows --> Shrink
+Windows --> Stay
+note bottom of Stay
+  Floor 2.4M.
+  The number can move.
+  The anti-data rules do not.
+end note
+@enduml

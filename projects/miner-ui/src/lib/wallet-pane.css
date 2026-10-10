@@ -1,0 +1,76 @@
+:host {
+  display: block;
+}
+
+.wallet-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(16rem, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.phrase-region {
+  min-height: 22rem;
+  margin-top: 12px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.wallet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wallet-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 8px;
+  border: 1px solid #c9a85a;
+  border-radius: 4px;
+}
+
+.wallet-list li.selected {
+  outline: 2px solid #c9a85a;
+}
+
+.mine-flag {
+  color: #c9a85a;
+  font-size: 0.82rem;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}
+
+.hint {
+  color: #c4bfb0;
+  line-height: 1.4;
+}
+
+.err {
+  padding: 8px;
+  border-radius: 4px;
+  background: #3a1d1d;
+  color: #ffb4b4;
+}
+
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 900px) {
+  .wallet-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -5,5 +5,12 @@
   "compilerOptions": {
     "types": ["vitest/globals"]
   },
-  "include": ["src/**/*.d.ts", "src/**/*.spec.ts"]
+  "include": [
+    "src/**/*.d.ts",
+    "src/**/*.spec.ts",
+    "projects/miner-ui/src/**/*.spec.ts",
+    "projects/miner-ui/src/**/*.d.ts",
+    "projects/miner-ui/src/**/*.json"
+  ],
+  "exclude": ["projects/miner-ui/src/lib/asic-pow.spec.ts"]
 }

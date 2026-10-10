@@ -142,7 +142,7 @@ export function deserializeHeader(input: Uint8Array): HeaderV2 | null {
   return h;
 }
 
-function xorKeyMaskBytes(xorKey: Uint8Array, clearBits: number): Uint8Array {
+export function xorKeyMaskBytes(xorKey: Uint8Array, clearBits: number): Uint8Array {
   const mask = new Uint8Array(32);
   if (isAllZero(xorKey)) {
     return mask;

@@ -1,105 +1,69 @@
 # FederationCoin CPU miner (Electron)
 
-Local **Electron** app: Angular UI in the renderer, Node in the main process.
-Origin is `git@github.com:FederationCoin/cpu-miner.git`. Work on
-`federationcoin`. Two mining modes (neither uses curl or WSL detection):
+Local **Federation Miner** app: Angular UI in the renderer, Node in the main process. Not Bitcoin. Experimental. No price promise.
 
-- **Node RPC** — cookie + `getblocktemplate` / `submitblock` via Node `fetch`
-  to a host/port you set (default `127.0.0.1:35332`). Main reads
-  `testnet3/.cookie`. The cookie never goes to the renderer. You still set a
-  **tfcn1** payout; the app builds the coinbase.
-- **Stratum** — ASIC-style TCP Stratum v1 (`net.Socket`). Host/port/worker
-  (username) / password (default `x`). Default `127.0.0.1:23334`. A
-  `.worker` suffix is allowed and not parsed specially. No payout field: the
-  pool or proxy builds the coinbase. Solo still uses
-  [`stratum-proxy --payout-address tfcn1…`](../cpu-miner-cpp/README.md) (or
-  DATUM `mining.pool_address`); this miner only authorizes as **worker**.
+## For users
 
-Dummy **MAIN** is off. Threads stay in both modes. PoW is TypeScript
-(`@noble/hashes` blake2b `dkLen: 32`) with vectors in
-[`testdata/block_header_v2.json`](testdata/block_header_v2.json). Tests do not
-live-grind nonces.
+**Testnet is the public net.** Dummy **MAIN** is not live (`mainIsLive` false). The Main tab stays enabled and toasts that MAIN is not launched; cookie/RPC failures there are expected until announcement.
 
-C++ [`cpu-miner-cpp/`](../cpu-miner-cpp/) (`fcminer` + TCP `stratum-proxy`) is
-the fast CLI in the parent workspace. This app does **not** wrap those
-binaries.
+Network is the tenant (toggle upper right). Tabs under it are **Mine | Pool |
+Docs | Finder**. Desktop and the web demo share `@federationcoin/miner-ui`
+(path-mapped workspace; do not `npm publish`). Desktop hashes with CUDA, OpenCL,
+WebGPU, or CPU. The web shell is [mine.federationcoin.org](https://mine.federationcoin.org)
+(network dropdown in-app) and hashes with WebGPU or CPU over
+`wss://pool.testnet.federationcoin.org/stratum`. Unexpected WSS close
+reconnects with capped backoff and retries in-flight `mining.submit`
+until the pool’s accept/reject arrives. A later circuit breaker
+(429/502/503, timeouts, WS rebuilds) is
+[docs/pool-directory-todo.md](https://github.com/ldelarua/workspace-FederationCoin/blob/master/docs/pool-directory-todo.md);
+do not add it in this pass.
 
-No Electron, Angular, or other vendor trademarks as app icons. Next pass:
-**Federation Miner** robot icon, same fidelity and style as the forked
-Sparrow logo. Do not copy `electron.png` / default Electron icons into git.
+Mine-to kinds:
 
-## Host and port
+- **Node RPC** — cookie + `getblocktemplate` / `submitblock` via Node `fetch` to a host/port you set. Testnet default `127.0.0.1:35332` and `testnet3/.cookie`, payout **tgfcn1**. Main default `127.0.0.1:4094` and `<datadir>/.cookie`, payout **gfcn1**. The cookie never goes to the renderer.
+- **Stratum** — ASIC-style TCP Stratum v1. Host/port/worker (username) / password (default `x`). Default `127.0.0.1:23334` (saved per chain). A `.worker` suffix is allowed. No payout field: the pool or proxy builds the coinbase. Solo still uses `stratum-proxy --payout-address tgfcn1…` from [`cpu-miner-cpp`](https://github.com/ldelarua/workspace-FederationCoin/tree/master/cpu-miner-cpp) (or DATUM `mining.pool_address`); this miner only authorizes as **worker**.
+- **DATUM Prime** — desktop only, with **your** node (TCP 28916). The web demo greys this out: DATUM is bring your own node, and the house pool will not proxy cluster bitcoind.
+- **Host a pool** — Pool tab on desktop. Spawns [`federation-pool`](https://github.com/FederationCoin/federation-pool) (DATUM Prime **28916** + TIDES + Stratum v1 **23334**) against the operator’s `federationcoind`. Friends-and-family grade (JSONL, one process). Testnet default. Main still toasts that MAIN is not live. Cookie stays in the main process. This app does **not** wrap `cpu-miner-cpp` binaries. The web demo’s Pool tab is read-only status for the house testnet pool (MAIN house pool is off).
+- **Docs / Finder** — pool grades, DATUM is bring-your-own-node, and a curated list plus stub register (no fake PKI).
 
-Host and port are plain TCP/HTTP. Pick values the **miner process** can open,
-same as firmware. There is no OS-specific transport.
+GPU hashing is additive and in-process. Detect lists each adapter once; pick Off,
+WebGPU, CUDA, or OpenCL (only strategies that can grind). All start Off, including
+Intel iGPU. You do **not** run a second app or `fcminer`. CUDA grind needs
+`asic_pow.ptx` from `nvcc` at build time; without it the same NVIDIA card still
+lists OpenCL. Install NVIDIA / AMD / Intel **GPU drivers** (OpenCL ICD) if you
+want native devices listed. No HIP kernel. A GPU driver fault can take down the
+whole app. ccminer “blake2b” hashes the wrong construction.
 
-If Electron runs in a WSL GUI and the node or proxy is on Windows
-`127.0.0.1`, that loopback is not Windows loopback. Set **Host** to an address
-this process can route (Windows LAN IP, listen `0.0.0.0`, mirrored
-networking, or run both in the same OS).
+Host and port are plain TCP/HTTP. If Electron runs in a WSL GUI and the node is on Windows `127.0.0.1`, that loopback is not Windows loopback. Set **Host** to an address this process can route.
 
-Default datadir (RPC cookie parent) follows where the miner process runs:
+Default datadir (RPC cookie parent):
+
 - Windows: `%LOCALAPPDATA%\FederationCoin`
 - Linux (including WSL): `~/.federationcoin`
 
-If the **node** is the Windows package with `-datadir G:\btc\federation-coin`,
-paste `/mnt/g/btc/federation-coin` (or set `FEDERATIONCOIN_DATADIR`). Cookie is
-`<datadir>/testnet3/.cookie`.
+If the **node** is the Windows package with `-datadir G:\btc\federation-coin`, paste `/mnt/g/btc/federation-coin` (or set `FEDERATIONCOIN_DATADIR`). Testnet cookie is `<datadir>/testnet3/.cookie`. Main cookie is `<datadir>/.cookie`. GBT waits until the node is out of header/block sync. Wrong-PoW pools (ckpool 80-byte SHA256d) will `high-hash`.
 
-GBT still waits until the node is out of header/block sync. Wrong-PoW pools
-(ckpool 80-byte SHA256d) will still `high-hash`.
+While **Start** is active, a dropped session retries (backoff up to 60s). **Help > Error log** tails a ring buffer. Cookie and password are not logged.
 
-## Reconnect, Help log, toasts
+Builds are unsigned. Gatekeeper and SmartScreen may warn. If you cannot bypass them, do not run it.
 
-While **Start** is active, a dropped session is not a permanent stop. RPC
-retries on `fetch` fail / ECONNREFUSED / node down after a good GBT. Stratum
-retries on socket `close`/`error`. Backoff starts around 1s, doubles, and
-caps at **60s**. A successful GBT or a live Stratum session (`mining.notify` or
-authorized) resets the delay. **Stop** cancels the timer and does not
-reconnect.
+Issues: [FederationCoin/cpu-miner](https://github.com/FederationCoin/cpu-miner/issues).
 
-Errors and reconnects toast on the main window (few seconds). **Help >
-Error log** opens a second window that tails a ring buffer in main (~500
-lines). Cookie and password are not logged; worker name is fine.
+## For developers
 
-## Unsigned builds (no Developer account)
+Origin is `git@github.com:FederationCoin/cpu-miner.git`. Mainline is `federationcoin`. There is no upstream remote. **Never push** any registry or GitHub org that is not FederationCoin.
 
-We do not codesign. A vendor “Developer account” is identity-for-sale and
-contradicts “don’t trust the node binary.” Anyone can fork this miner/node; if
-it speaks the protocol, peers and consensus decide, not Gatekeeper or
-SmartScreen. Censored OS warnings are expected. If you cannot bypass them,
-don’t run it.
+PoW is TypeScript (`@noble/hashes` blake2b `dkLen: 32`) with vectors in [`testdata/block_header_v2.json`](testdata/block_header_v2.json). Tests do not live-grind nonces. GPU hasher: [`native/gpu-hasher/README.md`](native/gpu-hasher/README.md). App icon is `build/icon.png` (Federation Miner). Do not copy default Electron icons into git.
 
-`electron-builder` is a **local** devDependency. Scripts produce unsigned
-Linux / Windows / macOS artifacts under `dist-electron/` (gitignored). No
-`npm publish`, no public Docker, no auto-update feed, no Apple Developer ID,
-no Microsoft Authenticode.
+The C++ CLI (`fcminer` + `stratum-proxy`) lives in the workspace dump as [`cpu-miner-cpp/`](https://github.com/ldelarua/workspace-FederationCoin/tree/master/cpu-miner-cpp). This app does **not** wrap those binaries. `private: true` so `npm publish` is refused.
+
+### Clone and build
+
+Use **nvm** Current Node (`.nvmrc` is `node`). Angular CLI is a **local** devDependency. Do not `npm install -g @angular/cli`.
 
 ```bash
-npm run dist:linux
-npm run dist:win
-npm run dist:mac
-```
-
-CI Package (Actions → Package, human tag, draft Release) is the ship path.
-Tags match `package.json` version:
-
-```text
-vMAJOR.MINOR.PATCH-federationcoin.<fork>
-vMAJOR.MINOR.PATCH-federationcoin.<fork>.<ext>
-```
-
-Examples: `v0.0.0-federationcoin.0`, `v0.0.0-federationcoin.0.rc1`. Tag on
-origin **before** Package. Package does not create tags. Promote the draft in
-the GitHub UI. See [docs/golive-notes.md](../docs/golive-notes.md).
-
-## Toolchain
-
-Use **nvm** Current Node (`.nvmrc` is `node`). Angular CLI is a **local**
-devDependency. Do not `npm install -g @angular/cli`. Do not use a Windows or
-PATH `ng`.
-
-```bash
+git clone git@github.com:FederationCoin/cpu-miner.git
+git checkout federationcoin
 export NVM_DIR="$HOME/.nvm"
 . "$NVM_DIR/nvm.sh"
 nvm install node
@@ -107,20 +71,39 @@ nvm use
 npm install
 npm test
 npm start
+# web demo (WebGPU / CPU, WSS Stratum to pool.testnet). SPA is mine.federationcoin.org.
+npm run start:web
 ```
 
-`npm start` builds the renderer + `out-electron/` then launches Electron.
+`npm start` builds the renderer + `out-electron/` then the GPU addon (Electron 44 ABI) then launches Electron. If the addon fails to compile, Start still works on CPU. **Host a pool** copies `../federation-pool/dist/cli.js` into `vendor/federation-pool` when that sibling exists (`FEDERATION_POOL_CLI` overrides). Build the pool CLI first if you want that tab to spawn a process.
 
-## Rejected: in-browser + Stratum WebSocket sidecar
+Unsigned artifacts under `dist-electron/` (gitignored):
 
-A page cannot call node RPC (CORS, mixed content, users pasting RPC
-passwords). Sv1-over-WebSocket is only a wrap of TCP Stratum, not a standard.
-A loopback WS sidecar plus pairing token would still mean installing something
-local, so this app is the product. HTTPS `ws://127.0.0.1` stays mixed
-content. Do not add `--ws-listen` on `stratum-proxy` for this.
+```bash
+npm run dist:linux
+npm run dist:win
+npm run dist:mac
+```
 
-## Later: a proper pool
+`npm run dist:linux` runs `build:gpu` (Linux ELF addon). `npm run dist:win` runs `build:gpu` **only on Windows** (MSVC PE + nvcc PTX), then asserts PE `MZ` + `asic_pow.ptx` + `asic_pow.cl`. WSL `node-gyp` emits an ELF `gpu-hasher.node`; do not run `build:gpu` on Linux before packing `--win`. From WSL, copy a Package PE addon plus PTX into `native/gpu-hasher/dist/` then `dist:win`. Package `windows-2022` and `ubuntu-22.04` x64 install the CUDA Toolkit so `nvcc` produces `asic_pow.ptx` in CI. macOS and linux-arm64 keep OpenCL/WebGPU. Do not reuse the Sep 2026 OpenCL-only PE (no CUDA, host `1<<18` batches). Fast CUDA is the inner-loop kernel (`kLaunchHashes`) plus PTX.
 
-Many miners, each sets **their own** `tfcn1`, shares scored and paid, public
-stratum (`wss://` or TCP `:23334`). See
-[docs/golive-notes.md](../docs/golive-notes.md). Do not vendor DATUM here.
+`npm run pack:win` unpacks Electron’s win32 zip without Wine. It does **not** compile a Windows `gpu-hasher.node`. Package CI runs `FC_GPU_REQUIRED=1 npm run build:gpu` on each OS runner.
+
+### Branching
+
+Work on a branch off `federationcoin`. Open a same-repo pull request; a human merges. Do not push straight to mainline. Current work branch: `get-to-mainnet`.
+
+### Release
+
+Version is `version` in `package.json`. Tags (human, on origin mainline, before Package):
+
+```text
+vMAJOR.MINOR.PATCH-federationcoin.<fork>
+vMAJOR.MINOR.PATCH-federationcoin.<fork>.<ext>
+```
+
+Example: `v0.1.0-federationcoin.0`. electron-builder uses `--publish never`. Package may open a **draft** GitHub Release only. No public Docker, no auto-update feed, no Apple Developer ID, no Microsoft Authenticode. Process: [golive notes](https://github.com/ldelarua/workspace-FederationCoin/blob/master/docs/golive-notes.md).
+
+### Quality
+
+Code quality checks and metrics will be added over time.

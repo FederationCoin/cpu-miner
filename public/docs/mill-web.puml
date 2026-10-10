@@ -1,0 +1,17 @@
+@startuml mill-web
+title Web mill
+left to right direction
+rectangle "Browser\nSPA" as Browser
+rectangle "Stratum pool" as Pool
+rectangle "DATUM Gateway" as Gw
+rectangle "Node" as Node
+rectangle "DATUM Prime" as Prime
+Browser --> Pool : WSS /stratum
+Browser --> Gw : WSS /stratum
+Gw --> Node : GBT submitblock
+Gw --> Prime : DATUM
+note bottom of Browser
+  Hasher never speaks DATUM.
+  Localhost needs Apps On Device.
+end note
+@enduml

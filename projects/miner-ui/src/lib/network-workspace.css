@@ -1,0 +1,52 @@
+:host {
+  display: block;
+}
+
+:host[hidden] {
+  display: none;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  min-width: 600px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  border-bottom: 1px solid #c9a85a;
+}
+
+.tabs button {
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #c9a85a;
+  border-radius: 4px;
+  background: #15202e;
+  color: #e8e4d9;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: #c9a85a;
+  border-color: #c9a85a;
+  color: #0e1824;
+}
+
+.pane-col {
+  min-width: 0;
+  border: 1px solid #c9a85a;
+  border-radius: 6px;
+  padding: 1rem 1.1rem 1.25rem;
+  background: #15202e;
+}
+
+.pane-col h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}

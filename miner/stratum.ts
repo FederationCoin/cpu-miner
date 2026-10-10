@@ -1,5 +1,6 @@
 import { createConnection, type Socket } from 'node:net';
 import { parseHex, toHex } from './bytes.js';
+import { formatStratumReject } from './stratum-reject.js';
 
 export const STRATUM_HOST = '127.0.0.1';
 export const STRATUM_PORT = 23334;
@@ -111,6 +112,45 @@ export function parseNotify(msg: unknown): StratumNotify | null {
   }
 }
 
+/** Why parseNotify returned null. Keep the 39-byte DATUM coinb1 check. */
+export function notifyIgnoreReason(msg: unknown): string {
+  if (!msg || typeof msg !== 'object') {
+    return 'bad mining.notify';
+  }
+  const rec = msg as { params?: unknown };
+  if (!Array.isArray(rec.params) || rec.params.length < 3) {
+    return 'bad mining.notify';
+  }
+  const coinb1 = rec.params[2];
+  if (typeof coinb1 !== 'string') {
+    return 'bad mining.notify';
+  }
+  try {
+    const n = parseHex(coinb1).length;
+    if (n !== 39) {
+      return `bad mining.notify (coinb1 ${n} bytes)`;
+    }
+  } catch {
+    return 'bad mining.notify (coinb1)';
+  }
+  return 'bad mining.notify';
+}
+
+export function parseSetDifficulty(msg: unknown): number | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { method?: unknown; params?: unknown };
+  if (rec.method !== 'mining.set_difficulty' || !Array.isArray(rec.params) || rec.params.length < 1) {
+    return null;
+  }
+  const d = Number(rec.params[0]);
+  if (!Number.isFinite(d) || d <= 0) {
+    return null;
+  }
+  return d;
+}
+
 export function isAuthorizeOk(msg: unknown): boolean {
   if (!msg || typeof msg !== 'object') {
     return false;
@@ -121,11 +161,34 @@ export function isAuthorizeOk(msg: unknown): boolean {
 
 export type StratumHandlers = {
   onNotify: (job: StratumNotify) => void;
+  onDifficulty: (diff: number) => void;
   onSubscribed: (sub: StratumSubscribe) => void;
   onAuthorized: () => void;
   onSubmitResult: (ok: boolean, error?: string) => void;
   onClose: (reason: string) => void;
+  onJobIgnored: (reason: string) => void;
+  onPoolStats?: (stats: { height: number; workers: number; status: string }) => void;
 };
+
+export function parseClientPoolStats(msg: unknown): { height: number; workers: number; status: string } | null {
+  if (!msg || typeof msg !== 'object') {
+    return null;
+  }
+  const rec = msg as { method?: unknown; params?: unknown };
+  if (rec.method !== 'client.pool_stats' || !Array.isArray(rec.params) || rec.params.length < 1) {
+    return null;
+  }
+  const raw = rec.params[0];
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const o = raw as { height?: unknown; workers?: unknown; status?: unknown };
+  return {
+    height: Number(o.height) || 0,
+    workers: Number(o.workers) || 0,
+    status: typeof o.status === 'string' ? o.status : '',
+  };
+}
 
 export class StratumClient {
   private sock: Socket | null = null;
@@ -195,14 +258,27 @@ export class StratumClient {
       return;
     }
     const rec = msg as { method?: unknown; id?: unknown; result?: unknown; error?: unknown };
+    if (rec.method === 'client.pool_stats') {
+      const stats = parseClientPoolStats(msg);
+      if (stats) {
+        this.handlers.onPoolStats?.(stats);
+      }
+      return;
+    }
     if (rec.method === 'mining.notify') {
       const job = parseNotify(msg);
       if (job) {
         this.handlers.onNotify(job);
+      } else {
+        this.handlers.onJobIgnored(notifyIgnoreReason(msg));
       }
       return;
     }
     if (rec.method === 'mining.set_difficulty') {
+      const diff = parseSetDifficulty(msg);
+      if (diff != null) {
+        this.handlers.onDifficulty(diff);
+      }
       return;
     }
     if (rec.id === 1) {
@@ -218,8 +294,7 @@ export class StratumClient {
     }
     if (typeof rec.id === 'number' && rec.id >= 10) {
       const ok = rec.result === true && rec.error == null;
-      const err =
-        rec.error == null ? undefined : typeof rec.error === 'string' ? rec.error : JSON.stringify(rec.error);
+      const err = rec.error == null ? undefined : formatStratumReject(rec.error);
       this.handlers.onSubmitResult(ok, err);
     }
   }

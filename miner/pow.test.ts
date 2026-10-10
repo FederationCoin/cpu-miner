@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { encodeAddress, testnetPayoutScript } from './bech32.js';
-import { BLAKE2B_HEADLINE, coinbaseScriptSig } from './coinbase.js';
+import { encodeAddress, addressToScript, payoutScript } from './bech32.js';
+import { coinbaseScriptSig } from './coinbase.js';
 import { toHex, u128FromHexReversed, u256FromHex, u256ToHex } from './bytes.js';
 import { blake2b32, sha256 } from './hash.js';
 import { asicPreimage, deserializeHeader, emptyHeader, headerHash, serializeHeader, type HeaderV2 } from './pow.js';
@@ -78,10 +78,8 @@ describe('header-v2 vectors', () => {
 });
 
 describe('coinbase scriptSig', () => {
-  it('height 1 includes the Blake2b headline', () => {
-    const sig = coinbaseScriptSig(1);
-    const want = '51003b' + toHex(new TextEncoder().encode(BLAKE2B_HEADLINE));
-    expect(toHex(sig)).toBe(want);
+  it('height 1 is the height push and OP_0', () => {
+    expect(toHex(coinbaseScriptSig(1))).toBe('5100');
   });
 
   it('height 17 is 011100', () => {
@@ -107,18 +105,62 @@ describe('sha256 / blake2b self-checks', () => {
 });
 
 describe('payout address', () => {
-  it('accepts a tfcn1 taproot address', () => {
-    const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('tfcn', 1, program);
-    expect(addr).toMatch(/^tfcn1p/);
-    const script = testnetPayoutScript(addr!);
-    expect(script[0]).toBe(0x51);
-    expect(script[1]).toBe(32);
+  it('accepts a tgfcn1 P2WPKH address on testnet', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('tgfcn', 0, program);
+    expect(addr).toMatch(/^tgfcn1q/);
+    const script = payoutScript(addr!, 'testnet');
+    expect(script[0]).toBe(0x00);
+    expect(script[1]).toBe(20);
   });
 
-  it('refuses fcn1', () => {
+  it('refuses gfcn1 on testnet', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('gfcn', 0, program);
+    expect(() => payoutScript(addr!, 'testnet')).toThrow(/tgfcn1, not gfcn1/);
+  });
+
+  it('accepts a gfcn1 P2WPKH address on main', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('gfcn', 0, program);
+    expect(addr).toMatch(/^gfcn1q/);
+    const script = payoutScript(addr!, 'main');
+    expect(script[0]).toBe(0x00);
+    expect(script[1]).toBe(20);
+  });
+
+  it('refuses tgfcn1 on main', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const addr = encodeAddress('tgfcn', 0, program);
+    expect(() => payoutScript(addr!, 'main')).toThrow(/gfcn1, not tgfcn1/);
+  });
+
+  it('refuses witness v1 / bech32m on testnet and main', () => {
     const program = new Uint8Array(32).fill(0x11);
-    const addr = encodeAddress('fcn', 1, program);
-    expect(() => testnetPayoutScript(addr!)).toThrow(/dummy MAIN/);
+    const tgfcn = encodeAddress('tgfcn', 1, program);
+    const gfcn = encodeAddress('gfcn', 1, program);
+    expect(tgfcn).toMatch(/^tgfcn1p/);
+    expect(gfcn).toMatch(/^gfcn1p/);
+    expect(() => payoutScript(tgfcn!, 'testnet')).toThrow(/witness v0|bech32m|Taproot/i);
+    expect(() => payoutScript(gfcn!, 'main')).toThrow(/witness v0|bech32m|Taproot/i);
+  });
+
+  it('accepts witness v0 tgfcn and gfcn', () => {
+    const program = new Uint8Array(20).fill(0x11);
+    const tgfcn = encodeAddress('tgfcn', 0, program);
+    const gfcn = encodeAddress('gfcn', 0, program);
+    const t = addressToScript(tgfcn!);
+    const m = addressToScript(gfcn!);
+    expect(t?.hrp).toBe('tgfcn');
+    expect(t?.script[0]).toBe(0x00);
+    expect(t?.script[1]).toBe(20);
+    expect(m?.hrp).toBe('gfcn');
+    expect(m?.script[0]).toBe(0x00);
+  });
+
+  it('rejects Bitcoin HRPs', () => {
+    expect(addressToScript('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4')).toBeNull();
+    expect(addressToScript('tb1qawkzyj2l5yck5jq4wyhkc4837x088580y9uyk8')).toBeNull();
+    expect(() => payoutScript('bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', 'testnet')).toThrow(/tgfcn1/);
   });
 });

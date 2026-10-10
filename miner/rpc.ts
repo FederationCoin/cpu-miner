@@ -1,9 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
+import type { MinerChain } from './chain.js';
+import { RPC_PORT_TESTNET } from './chain.js';
 
 export const RPC_HOST = '127.0.0.1';
-export const RPC_PORT = 35332;
+export const RPC_PORT = RPC_PORT_TESTNET;
 
 export type RpcAuth = { user: string; password: string };
 
@@ -14,18 +16,22 @@ export type RpcOptions = {
 };
 
 /** Windows miner: %LOCALAPPDATA%\FederationCoin. Else ~/.federationcoin. */
-export function defaultDatadir(): string {
-  const env = process.env.FEDERATIONCOIN_DATADIR?.trim();
-  if (env) {
-    return env;
+export function datadirFor(platform: NodeJS.Platform, env: NodeJS.ProcessEnv, home: string): string {
+  const fromEnv = env.FEDERATIONCOIN_DATADIR?.trim();
+  if (fromEnv) {
+    return fromEnv;
   }
-  if (process.platform === 'win32') {
-    const local = process.env.LOCALAPPDATA?.trim();
+  if (platform === 'win32') {
+    const local = env.LOCALAPPDATA?.trim();
     if (local) {
       return join(local, 'FederationCoin');
     }
   }
-  return join(homedir(), '.federationcoin');
+  return join(home, '.federationcoin');
+}
+
+export function defaultDatadir(): string {
+  return datadirFor(process.platform, process.env, homedir());
 }
 
 export function parseHost(raw: string): string {
@@ -50,9 +56,15 @@ export function parsePort(raw: number | string): number {
   return port;
 }
 
-/** Cookie for -testnet: <datadir>/testnet3/.cookie, or .cookie if datadir is already testnet3. */
-export function cookiePathForDatadir(datadir: string): string {
+/**
+ * Main: <datadir>/.cookie.
+ * Testnet: <datadir>/testnet3/.cookie, or .cookie if datadir is already testnet3.
+ */
+export function cookiePathForDatadir(datadir: string, chain: MinerChain): string {
   const d = datadir.trim().replace(/[/\\]+$/, '');
+  if (chain === 'main') {
+    return join(d, '.cookie');
+  }
   const nested = join(d, 'testnet3', '.cookie');
   const direct = join(d, '.cookie');
   if (existsSync(direct) && (basename(d) === 'testnet3' || !existsSync(nested))) {
@@ -61,8 +73,8 @@ export function cookiePathForDatadir(datadir: string): string {
   return nested;
 }
 
-export function cookiePath(datadir = defaultDatadir()): string {
-  return cookiePathForDatadir(datadir);
+export function cookiePath(datadir = defaultDatadir(), chain: MinerChain = 'testnet'): string {
+  return cookiePathForDatadir(datadir, chain);
 }
 
 export function loadCookie(path = cookiePath()): RpcAuth {

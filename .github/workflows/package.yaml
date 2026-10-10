@@ -1,7 +1,14 @@
 # Unsigned Electron miner for a human-created git tag.
 # Tag: vMAJOR.MINOR.PATCH-federationcoin.<fork> plus optional .alpha/.beta/.rcN
 # (same shape as Sparrow; MAJOR.MINOR.PATCH is package.json version).
+# After npm ci, fetch-extras.mjs downloads pinned node/gateway daemon zips
+# for this runner OS (MILL_ARTIFACT). Empty extras pin skips. Filled pin
+# SHA-256 mismatch fails the job. Fetch uses github.token; electron-builder
+# must keep GH_TOKEN empty. Never CONVOY. Never MAIN. Dummy MAIN unused.
 # CI does not create tags. Do not dispatch this from the test workflow.
+# GH_TOKEN is github.token on gate/draft for gh (same as Sparrow). The pack
+# job must not pass it to electron-builder; --publish never so v26 cannot
+# auto-create a GitHub Release. private: true refuses npm publish.
 # Apple Developer ID / Microsoft Authenticode: not yet provisioned.
 name: Package
 
@@ -42,7 +49,7 @@ jobs:
           set -euo pipefail
           if ! printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+-federationcoin\.[A-Za-z0-9]+(\.(alpha[0-9]*|beta[0-9]*|rc[0-9]+))?$'; then
             echo "tag must match vMAJOR.MINOR.PATCH-federationcoin.<fork> with optional .alpha/.beta/.rcN (got: ${TAG})" >&2
-            echo "example: v0.0.0-federationcoin.0 or v0.0.0-federationcoin.0.rc1" >&2
+            echo "example: v0.1.0-federationcoin.0 or v0.1.0-federationcoin.0.rc1" >&2
             exit 1
           fi
           git fetch --no-tags origin "refs/tags/${TAG}:refs/tags/${TAG}"
@@ -61,31 +68,103 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            dist: dist:linux
+            eb: linux
             artifact: linux-x64
+            cuda: true
           - os: ubuntu-22.04-arm
-            dist: dist:linux
+            eb: linux
             artifact: linux-arm64
+            cuda: false
           - os: windows-2022
-            dist: dist:win
+            eb: win
             artifact: win-x64
+            cuda: true
           - os: macos-14
-            dist: dist:mac
+            eb: mac
             artifact: macos-arm64
+            cuda: false
           - os: macos-15-intel
-            dist: dist:mac
+            eb: mac
             artifact: macos-x64
+            cuda: false
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ inputs.tag }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26'
           cache: npm
+      - run: node -v && npm -v
+      - name: Native toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y g++ make python3 python3-setuptools
+      - name: Native toolchain (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python --version
+          # npm 11 rejects `npm config set msvs_version`; node-gyp still honors this.
+          echo "GYP_MSVS_VERSION=2022" >> $env:GITHUB_ENV
+      # nvcc -ptx does not need a GPU. Do not stitch Linux PTX into the Windows PE.
+      - name: CUDA Toolkit (nvcc)
+        if: matrix.cuda && runner.os != 'Windows'
+        uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d # v0.2.36
+        with:
+          cuda: '12.6.3'
+          method: network
+          sub-packages: '["nvcc"]'
+      # Windows nvcc-only network install has no cuda_runtime.h for cl.exe.
+      - name: CUDA Toolkit (nvcc and cudart)
+        if: matrix.cuda && runner.os == 'Windows'
+        uses: Jimver/cuda-toolkit@b8bf9c6c28f8a92fbb04dcfcaee872e60c57462d # v0.2.36
+        with:
+          cuda: '12.6.3'
+          method: network
+          sub-packages: '["nvcc","cudart"]'
+      # nvcc -ptx needs cl.exe on PATH. Do not dump vcvars into GITHUB_ENV
+      # (that overwrites runner vars and breaks node/npm on the next step).
+      - name: MSVC host compiler for nvcc
+        if: runner.os == 'Windows' && matrix.cuda
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $cl = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find '**\Hostx64\x64\cl.exe' | Select-Object -First 1
+          if (-not $cl) { throw 'vswhere did not find Hostx64 cl.exe' }
+          echo (Split-Path $cl) >> $env:GITHUB_PATH
       - run: npm ci
+      # Pinned node/gateway daemon zips. Empty extras pin skips. Filled pin
+      # SHA-256 mismatch fails this job. Uses github.token against promoted
+      # public Releases on FederationCoin/FederationCoin and
+      # FederationCoin/datum_gateway. Never CONVOY. Never MAIN.
+      # Do not pass this token to electron-builder.
+      - name: Fetch pinned extras
+        env:
+          MILL_ARTIFACT: ${{ matrix.artifact }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/fetch-extras.mjs
+      - name: Native GPU hasher (Electron ABI)
+        env:
+          FC_GPU_REQUIRED: '1'
+        run: npm run build:gpu
+      - name: Require gpu-hasher.node
+        shell: bash
+        run: test -s native/gpu-hasher/dist/gpu-hasher.node
+      - name: Require asic_pow.ptx
+        if: matrix.cuda
+        shell: bash
+        run: test -s native/gpu-hasher/dist/asic_pow.ptx
+      # Do not give this job GH_TOKEN (Sparrow does not either). electron-builder
+      # v26 still implicit-publishes on GITHUB_ACTIONS and would upload a Release
+      # if a token were present. --publish never: pack only. Draft is the gh job.
       - name: Unsigned electron-builder
-        run: npm run ${{ matrix.dist }}
+        shell: bash
+        env:
+          GH_TOKEN: ''
+        run: |
+          set -euo pipefail
+          npm run build:app
+          npx --no-install electron-builder --${{ matrix.eb }} --publish never
       # Unsigned only. Do not inherit Electron's icon into git.
       # Future action: https://codesign.federationcoin.org
       # - name: Codesign

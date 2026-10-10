@@ -1,0 +1,146 @@
+<div class="pane" [formGroup]="form">
+  @if (showMainWarning()) {
+    <p class="warn" data-main-warning>
+      Main is not live. Dummy genesis and RPC {{ config().rpcPort }} are
+      placeholders. The Big One will not start mining on dummy MAIN.
+      Mine Testnet until announcement.
+    </p>
+  }
+
+  @if (otherMiningLabel(); as other) {
+    <p class="hint" data-other-mining>Mining is running on {{ other }}.</p>
+  }
+
+  <mat-card class="mine-to-card">
+    <mat-card-header>
+      <mat-card-title>Mine to</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (isWebDemo()) {
+        <app-web-mine-to
+          [form]="form"
+          [chain]="chain()"
+          [kindLocked]="kindLocked()"
+          [gatewayInfo]="gatewayInfoView()"
+          (fetchInfo)="fetchGatewayInfo()"
+          (pull)="pullSelected()"
+        />
+      } @else {
+        <app-desktop-mine-to [form]="form" [chain]="chain()" [kindLocked]="kindLocked()" (pull)="pullSelected()" />
+      }
+    </mat-card-content>
+  </mat-card>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Threads</mat-label>
+    <input matInput [id]="id('threads')" type="number" min="1" max="64" formControlName="threads" />
+  </mat-form-field>
+
+  <div class="row">
+    @if (!showMainWarning()) {
+      <button mat-flat-button type="button" color="primary" [id]="id('start')" [disabled]="startDisabled()" (click)="requestStart()">
+        Start
+      </button>
+    }
+    <button mat-stroked-button type="button" [id]="id('stop')" [disabled]="stopDisabled()" (click)="stop()">Stop</button>
+  </div>
+
+  @if (pendingMineTo()) {
+    <mat-card [attr.id]="id('mine-to-confirm')">
+      <mat-card-header>
+        <mat-card-title>Confirm mine-to</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Hashrate will use:</p>
+        <p class="mono">{{ pendingMineTo() }}</p>
+        <div class="row">
+          <button mat-flat-button color="primary" type="button" [id]="id('confirm-mine-to')" (click)="confirmStart()">Confirm</button>
+          <button mat-stroked-button type="button" [id]="id('cancel-mine-to')" (click)="pendingMineTo.set(null)">Cancel</button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (formError()) {
+    <p class="err">{{ formError() }}</p>
+  }
+
+  <app-defaults-fold [foldId]="id('gpus-fold')" title="GPUs" [summary]="gpuSummary()">
+    <mat-card class="gpus" [attr.id]="id('gpus')">
+      <mat-card-header>
+        <mat-card-title>GPUs</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+      <div class="row">
+        <button mat-stroked-button type="button" [id]="id('detectGpus')" [disabled]="gpuDetectDisabled()" (click)="detectGpus()">
+          {{ gpuDetecting() ? 'Detecting...' : 'Detect GPUs' }}
+        </button>
+        @if (webGpuHelpVisible()) {
+          <app-webgpu-help [chain]="chain()" [autoOpen]="webgpuHelpAutoOpen()" />
+        }
+      </div>
+      @if (gpuList().length > 0) {
+        @for (dev of gpuList(); track dev.key) {
+          <mat-card class="gpu-adapter" [attr.id]="id('gpu-adapter-' + gpuDomId(dev.key))">
+            <mat-card-header>
+              <mat-card-title>{{ dev.label }}</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+            <span class="hint-inline">{{ gpuAdapterHint(dev) }}</span>
+            <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.key) + '-off')">
+              <input
+                [id]="id('gpu-' + gpuDomId(dev.key) + '-off')"
+                type="radio"
+                [name]="id('gpu-' + gpuDomId(dev.key))"
+                [checked]="gpuPickKind(dev.key) === 'off'"
+                [attr.disabled]="kindLocked() ? true : null"
+                (change)="setGpuStrategy(dev.key, null)"
+              />
+              Off
+            </label>
+            @for (strat of dev.strategies; track strat.kind) {
+              <label class="check" [attr.for]="id('gpu-' + gpuDomId(dev.key) + '-' + strat.kind)">
+                <input
+                  [id]="id('gpu-' + gpuDomId(dev.key) + '-' + strat.kind)"
+                  type="radio"
+                  [name]="id('gpu-' + gpuDomId(dev.key))"
+                  [checked]="gpuPickKind(dev.key) === strat.kind"
+                  [attr.disabled]="kindLocked() ? true : null"
+                  (change)="setGpuStrategy(dev.key, strat)"
+                />
+                {{ strategyKindLabel(strat.kind) }}
+              </label>
+            }
+            </mat-card-content>
+          </mat-card>
+        }
+      }
+      <p class="hint">{{ gpuHint() }}</p>
+      </mat-card-content>
+    </mat-card>
+  </app-defaults-fold>
+
+  <dl>
+    <dt>Link</dt>
+    <dd>
+      <span class="link-pill" [attr.data-link]="paneStats().link" [attr.id]="id('link')">{{ linkLabel() }}</span>
+    </dd>
+    <dt>Status</dt>
+    <dd>{{ paneStats().status }}</dd>
+    <dt>Hashrate</dt>
+    <dd>{{ formatRate(paneStats().hashrate) }}</dd>
+    <dt>Height</dt>
+    <dd>{{ paneStats().height }}</dd>
+    <dt>Hashes</dt>
+    <dd>{{ paneStats().hashes }}</dd>
+    <dt>Accepted</dt>
+    <dd>{{ paneStats().accepted }}</dd>
+    <dt>Rejected</dt>
+    <dd>{{ paneStats().rejected }}</dd>
+    <dt>Last hash</dt>
+    <dd class="mono">{{ paneStats().lastHash || '—' }}</dd>
+    <dt>Endpoint</dt>
+    <dd class="mono">{{ endpointHint() }}</dd>
+  </dl>
+  <p class="hint">Hashrate is your computer, not a pool or gateway limit.</p>
+</div>

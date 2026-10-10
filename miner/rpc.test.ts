@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { cookiePathForDatadir, defaultDatadir, parseHost, parsePort, rpcCall } from './rpc.js';
+import { cookiePathForDatadir, datadirFor, defaultDatadir, parseHost, parsePort, rpcCall } from './rpc.js';
 
 describe('datadir / cookie path', () => {
   it('defaults to ~/.federationcoin on non-Windows', () => {
@@ -12,11 +12,27 @@ describe('datadir / cookie path', () => {
     expect(d).not.toContain('AppData');
   });
 
+  it('prefers FEDERATIONCOIN_DATADIR over platform defaults', () => {
+    expect(datadirFor('win32', { FEDERATIONCOIN_DATADIR: ' D:\\fc ', LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me')).toBe(
+      'D:\\fc',
+    );
+  });
+
+  it('uses LOCALAPPDATA\\FederationCoin on Windows', () => {
+    expect(datadirFor('win32', { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' }, 'C:\\Users\\me')).toBe(
+      join('C:\\Users\\me\\AppData\\Local', 'FederationCoin'),
+    );
+  });
+
+  it('falls back to ~/.federationcoin on Windows without LOCALAPPDATA', () => {
+    expect(datadirFor('win32', {}, 'C:\\Users\\me')).toBe(join('C:\\Users\\me', '.federationcoin'));
+  });
+
   it('uses testnet3/.cookie under a top-level datadir', () => {
     const root = mkdtempSync(join(tmpdir(), 'fc-datadir-'));
     mkdirSync(join(root, 'testnet3'));
     writeFileSync(join(root, 'testnet3', '.cookie'), '__cookie__:x');
-    expect(cookiePathForDatadir(root)).toBe(join(root, 'testnet3', '.cookie'));
+    expect(cookiePathForDatadir(root, 'testnet')).toBe(join(root, 'testnet3', '.cookie'));
   });
 
   it('uses .cookie when datadir is already testnet3', () => {
@@ -24,7 +40,15 @@ describe('datadir / cookie path', () => {
     const tn = join(root, 'testnet3');
     mkdirSync(tn);
     writeFileSync(join(tn, '.cookie'), '__cookie__:x');
-    expect(cookiePathForDatadir(tn)).toBe(join(tn, '.cookie'));
+    expect(cookiePathForDatadir(tn, 'testnet')).toBe(join(tn, '.cookie'));
+  });
+
+  it('uses datadir/.cookie on main even when testnet3 exists', () => {
+    const root = mkdtempSync(join(tmpdir(), 'fc-main-'));
+    mkdirSync(join(root, 'testnet3'));
+    writeFileSync(join(root, 'testnet3', '.cookie'), '__cookie__:tn');
+    writeFileSync(join(root, '.cookie'), '__cookie__:main');
+    expect(cookiePathForDatadir(root, 'main')).toBe(join(root, '.cookie'));
   });
 });
 

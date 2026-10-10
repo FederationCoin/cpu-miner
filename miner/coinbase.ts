@@ -2,9 +2,6 @@ import { parseHex, writeLe32, writeLe64 } from './bytes.js';
 import { sha256d } from './hash.js';
 import { HEADER_V2_SIZE, type HeaderV2, serializeHeader } from './pow.js';
 
-export const BLAKE2B_HEADLINE = '09/Sep/2026 FederationCoin: time is the unit, not the state';
-export const BLAKE2B_HEIGHT = 1;
-
 export function writeCompactSize(out: number[], n: number | bigint): void {
   const v = typeof n === 'bigint' ? n : BigInt(n);
   if (v < 0xfdn) {
@@ -68,9 +65,6 @@ export function coinbaseScriptSig(height: number): Uint8Array {
   const s: number[] = [];
   scriptPushInt(s, height);
   s.push(0x00);
-  if (height === BLAKE2B_HEIGHT) {
-    scriptPushBytes(s, new TextEncoder().encode(BLAKE2B_HEADLINE));
-  }
   return Uint8Array.from(s);
 }
 

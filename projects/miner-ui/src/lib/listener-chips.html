@@ -1,0 +1,22 @@
+@if (nodeConnect()) {
+  <span class="wallet-chip" id="node-chip">
+    node: {{ nodeConnect() }}
+    <button mat-icon-button type="button" id="node-copy" aria-label="Copy node connect info" (click)="copy(nodeConnect())">
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </span>
+}
+@if (gatewayConnect()) {
+  <span class="wallet-chip" id="gateway-chip">
+    datum gateway: {{ gatewayConnect() }}
+    <button
+      mat-icon-button
+      type="button"
+      id="gateway-copy"
+      aria-label="Copy DATUM gateway connect info"
+      (click)="copy(gatewayConnect())"
+    >
+      <mat-icon>content_copy</mat-icon>
+    </button>
+  </span>
+}

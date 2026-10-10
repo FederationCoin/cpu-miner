@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" role="img" aria-labelledby="webTitle webDesc">
+  <title id="webTitle">Web mill</title>
+  <desc id="webDesc">The browser SPA speaks WSS Stratum to a pool or a DATUM Gateway. The gateway talks GBT to the node and DATUM to DATUM Prime Pool.</desc>
+  <rect width="720" height="300" fill="#0e1824"/>
+  <rect x="24" y="88" width="168" height="80" rx="8" fill="#15202e" stroke="#c9a85a"/>
+  <text x="108" y="122" text-anchor="middle" fill="#e8e4d9" font-family="sans-serif" font-size="15">Browser</text>
+  <text x="108" y="144" text-anchor="middle" fill="#c9a85a" font-family="sans-serif" font-size="12">SPA</text>
+  <rect x="280" y="24" width="176" height="52" rx="8" fill="#15202e" stroke="#c9a85a"/>
+  <text x="368" y="56" text-anchor="middle" fill="#e8e4d9" font-family="sans-serif" font-size="14">Stratum pool</text>
+  <rect x="280" y="140" width="176" height="52" rx="8" fill="#15202e" stroke="#b33a2b"/>
+  <text x="368" y="172" text-anchor="middle" fill="#e8e4d9" font-family="sans-serif" font-size="14">DATUM Gateway</text>
+  <rect x="280" y="228" width="176" height="44" rx="8" fill="#15202e" stroke="#c9a85a"/>
+  <text x="368" y="256" text-anchor="middle" fill="#e8e4d9" font-family="sans-serif" font-size="14">Node</text>
+  <rect x="520" y="140" width="176" height="52" rx="8" fill="#15202e" stroke="#b33a2b"/>
+  <text x="608" y="166" text-anchor="middle" fill="#e8e4d9" font-family="sans-serif" font-size="13">DATUM Prime</text>
+  <text x="608" y="184" text-anchor="middle" fill="#e8e4d9" font-family="sans-serif" font-size="13">Pool</text>
+  <path d="M192 108 L280 50" stroke="#c9a85a" marker-end="url(#gold)"/>
+  <text x="208" y="68" fill="#c4bfb0" font-family="sans-serif" font-size="11">WSS /stratum</text>
+  <path d="M192 140 H280" stroke="#c9a85a" marker-end="url(#gold)"/>
+  <text x="208" y="132" fill="#c4bfb0" font-family="sans-serif" font-size="11">WSS /stratum</text>
+  <path d="M456 166 H520" stroke="#b33a2b" marker-end="url(#crimson)"/>
+  <text x="470" y="156" fill="#c4bfb0" font-family="sans-serif" font-size="11">DATUM</text>
+  <path d="M368 192 V228" stroke="#c9a85a" marker-end="url(#gold)"/>
+  <text x="376" y="214" fill="#c4bfb0" font-family="sans-serif" font-size="11">GBT</text>
+  <defs>
+    <marker id="gold" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#c9a85a"/>
+    </marker>
+    <marker id="crimson" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#b33a2b"/>
+    </marker>
+  </defs>
+</svg>

@@ -3,7 +3,10 @@ import {
   authorizeLine,
   isAuthorizeOk,
   parseNotify,
+  parseSetDifficulty,
   parseSubscribeResult,
+  parseClientPoolStats,
+  notifyIgnoreReason,
   subscribeLine,
   submitLine,
 } from './stratum.js';
@@ -75,23 +78,51 @@ describe('stratum wire', () => {
     expect(parseNotify(msg)).toBeNull();
   });
 
+  it('reports 38-byte coinb1 without accepting the job', () => {
+    const prev = '11'.repeat(32);
+    const coinb1 = '22'.repeat(38);
+    const msg = {
+      method: 'mining.notify',
+      params: ['j', prev, coinb1, '', [], '20000000', '1e00ffff', '01020304', true],
+    };
+    expect(parseNotify(msg)).toBeNull();
+    expect(notifyIgnoreReason(msg)).toBe('bad mining.notify (coinb1 38 bytes)');
+  });
+
   it('authorize and submit JSON match fcminer', () => {
-    expect(JSON.parse(authorizeLine(2, 'tfcn1abc.cpu', 'x'))).toEqual({
+    expect(JSON.parse(authorizeLine(2, 'tgfcn1abc.cpu', 'x'))).toEqual({
       id: 2,
       method: 'mining.authorize',
-      params: ['tfcn1abc.cpu', 'x'],
+      params: ['tgfcn1abc.cpu', 'x'],
     });
     const en2 = new Uint8Array(8);
     const ntime = new Uint8Array(8);
     const nonce = new Uint8Array(8);
     en2[0] = 1;
-    const rec = JSON.parse(submitLine(10, 'tfcn1abc.cpu', 'job1', en2, ntime, nonce)) as {
+    const rec = JSON.parse(submitLine(10, 'tgfcn1abc.cpu', 'job1', en2, ntime, nonce)) as {
       params: string[];
     };
-    expect(rec.params[0]).toBe('tfcn1abc.cpu');
+    expect(rec.params[0]).toBe('tgfcn1abc.cpu');
     expect(rec.params[1]).toBe('job1');
     expect(rec.params[2]).toHaveLength(16);
     expect(isAuthorizeOk({ id: 2, result: true, error: null })).toBe(true);
     expect(isAuthorizeOk({ id: 2, result: false })).toBe(false);
+  });
+
+  it('parses mining.set_difficulty', () => {
+    expect(parseSetDifficulty({ method: 'mining.set_difficulty', params: [1] })).toBe(1);
+    expect(parseSetDifficulty({ method: 'mining.set_difficulty', params: [0] })).toBeNull();
+    expect(parseSetDifficulty({ method: 'mining.notify', params: [1] })).toBeNull();
+  });
+
+  it('parses client.pool_stats height', () => {
+    const stats = parseClientPoolStats({
+      id: null,
+      method: 'client.pool_stats',
+      params: [{ running: true, height: 9, workers: 2, status: 'ok' }],
+    });
+    expect(stats?.height).toBe(9);
+    expect(stats?.workers).toBe(2);
+    expect(parseClientPoolStats({ method: 'mining.notify', params: [] })).toBeNull();
   });
 });
